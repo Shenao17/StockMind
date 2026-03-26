@@ -1,0 +1,19 @@
+# Java
+backend/target/
+
+# Python
+analytics/venv/
+analytics/__pycache__/
+analytics/src/__pycache__/
+analytics/src/routes/__pycache__/
+analytics/src/services/__pycache__/
+analytics/src/models/__pycache__/
+
+# Node
+gateway/node_modules/
+
+# Variables de entorno
+gateway/.env
+
+# Base de datos
+*.sql.bak
