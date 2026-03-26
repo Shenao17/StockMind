@@ -1,6 +1,6 @@
 # StockMind — Sistema Inteligente de Gestión de Inventario y Predicción de Demanda
 
-> Plataforma web full stack para la gestión de inventario y ventas con analítica predictiva integrada.
+> Plataforma web para la gestión de inventario y ventas con analítica predictiva integrada.
 
 ---
 
