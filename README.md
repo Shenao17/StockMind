@@ -185,7 +185,7 @@ El frontend **nunca** consume directamente el backend Java ni el microservicio P
 | HTML5/CSS3/JS | ES2020+ | Frontend | Base de la web sin overhead de frameworks |
 | Node.js | 20 LTS | API Gateway | I/O no bloqueante ideal para proxy de peticiones |
 | Express | 4.x | Framework HTTP | Minimalista, robusto, ecosistema maduro |
-| Java | 17 LTS | Backend | Tipado fuerte, robustez empresarial |
+| Java | 17 LTS | Backend | Tipado fuerte, robustez |
 | Spring Boot | 3.x | Framework Java | Auto-configuración, Spring Security, JPA |
 | Python | 3.11+ | Microservicio | Ecosistema estadístico sin equivalente |
 | Flask | 3.x | Framework Python | Ligero, ideal para microservicio REST |
@@ -482,4 +482,4 @@ JWT_SECRET=stockmind_super_secret_key_2024
 
 ---
 
-*Desarrollado como proyecto académico full stack — StockMind v1.0*
+*Desarrollado como proyecto académico — StockMind v1.0* 
