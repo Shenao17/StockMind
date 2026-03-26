@@ -1,0 +1,20 @@
+# StockMind — Microservicio de Analítica Predictiva
+# Dependencias Python
+
+# Framework web
+flask==3.0.0
+flask-cors==4.0.0
+
+# Conexión a MySQL
+mysql-connector-python==8.2.0
+
+# Análisis de datos y predicción
+pandas==2.1.4
+numpy==1.26.2
+scikit-learn==1.3.2
+
+# Variables de entorno
+python-dotenv==1.0.0
+
+# Servidor WSGI para producción (opcional)
+gunicorn==21.2.0
