@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StockMind — Iniciar Sesión</title>
+  <link rel="stylesheet" href="css/main.css" />
+  <style>
+    .login-error {
+      background: #ef444415;
+      border: 1px solid #ef444435;
+      color: #ef4444;
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-size: .85rem;
+      margin-bottom: 18px;
+      display: none;
+    }
+    .login-error.visible { display: block; }
+    .version-tag {
+      text-align: center;
+      margin-top: 24px;
+      font-size: .72rem;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+  </style>
+</head>
+<body>
+  <div class="login-wrapper">
+    <div class="login-card">
+      <h1>StockMind</h1>
+      <p>Sistema de gestión de inventario y predicción de demanda</p>
+
+      <div id="login-error" class="login-error"></div>
+
+      <div class="form-group">
+        <label for="username">Usuario</label>
+        <input type="text" id="username" placeholder="Ingrese su usuario"
+               autocomplete="username" />
+      </div>
+
+      <div class="form-group">
+        <label for="password">Contraseña</label>
+        <input type="password" id="password" placeholder="Ingrese su contraseña"
+               autocomplete="current-password" />
+      </div>
+
+      <button class="btn btn-primary" id="login-btn" style="width:100%"
+              onclick="handleLogin()">
+        Iniciar sesión
+      </button>
+
+      <p class="version-tag">StockMind v1.0.0 — Proyecto Académico</p>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script>
+    // Si ya hay sesión activa, redirigir al dashboard
+    if (Auth.isLoggedIn()) {
+      window.location.href = 'dashboard.html';
+    }
+
+    // Enter en el campo de contraseña ejecuta el login
+    document.getElementById('password').addEventListener('keydown', e => {
+      if (e.key === 'Enter') handleLogin();
+    });
+
+    async function handleLogin() {
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      const errorEl  = document.getElementById('login-error');
+      const btn      = document.getElementById('login-btn');
+
+      if (!username || !password) {
+        showError('Complete todos los campos');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Verificando...';
+      errorEl.classList.remove('visible');
+
+      try {
+        const response = await API.auth.login({ username, password });
+
+        if (response?.token) {
+          Auth.setSession(response.token, {
+            id:       response.userId,
+            username: response.username,
+            role:     response.role
+          });
+          window.location.href = 'dashboard.html';
+        } else {
+          showError('Respuesta inesperada del servidor');
+        }
+      } catch (error) {
+        showError(error.message || 'Error de autenticación');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Iniciar sesión';
+      }
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('login-error');
+      el.textContent = msg;
+      el.classList.add('visible');
+    }
+  </script>
+</body>
+</html>

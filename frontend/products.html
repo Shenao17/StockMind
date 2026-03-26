@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StockMind — Productos</title>
+  <link rel="stylesheet" href="css/main.css" />
+</head>
+<body>
+  <div class="app-layout">
+    <aside class="sidebar">
+      <div class="sidebar-logo"><h1>StockMind</h1><span>Gestión de Inventario</span></div>
+      <nav class="sidebar-nav">
+        <span class="nav-section-label">Principal</span>
+        <a href="dashboard.html" class="nav-item"><span class="nav-icon">⊞</span> Dashboard</a>
+        <a href="products.html" class="nav-item active"><span class="nav-icon">◈</span> Productos</a>
+        <a href="inventory.html" class="nav-item"><span class="nav-icon">⊟</span> Inventario</a>
+        <a href="sales.html" class="nav-item"><span class="nav-icon">◉</span> Ventas</a>
+        <span class="nav-section-label">Analítica</span>
+        <a href="predictions.html" class="nav-item"><span class="nav-icon">◈</span> Predicciones</a>
+        <a href="reports.html" class="nav-item"><span class="nav-icon">⊡</span> Reportes</a>
+        <span class="nav-section-label">Administración</span>
+        <a href="users.html" class="nav-item" id="nav-users"><span class="nav-icon">◎</span> Usuarios</a>
+      </nav>
+      <div class="sidebar-user">
+        <div class="user-avatar" id="user-avatar">—</div>
+        <div class="user-info">
+          <div class="user-name" id="user-name">Cargando...</div>
+          <div class="user-role" id="user-role">—</div>
+        </div>
+        <button class="btn btn-ghost btn-sm btn-icon" onclick="logout()" title="Cerrar sesión">⎋</button>
+      </div>
+    </aside>
+
+    <header class="topbar">
+      <span class="topbar-title">Productos</span>
+      <div class="topbar-actions">
+        <input type="text" id="search-input" placeholder="Buscar por nombre o SKU..."
+               style="width:240px" oninput="filterProducts()" />
+        <button class="btn btn-primary" id="btn-new" onclick="openModal()">+ Nuevo producto</button>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <div class="table-container">
+        <div class="table-header">
+          <h2>Catálogo de Productos</h2>
+          <span id="product-count" style="font-size:.8rem;color:var(--text-muted);font-family:var(--font-mono)"></span>
+        </div>
+        <div id="products-table">
+          <div class="loading-state"><div class="spinner"></div> Cargando productos...</div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Modal crear/editar producto -->
+  <div class="modal-overlay" id="product-modal">
+    <div class="modal">
+      <h3 class="modal-title" id="modal-title">Nuevo Producto</h3>
+      <input type="hidden" id="edit-id" />
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Nombre del producto *</label>
+          <input type="text" id="f-name" placeholder="Ej: Mouse Inalámbrico" />
+        </div>
+        <div class="form-group">
+          <label>SKU *</label>
+          <input type="text" id="f-sku" placeholder="Ej: ELEC-001" />
+        </div>
+        <div class="form-group">
+          <label>Precio (COP) *</label>
+          <input type="number" id="f-price" min="0" step="100" placeholder="0" />
+        </div>
+        <div class="form-group">
+          <label>Stock inicial</label>
+          <input type="number" id="f-stock" min="0" value="0" />
+        </div>
+        <div class="form-group">
+          <label>Stock mínimo</label>
+          <input type="number" id="f-min-stock" min="0" value="5" />
+        </div>
+        <div class="form-group">
+          <label>Unidad</label>
+          <select id="f-unit">
+            <option value="UNIT">Unidad</option>
+            <option value="KG">Kilogramo</option>
+            <option value="LT">Litro</option>
+            <option value="BOX">Caja</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Categoría *</label>
+          <select id="f-category"><option value="">Seleccionar...</option></select>
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Descripción</label>
+          <textarea id="f-desc" rows="2" placeholder="Descripción opcional"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+        <button class="btn btn-primary" onclick="saveProduct()">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    requireAuth();
+    initUserUI();
+
+    // Ocultar botón nuevo si no es admin
+    if (!Auth.isAdmin()) {
+      document.getElementById('btn-new').style.display = 'none';
+    }
+
+    let allProducts = [];
+
+    const fmt = v => new Intl.NumberFormat('es-CO', {
+      style:'currency', currency:'COP', minimumFractionDigits:0
+    }).format(v || 0);
+
+    async function loadProducts() {
+      try {
+        allProducts = await API.products.list() || [];
+        document.getElementById('product-count').textContent = `${allProducts.length} productos`;
+        renderTable(allProducts);
+      } catch(e) {
+        showToast('Error cargando productos: ' + e.message, 'error');
+      }
+    }
+
+    function filterProducts() {
+      const q = document.getElementById('search-input').value.toLowerCase();
+      const filtered = allProducts.filter(p =>
+        p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q));
+      renderTable(filtered);
+    }
+
+    function renderTable(products) {
+      const container = document.getElementById('products-table');
+      if (!products.length) {
+        container.innerHTML = `<div class="loading-state">Sin resultados</div>`; return;
+      }
+      const isAdmin = Auth.isAdmin();
+      container.innerHTML = `
+        <table>
+          <thead><tr>
+            <th>Nombre</th><th>SKU</th><th>Categoría</th>
+            <th>Precio</th><th>Stock</th><th>Estado</th>
+            ${isAdmin ? '<th>Acciones</th>' : ''}
+          </tr></thead>
+          <tbody>
+            ${products.map(p => `
+              <tr>
+                <td><strong>${p.name}</strong></td>
+                <td class="mono">${p.sku}</td>
+                <td>${p.category?.name || '—'}</td>
+                <td class="mono">${fmt(p.price)}</td>
+                <td>
+                  <span style="color:${p.stockCurrent <= p.stockMinimum ? 'var(--danger)' : 'var(--text)'}">
+                    ${p.stockCurrent}</span>
+                  <span style="color:var(--text-muted);font-size:.78rem"> / min ${p.stockMinimum}</span>
+                </td>
+                <td>
+                  ${p.stockCurrent <= p.stockMinimum
+                    ? '<span class="badge badge-danger">CRÍTICO</span>'
+                    : '<span class="badge badge-success">OK</span>'}
+                </td>
+                ${isAdmin ? `
+                <td style="display:flex;gap:6px">
+                  <button class="btn btn-ghost btn-sm" onclick="openModal(${JSON.stringify(p).replace(/"/g,'&quot;')})">Editar</button>
+                  <button class="btn btn-danger btn-sm" onclick="deleteProduct(${p.id})">Eliminar</button>
+                </td>` : ''}
+              </tr>`).join('')}
+          </tbody>
+        </table>`;
+    }
+
+    async function openModal(product = null) {
+      // Cargar categorías
+      const cats = await API.products.list().then(() =>
+        fetch('http://localhost:3000/api/products', {
+          headers: { Authorization: `Bearer ${Auth.getToken()}` }
+        }).then(r => r.json())
+      ).catch(() => []);
+
+      // Obtener categorías únicas
+      const uniqueCats = [...new Map(allProducts.map(p =>
+        [p.category?.id, p.category])).values()].filter(Boolean);
+
+      const catSel = document.getElementById('f-category');
+      catSel.innerHTML = '<option value="">Seleccionar...</option>' +
+        uniqueCats.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+
+      if (product) {
+        document.getElementById('modal-title').textContent = 'Editar Producto';
+        document.getElementById('edit-id').value   = product.id;
+        document.getElementById('f-name').value    = product.name;
+        document.getElementById('f-sku').value     = product.sku;
+        document.getElementById('f-price').value   = product.price;
+        document.getElementById('f-stock').value   = product.stockCurrent;
+        document.getElementById('f-min-stock').value = product.stockMinimum;
+        document.getElementById('f-unit').value    = product.unit;
+        document.getElementById('f-desc').value    = product.description || '';
+        if (product.category) catSel.value = product.category.id;
+      } else {
+        document.getElementById('modal-title').textContent = 'Nuevo Producto';
+        document.getElementById('edit-id').value = '';
+        ['f-name','f-sku','f-price','f-desc'].forEach(id => document.getElementById(id).value = '');
+        document.getElementById('f-stock').value = 0;
+        document.getElementById('f-min-stock').value = 5;
+        document.getElementById('f-unit').value = 'UNIT';
+      }
+
+      document.getElementById('product-modal').classList.add('open');
+    }
+
+    function closeModal() {
+      document.getElementById('product-modal').classList.remove('open');
+    }
+
+    async function saveProduct() {
+      const id = document.getElementById('edit-id').value;
+      const data = {
+        name:         document.getElementById('f-name').value.trim(),
+        sku:          document.getElementById('f-sku').value.trim(),
+        price:        parseFloat(document.getElementById('f-price').value),
+        stockCurrent: parseInt(document.getElementById('f-stock').value),
+        stockMinimum: parseInt(document.getElementById('f-min-stock').value),
+        unit:         document.getElementById('f-unit').value,
+        categoryId:   document.getElementById('f-category').value,
+        description:  document.getElementById('f-desc').value.trim()
+      };
+
+      if (!data.name || !data.sku || !data.categoryId || isNaN(data.price)) {
+        showToast('Complete los campos obligatorios', 'warning'); return;
+      }
+
+      try {
+        if (id) {
+          await API.products.update(id, data);
+          showToast('Producto actualizado correctamente');
+        } else {
+          await API.products.create(data);
+          showToast('Producto creado correctamente');
+        }
+        closeModal();
+        loadProducts();
+      } catch(e) {
+        showToast('Error: ' + e.message, 'error');
+      }
+    }
+
+    async function deleteProduct(id) {
+      if (!confirm('¿Desactivar este producto? Ya no aparecerá en el catálogo.')) return;
+      try {
+        await API.products.remove(id);
+        showToast('Producto desactivado');
+        loadProducts();
+      } catch(e) {
+        showToast('Error: ' + e.message, 'error');
+      }
+    }
+
+    // Cerrar modal al hacer clic fuera
+    document.getElementById('product-modal').addEventListener('click', e => {
+      if (e.target.id === 'product-modal') closeModal();
+    });
+
+    loadProducts();
+  </script>
+</body>
+</html>

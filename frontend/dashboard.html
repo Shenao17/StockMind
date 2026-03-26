@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StockMind — Dashboard</title>
+  <link rel="stylesheet" href="css/main.css" />
+</head>
+<body>
+  <div class="app-layout">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <h1>StockMind</h1>
+        <span>Gestión de Inventario</span>
+      </div>
+      <nav class="sidebar-nav">
+        <span class="nav-section-label">Principal</span>
+        <a href="dashboard.html" class="nav-item active">
+          <span class="nav-icon">⊞</span> Dashboard
+        </a>
+        <a href="products.html" class="nav-item">
+          <span class="nav-icon">◈</span> Productos
+        </a>
+        <a href="inventory.html" class="nav-item">
+          <span class="nav-icon">⊟</span> Inventario
+        </a>
+        <a href="sales.html" class="nav-item">
+          <span class="nav-icon">◉</span> Ventas
+        </a>
+        <span class="nav-section-label">Analítica</span>
+        <a href="predictions.html" class="nav-item">
+          <span class="nav-icon">◈</span> Predicciones
+        </a>
+        <a href="reports.html" class="nav-item">
+          <span class="nav-icon">⊡</span> Reportes
+        </a>
+        <span class="nav-section-label">Administración</span>
+        <a href="users.html" class="nav-item" id="nav-users">
+          <span class="nav-icon">◎</span> Usuarios
+        </a>
+      </nav>
+      <div class="sidebar-user">
+        <div class="user-avatar" id="user-avatar">—</div>
+        <div class="user-info">
+          <div class="user-name" id="user-name">Cargando...</div>
+          <div class="user-role" id="user-role">—</div>
+        </div>
+        <button class="btn btn-ghost btn-sm btn-icon" onclick="logout()" title="Cerrar sesión">⎋</button>
+      </div>
+    </aside>
+
+    <!-- TOPBAR -->
+    <header class="topbar">
+      <span class="topbar-title">Dashboard</span>
+      <div class="topbar-actions">
+        <span id="current-date" style="font-size:.8rem;color:var(--text-muted);font-family:var(--font-mono)"></span>
+      </div>
+    </header>
+
+    <!-- CONTENIDO PRINCIPAL -->
+    <main class="main-content">
+
+      <!-- Alerta de stock bajo -->
+      <div id="low-stock-alert" class="alert-banner" style="display:none">
+        ⚠ <strong id="low-stock-count">0</strong> producto(s) con stock crítico.
+        <a href="inventory.html" style="margin-left:8px">Ver inventario →</a>
+      </div>
+
+      <!-- Estadísticas -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Ventas hoy</div>
+          <div class="stat-value accent" id="stat-sales-today">—</div>
+          <div class="stat-sub" id="stat-sales-count">— transacciones</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Productos activos</div>
+          <div class="stat-value" id="stat-products">—</div>
+          <div class="stat-sub">en catálogo</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Stock crítico</div>
+          <div class="stat-value danger" id="stat-low-stock">—</div>
+          <div class="stat-sub">productos bajo mínimo</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Ventas del mes</div>
+          <div class="stat-value success" id="stat-sales-month">—</div>
+          <div class="stat-sub">total acumulado</div>
+        </div>
+      </div>
+
+      <!-- Tabla de productos con stock crítico -->
+      <div class="table-container" style="margin-bottom:24px">
+        <div class="table-header">
+          <h2>⚠ Productos con Stock Crítico</h2>
+          <a href="inventory.html" class="btn btn-ghost btn-sm">Ver todos</a>
+        </div>
+        <div id="low-stock-table">
+          <div class="loading-state"><div class="spinner"></div> Cargando...</div>
+        </div>
+      </div>
+
+      <!-- Tabla de ventas recientes -->
+      <div class="table-container">
+        <div class="table-header">
+          <h2>Ventas Recientes</h2>
+          <a href="sales.html" class="btn btn-ghost btn-sm">Ver todas</a>
+        </div>
+        <div id="recent-sales-table">
+          <div class="loading-state"><div class="spinner"></div> Cargando...</div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    requireAuth();
+    initUserUI();
+
+    // Fecha actual
+    document.getElementById('current-date').textContent =
+      new Date().toLocaleDateString('es-CO', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+
+    async function loadDashboard() {
+      try {
+        // Cargar datos en paralelo
+        const [products, lowStock, sales] = await Promise.all([
+          API.products.list(),
+          API.products.lowStock(),
+          API.sales.list()
+        ]);
+
+        // Estadísticas
+        document.getElementById('stat-products').textContent = products?.length || 0;
+
+        const criticalCount = lowStock?.length || 0;
+        document.getElementById('stat-low-stock').textContent = criticalCount;
+
+        if (criticalCount > 0) {
+          document.getElementById('low-stock-alert').style.display = 'flex';
+          document.getElementById('low-stock-count').textContent = criticalCount;
+        }
+
+        // Ventas del día
+        const today = new Date().toISOString().split('T')[0];
+        const todaySales = (sales || []).filter(s =>
+          s.createdAt?.startsWith(today) && s.status === 'COMPLETED');
+        const todayTotal = todaySales.reduce((sum, s) => sum + (s.total || 0), 0);
+
+        document.getElementById('stat-sales-today').textContent = formatCurrency(todayTotal);
+        document.getElementById('stat-sales-count').textContent = `${todaySales.length} transacciones`;
+
+        // Ventas del mes
+        const month = today.substring(0, 7);
+        const monthSales = (sales || []).filter(s =>
+          s.createdAt?.startsWith(month) && s.status === 'COMPLETED');
+        const monthTotal = monthSales.reduce((sum, s) => sum + (s.total || 0), 0);
+        document.getElementById('stat-sales-month').textContent = formatCurrency(monthTotal);
+
+        // Tabla stock crítico
+        renderLowStockTable(lowStock || []);
+
+        // Tabla ventas recientes (últimas 8)
+        renderRecentSalesTable((sales || []).slice(0, 8));
+
+      } catch (error) {
+        showToast('Error cargando el dashboard: ' + error.message, 'error');
+      }
+    }
+
+    function renderLowStockTable(products) {
+      const container = document.getElementById('low-stock-table');
+      if (!products.length) {
+        container.innerHTML = `<div class="loading-state" style="color:var(--success)">
+          ✓ Todos los productos tienen stock suficiente</div>`;
+        return;
+      }
+      container.innerHTML = `
+        <table>
+          <thead><tr>
+            <th>Producto</th><th>SKU</th><th>Stock actual</th>
+            <th>Stock mínimo</th><th>Estado</th>
+          </tr></thead>
+          <tbody>
+            ${products.map(p => `
+              <tr>
+                <td>${p.name}</td>
+                <td class="mono">${p.sku}</td>
+                <td><strong style="color:var(--danger)">${p.stockCurrent}</strong></td>
+                <td>${p.stockMinimum}</td>
+                <td><span class="badge badge-danger">CRÍTICO</span></td>
+              </tr>`).join('')}
+          </tbody>
+        </table>`;
+    }
+
+    function renderRecentSalesTable(sales) {
+      const container = document.getElementById('recent-sales-table');
+      if (!sales.length) {
+        container.innerHTML = `<div class="loading-state">Sin ventas registradas</div>`;
+        return;
+      }
+      container.innerHTML = `
+        <table>
+          <thead><tr>
+            <th>#</th><th>Vendedor</th><th>Total</th>
+            <th>Estado</th><th>Fecha</th>
+          </tr></thead>
+          <tbody>
+            ${sales.map(s => `
+              <tr>
+                <td class="mono">#${s.id}</td>
+                <td>${s.user?.username || '—'}</td>
+                <td><strong>${formatCurrency(s.total)}</strong></td>
+                <td><span class="badge ${s.status === 'COMPLETED' ? 'badge-success' : 'badge-muted'}">${s.status}</span></td>
+                <td class="mono">${formatDate(s.createdAt)}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>`;
+    }
+
+    function formatCurrency(value) {
+      return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(value || 0);
+    }
+
+    function formatDate(dateStr) {
+      if (!dateStr) return '—';
+      return new Date(dateStr).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' });
+    }
+
+    function logout() {
+      Auth.clearSession();
+      window.location.href = 'index.html';
+    }
+
+    loadDashboard();
+  </script>
+</body>
+</html>

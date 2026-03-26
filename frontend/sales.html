@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StockMind — Ventas</title>
+  <link rel="stylesheet" href="css/main.css" />
+  <style>
+    .sale-grid { display: grid; grid-template-columns: 1fr 380px; gap: 24px; align-items: start; }
+    .cart-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); position: sticky; top: 0; }
+    .cart-header { padding: 18px 20px; border-bottom: 1px solid var(--border); }
+    .cart-header h3 { font-family: var(--font-head); font-size: 1rem; }
+    .cart-items { padding: 12px; max-height: 320px; overflow-y: auto; }
+    .cart-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 8px; border-radius: var(--radius-sm); border-bottom: 1px solid var(--border); gap: 8px; }
+    .cart-item:last-child { border-bottom: none; }
+    .cart-item-name { font-size: .85rem; flex: 1; }
+    .cart-item-qty { display: flex; align-items: center; gap: 6px; }
+    .qty-btn { width: 24px; height: 24px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: .9rem; }
+    .qty-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .cart-footer { padding: 16px 20px; border-top: 1px solid var(--border); }
+    .cart-total { font-family: var(--font-head); font-size: 1.6rem; color: var(--accent); margin: 8px 0 16px; }
+    .empty-cart { padding: 32px; text-align: center; color: var(--text-muted); font-size: .88rem; }
+  </style>
+</head>
+<body>
+  <div class="app-layout">
+    <aside class="sidebar">
+      <div class="sidebar-logo"><h1>StockMind</h1><span>Gestión de Inventario</span></div>
+      <nav class="sidebar-nav">
+        <span class="nav-section-label">Principal</span>
+        <a href="dashboard.html" class="nav-item"><span class="nav-icon">⊞</span> Dashboard</a>
+        <a href="products.html" class="nav-item"><span class="nav-icon">◈</span> Productos</a>
+        <a href="inventory.html" class="nav-item"><span class="nav-icon">⊟</span> Inventario</a>
+        <a href="sales.html" class="nav-item active"><span class="nav-icon">◉</span> Ventas</a>
+        <span class="nav-section-label">Analítica</span>
+        <a href="predictions.html" class="nav-item"><span class="nav-icon">◈</span> Predicciones</a>
+        <a href="reports.html" class="nav-item"><span class="nav-icon">⊡</span> Reportes</a>
+        <span class="nav-section-label">Administración</span>
+        <a href="users.html" class="nav-item" id="nav-users"><span class="nav-icon">◎</span> Usuarios</a>
+      </nav>
+      <div class="sidebar-user">
+        <div class="user-avatar" id="user-avatar">—</div>
+        <div class="user-info">
+          <div class="user-name" id="user-name">Cargando...</div>
+          <div class="user-role" id="user-role">—</div>
+        </div>
+        <button class="btn btn-ghost btn-sm btn-icon" onclick="logout()" title="Cerrar sesión">⎋</button>
+      </div>
+    </aside>
+
+    <header class="topbar">
+      <span class="topbar-title">Ventas</span>
+      <div class="topbar-actions">
+        <button class="btn btn-ghost" onclick="showHistorial()">Ver historial</button>
+        <button class="btn btn-primary" onclick="showNuevaVenta()">+ Nueva venta</button>
+      </div>
+    </header>
+
+    <main class="main-content">
+
+      <!-- PANEL: Nueva venta -->
+      <div id="panel-nueva-venta">
+        <div class="sale-grid">
+          <!-- Selector de productos -->
+          <div>
+            <div class="table-container">
+              <div class="table-header">
+                <h2>Seleccionar Productos</h2>
+                <input type="text" id="product-search" placeholder="Buscar producto..."
+                       style="width:200px" oninput="filterProductList()" />
+              </div>
+              <div id="product-list">
+                <div class="loading-state"><div class="spinner"></div> Cargando...</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Carrito -->
+          <div class="cart-panel">
+            <div class="cart-header">
+              <h3>Carrito de venta</h3>
+            </div>
+            <div class="cart-items" id="cart-items">
+              <div class="empty-cart">Agregue productos desde el catálogo</div>
+            </div>
+            <div class="cart-footer">
+              <div style="color:var(--text-muted);font-size:.78rem;font-family:var(--font-mono)">TOTAL</div>
+              <div class="cart-total" id="cart-total">$0</div>
+              <div class="form-group">
+                <label>Notas (opcional)</label>
+                <input type="text" id="sale-notes" placeholder="Ej: Venta mostrador" />
+              </div>
+              <button class="btn btn-primary" style="width:100%" onclick="registerSale()" id="btn-register">
+                Registrar venta
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PANEL: Historial de ventas -->
+      <div id="panel-historial" style="display:none">
+        <div class="table-container">
+          <div class="table-header">
+            <h2>Historial de Ventas</h2>
+          </div>
+          <div id="sales-history">
+            <div class="loading-state"><div class="spinner"></div> Cargando...</div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    requireAuth();
+    initUserUI();
+
+    let allProducts = [];
+    let cart = []; // [{ product, quantity }]
+
+    const fmt = v => new Intl.NumberFormat('es-CO', {
+      style:'currency', currency:'COP', minimumFractionDigits:0
+    }).format(v || 0);
+
+    async function loadProducts() {
+      try {
+        allProducts = (await API.products.list() || []).filter(p => p.stockCurrent > 0);
+        renderProductList(allProducts);
+      } catch(e) {
+        showToast('Error cargando productos: ' + e.message, 'error');
+      }
+    }
+
+    function filterProductList() {
+      const q = document.getElementById('product-search').value.toLowerCase();
+      renderProductList(allProducts.filter(p =>
+        p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q)));
+    }
+
+    function renderProductList(products) {
+      const el = document.getElementById('product-list');
+      if (!products.length) {
+        el.innerHTML = `<div class="loading-state">Sin productos disponibles</div>`; return;
+      }
+      el.innerHTML = `
+        <table>
+          <thead><tr><th>Producto</th><th>SKU</th><th>Precio</th><th>Stock</th><th></th></tr></thead>
+          <tbody>
+            ${products.map(p => `
+              <tr>
+                <td>${p.name}</td>
+                <td class="mono">${p.sku}</td>
+                <td class="mono">${fmt(p.price)}</td>
+                <td>${p.stockCurrent} ${p.unit}</td>
+                <td><button class="btn btn-primary btn-sm" onclick='addToCart(${JSON.stringify(p)})'>+ Agregar</button></td>
+              </tr>`).join('')}
+          </tbody>
+        </table>`;
+    }
+
+    function addToCart(product) {
+      const existing = cart.find(i => i.product.id === product.id);
+      if (existing) {
+        if (existing.quantity >= product.stockCurrent) {
+          showToast('Stock máximo alcanzado para este producto', 'warning'); return;
+        }
+        existing.quantity++;
+      } else {
+        cart.push({ product, quantity: 1 });
+      }
+      renderCart();
+    }
+
+    function removeFromCart(productId) {
+      cart = cart.filter(i => i.product.id !== productId);
+      renderCart();
+    }
+
+    function changeQty(productId, delta) {
+      const item = cart.find(i => i.product.id === productId);
+      if (!item) return;
+      const newQty = item.quantity + delta;
+      if (newQty <= 0) { removeFromCart(productId); return; }
+      if (newQty > item.product.stockCurrent) {
+        showToast('Stock máximo alcanzado', 'warning'); return;
+      }
+      item.quantity = newQty;
+      renderCart();
+    }
+
+    function renderCart() {
+      const el = document.getElementById('cart-items');
+      if (!cart.length) {
+        el.innerHTML = `<div class="empty-cart">Agregue productos desde el catálogo</div>`;
+        document.getElementById('cart-total').textContent = '$0';
+        return;
+      }
+      el.innerHTML = cart.map(i => `
+        <div class="cart-item">
+          <div>
+            <div class="cart-item-name">${i.product.name}</div>
+            <div style="font-size:.75rem;color:var(--text-muted);font-family:var(--font-mono)">${fmt(i.product.price)} c/u</div>
+          </div>
+          <div class="cart-item-qty">
+            <button class="qty-btn" onclick="changeQty(${i.product.id}, -1)">−</button>
+            <span style="font-family:var(--font-mono);min-width:20px;text-align:center">${i.quantity}</span>
+            <button class="qty-btn" onclick="changeQty(${i.product.id}, 1)">+</button>
+          </div>
+          <div style="font-family:var(--font-mono);font-size:.85rem;min-width:80px;text-align:right">
+            ${fmt(i.product.price * i.quantity)}</div>
+          <button onclick="removeFromCart(${i.product.id})"
+                  style="background:none;border:none;color:var(--text-muted);cursor:pointer;padding:4px">✕</button>
+        </div>`).join('');
+
+      const total = cart.reduce((sum, i) => sum + i.product.price * i.quantity, 0);
+      document.getElementById('cart-total').textContent = fmt(total);
+    }
+
+    async function registerSale() {
+      if (!cart.length) { showToast('El carrito está vacío', 'warning'); return; }
+      const btn = document.getElementById('btn-register');
+      btn.disabled = true; btn.textContent = 'Registrando...';
+
+      const payload = {
+        items: cart.map(i => ({
+          productId: i.product.id,
+          quantity:  i.quantity,
+          unitPrice: i.product.price
+        })),
+        notes: document.getElementById('sale-notes').value.trim()
+      };
+
+      try {
+        const sale = await API.sales.create(payload);
+        showToast(`Venta #${sale.id} registrada correctamente — ${fmt(sale.total)}`);
+        cart = [];
+        renderCart();
+        document.getElementById('sale-notes').value = '';
+        loadProducts(); // Actualizar stocks
+      } catch(e) {
+        showToast('Error: ' + e.message, 'error');
+      } finally {
+        btn.disabled = false; btn.textContent = 'Registrar venta';
+      }
+    }
+
+    function showNuevaVenta() {
+      document.getElementById('panel-nueva-venta').style.display = '';
+      document.getElementById('panel-historial').style.display = 'none';
+    }
+
+    async function showHistorial() {
+      document.getElementById('panel-nueva-venta').style.display = 'none';
+      document.getElementById('panel-historial').style.display = '';
+      try {
+        const sales = await API.sales.list() || [];
+        const el = document.getElementById('sales-history');
+        if (!sales.length) {
+          el.innerHTML = `<div class="loading-state">Sin ventas registradas</div>`; return;
+        }
+        el.innerHTML = `
+          <table>
+            <thead><tr><th>#</th><th>Vendedor</th><th>Productos</th><th>Total</th><th>Estado</th><th>Fecha</th></tr></thead>
+            <tbody>
+              ${sales.map(s => `
+                <tr>
+                  <td class="mono">#${s.id}</td>
+                  <td>${s.user?.username || '—'}</td>
+                  <td>${s.details?.length || 0} ítem(s)</td>
+                  <td class="mono"><strong>${fmt(s.total)}</strong></td>
+                  <td><span class="badge ${s.status === 'COMPLETED' ? 'badge-success' : 'badge-muted'}">${s.status}</span></td>
+                  <td class="mono">${new Date(s.createdAt).toLocaleString('es-CO')}</td>
+                </tr>`).join('')}
+            </tbody>
+          </table>`;
+      } catch(e) {
+        showToast('Error cargando historial: ' + e.message, 'error');
+      }
+    }
+
+    loadProducts();
+  </script>
+</body>
+</html>
