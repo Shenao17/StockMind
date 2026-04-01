@@ -57,6 +57,7 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 // Rate limiting: máximo 100 peticiones por IP cada 15 minutos
+//POR IMPLENTAR: Ajustar límites según necesidades reales
 
 
 // =============================================================================
