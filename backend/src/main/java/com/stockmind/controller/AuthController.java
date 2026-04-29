@@ -17,8 +17,8 @@ import java.util.Map;
 /**
  * AuthController — Endpoints de autenticación
  *
- * GET  /auth/me     → Retorna perfil del usuario autenticado
- * POST /auth/login  → Autentica y retorna JWT
+ * GET  /auth/me     -> Retorna perfil del usuario autenticado
+ * POST /auth/login  -> Autentica y retorna JWT
  */
 @RestController
 @RequestMapping("/auth")
