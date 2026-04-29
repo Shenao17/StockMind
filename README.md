@@ -4,6 +4,30 @@
 
 ---
 
+## Changelog
+
+### v1.1.0 — Migración del Frontend a React
+> Abril 2026
+
+El frontend del sistema fue completamente migrado de HTML/CSS/JavaScript vanilla a **React 18 con Vite**, manteniendo el diseño visual, la lógica de negocio y la integración con el gateway Node.js sin modificaciones.
+
+**Cambios realizados:**
+- Reemplazo de las 8 páginas HTML independientes por una **Single Page Application (SPA)** con React Router
+- Implementación de `AuthContext` para manejo global de sesión JWT
+- Componente `Sidebar` con `NavLink` de React Router (estado activo automático, sin repetición de HTML)
+- Modal reutilizable y sistema de toasts como hooks y componentes React
+- Protección de rutas mediante verificación del token JWT en el contexto
+- Cliente HTTP centralizado (`api.js`) migrado como módulo ES con exports explícitos
+- Stack: **Vite + React 18 + React Router DOM**
+
+**Lo que NO cambió:**
+- Paleta de colores, tipografías (Syne, Outfit, DM Mono) y estilos visuales
+- Lógica de autenticación y manejo del JWT en `localStorage`
+- Todas las llamadas al gateway Node.js (puerto 3000) — el backend no fue tocado
+- Funcionalidades: Dashboard, Productos, Inventario, Ventas, Reportes, Predicciones, Usuarios
+
+---
+
 ## Tabla de Contenidos
 
 1. [Descripción General](#descripción-general)
@@ -30,7 +54,7 @@ El sistema está construido sobre una arquitectura distribuida por capas:
 
 | Capa | Tecnología | Puerto |
 |------|-----------|--------|
-| Frontend | HTML + CSS + JavaScript | — (estático) |
+| Frontend | React 18 + Vite + React Router | 5173 |
 | API Gateway | Node.js + Express | 3000 |
 | Backend Principal | Java Spring Boot | 8080 |
 | Microservicio Analítico | Python Flask | 8000 |
@@ -57,7 +81,7 @@ Las pequeñas y medianas empresas del sector comercial enfrentan pérdidas recur
 
 **Dimensión académica:** El proyecto integra un stack tecnológico heterogéneo en una arquitectura de microservicios real, demostrando competencias en diseño de sistemas distribuidos, comunicación entre servicios REST y separación de responsabilidades.
 
-**Dimensión técnica:** Cada tecnología cumple un rol específico y no intercambiable. Java Spring Boot provee robustez transaccional. Node.js actúa como gateway sin acoplamiento directo. Python aporta capacidad estadística madura (scikit-learn, statsmodels, pandas) que complementa al stack sin duplicar responsabilidades.
+**Dimensión técnica:** Cada tecnología cumple un rol específico y no intercambiable. Java Spring Boot provee robustez transaccional. Node.js actúa como gateway sin acoplamiento directo. Python aporta capacidad estadística madura (scikit-learn, statsmodels, pandas) que complementa al stack sin duplicar responsabilidades. React permite una experiencia de usuario fluida mediante SPA con estado global de sesión.
 
 **Dimensión empresarial:** La predicción de demanda reduce el costo de capital inmovilizado en inventario entre un 15% y 35% según estudios del sector logístico. StockMind democratiza esta capacidad para empresas sin acceso a soluciones ERP de alto costo.
 
@@ -76,7 +100,7 @@ Desarrollar una plataforma web full stack para la gestión integral de inventari
 3. Implementar un gateway API en Node.js con Express que unifique las rutas y gestione la comunicación entre frontend y servicios backend.
 4. Construir un microservicio en Python Flask que consuma historial de ventas desde MySQL y genere predicciones de demanda usando regresión lineal o media móvil ponderada.
 5. Diseñar una base de datos MySQL normalizada que soporte transacciones de inventario, ventas y almacenamiento de predicciones.
-6. Desarrollar un frontend funcional en HTML, CSS y JavaScript que consuma exclusivamente las rutas del gateway Node.js.
+6. Desarrollar un frontend en React 18 con Vite que consuma exclusivamente las rutas del gateway Node.js, implementando navegación SPA con React Router y gestión de estado de sesión con Context API.
 7. Documentar el sistema con nivel de detalle suficiente para su reproducción técnica y presentación académica.
 
 ---
@@ -141,7 +165,8 @@ Desarrollar una plataforma web full stack para la gestión integral de inventari
 ```
 ┌──────────────────────────────────────────────────────────┐
 │                    CLIENTE (Browser)                      │
-│         HTML + CSS + JavaScript (Vanilla)                 │
+│         React 18 + Vite + React Router DOM               │
+│         Context API para sesión JWT                       │
 └─────────────────────┬────────────────────────────────────┘
                       │ HTTP/REST
                       ▼
@@ -182,7 +207,9 @@ El frontend **nunca** consume directamente el backend Java ni el microservicio P
 
 | Tecnología | Versión | Rol | Justificación |
 |-----------|---------|-----|--------------|
-| HTML5/CSS3/JS | ES2020+ | Frontend | Base de la web sin overhead de frameworks |
+| React | 18 | Frontend SPA | Componentes reutilizables, estado global, navegación SPA |
+| Vite | 8.x | Bundler/Dev server | HMR ultrarrápido, build optimizado |
+| React Router DOM | 6.x | Enrutamiento SPA | Navegación declarativa con protección de rutas |
 | Node.js | 20 LTS | API Gateway | I/O no bloqueante ideal para proxy de peticiones |
 | Express | 4.x | Framework HTTP | Minimalista, robusto, ecosistema maduro |
 | Java | 17 LTS | Backend | Tipado fuerte, robustez |
@@ -201,6 +228,7 @@ El frontend **nunca** consume directamente el backend Java ni el microservicio P
 ```
 stockmind/
 ├── README.md
+├── start.bat
 ├── docs/
 │   ├── architecture.md
 │   ├── api-endpoints.md
@@ -208,27 +236,34 @@ stockmind/
 │   ├── manual-tecnico.md
 │   └── manual-usuario.md
 │
-├── frontend/
+├── frontend/                        ← React 18 + Vite (migrado desde HTML/CSS/JS)
 │   ├── index.html
-│   ├── dashboard.html
-│   ├── products.html
-│   ├── inventory.html
-│   ├── sales.html
-│   ├── reports.html
-│   ├── predictions.html
-│   ├── users.html
-│   ├── css/
-│   │   ├── main.css
-│   │   ├── components.css
-│   │   └── dashboard.css
-│   └── js/
-│       ├── api.js
-│       ├── auth.js
-│       ├── products.js
-│       ├── inventory.js
-│       ├── sales.js
-│       ├── reports.js
-│       └── predictions.js
+│   ├── package.json
+│   ├── vite.config.js
+│   └── src/
+│       ├── main.jsx
+│       ├── App.jsx                  ← Router + layout protegido
+│       ├── api.js                   ← Cliente HTTP + Auth helpers
+│       ├── index.css                ← Estilos globales
+│       ├── context/
+│       │   └── AuthContext.jsx      ← Sesión JWT global
+│       ├── hooks/
+│       │   └── useToast.js
+│       ├── components/
+│       │   ├── layout/
+│       │   │   └── Sidebar.jsx
+│       │   └── ui/
+│       │       ├── Modal.jsx
+│       │       └── ToastContainer.jsx
+│       └── pages/
+│           ├── Login.jsx
+│           ├── Dashboard.jsx
+│           ├── Products.jsx
+│           ├── Inventory.jsx
+│           ├── Sales.jsx
+│           ├── Reports.jsx
+│           ├── Predictions.jsx
+│           └── Users.jsx
 │
 ├── gateway/
 │   ├── package.json
@@ -387,7 +422,7 @@ GET    /api/predictions/recommendations → Recomendaciones generales
 ```
 Frontend → POST /api/auth/login → Gateway → POST /auth/login (Java)
 Java: valida credenciales, genera JWT → Gateway → Frontend
-Frontend: almacena JWT en localStorage
+Frontend: almacena JWT en localStorage (vía AuthContext)
 ```
 
 ### Flujo 2: Registro de venta
@@ -407,7 +442,7 @@ Frontend → GET /api/predictions/42 → Gateway (verifica JWT)
 → GET /predict/42 (Python)
 Python: consulta MySQL → aplica modelo estadístico
 → persiste predicción → retorna {weeklyForecast, monthlyForecast, confidence}
-→ Gateway → Frontend: renderiza gráfico
+→ Gateway → Frontend: renderiza resultado
 ```
 
 ---
@@ -422,6 +457,12 @@ Python: consulta MySQL → aplica modelo estadístico
 - MySQL 8.x
 - Maven 3.x
 
+### Inicio rápido (Windows)
+
+Ejecutar `start.bat` en la raíz del proyecto. El script levanta todos los servicios en orden y abre el navegador automáticamente en `http://localhost:5173`.
+
+> Requiere XAMPP con MySQL activo y la base de datos inicializada previamente.
+
 ### 1. Base de datos
 
 ```bash
@@ -433,7 +474,6 @@ mysql -u root -p stockmind_db < database/seed.sql
 
 ```bash
 cd backend
-# Configurar application.properties con credenciales MySQL
 mvn clean install
 mvn spring-boot:run
 # Disponible en http://localhost:8080
@@ -444,9 +484,8 @@ mvn spring-boot:run
 ```bash
 cd analytics
 python -m venv venv
-source venv/bin/activate   # Windows: venv\Scripts\activate
+venv\Scripts\activate
 pip install -r requirements.txt
-# Configurar config.py con credenciales MySQL
 python app.py
 # Disponible en http://localhost:8000
 ```
@@ -456,19 +495,17 @@ python app.py
 ```bash
 cd gateway
 npm install
-# Configurar .env
 npm start
 # Disponible en http://localhost:3000
 ```
 
-### 5. Frontend
-
-Abrir `frontend/index.html` en el navegador o servir con cualquier servidor HTTP estático.
+### 5. Frontend React
 
 ```bash
-# Opción con Python
 cd frontend
-python -m http.server 5500
+npm install
+npm run dev
+# Disponible en http://localhost:5173
 ```
 
 ### Variables de entorno (gateway/.env)
@@ -482,4 +519,4 @@ JWT_SECRET=stockmind_super_secret_key_2024
 
 ---
 
-*Desarrollado como proyecto académico — StockMind v1.0* 
+*Desarrollado como proyecto académico — StockMind v1.1.0*
