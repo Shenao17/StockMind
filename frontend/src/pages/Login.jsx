@@ -82,7 +82,7 @@ export default function Login() {
           {loading ? 'Verificando...' : 'Iniciar sesión'}
         </button>
 
-        <p className="version-tag">StockMind v1.0.0 — Proyecto Académico</p>
+        <p className="version-tag">StockMind v1.1.0 (en Desarrollo)</p>
       </div>
     </div>
   );

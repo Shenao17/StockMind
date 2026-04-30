@@ -9,6 +9,11 @@ analytics/src/routes/__pycache__/
 analytics/src/services/__pycache__/
 analytics/src/models/__pycache__/
 
+# Frontend React
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
 # Node
 gateway/node_modules/
 

@@ -60,7 +60,12 @@ export default function Inventory({ showToast }) {
   return (
     <>
       <div className="table-container">
-        <div className="table-header"><h2>Historial de Movimientos</h2></div>
+        <div className="table-header">
+          <h2>Historial de Movimientos</h2>
+          <button className="btn btn-primary btn-sm" onClick={openModal}>
+            + Registrar movimiento
+          </button>
+        </div>
         {loading ? (
           <div className="loading-state"><div className="spinner" /> Cargando...</div>
         ) : movements.length === 0 ? (

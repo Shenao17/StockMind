@@ -95,12 +95,29 @@ export default function Products({ showToast }) {
       <div className="table-container">
         <div className="table-header">
           <h2>Catálogo de Productos</h2>
-          <span style={{ fontSize: '.8rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{filtered.length} productos</span>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <input
+              type="text"
+              placeholder="Buscar por nombre o SKU..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              style={{ width: 220 }}
+            />
+            <span style={{ fontSize: '.8rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
+              {filtered.length} productos
+            </span>
+            {isAdmin() && (
+              <button className="btn btn-primary btn-sm" onClick={() => openModal()}>
+                + Nuevo producto
+              </button>
+            )}
+          </div>
         </div>
-        {loading ? (
-          <div className="loading-state"><div className="spinner" /> Cargando...</div>
-        ) : filtered.length === 0 ? (
-          <div className="loading-state">Sin resultados</div>
+
+        {filtered.length === 0 ? (
+          <div className="loading-state">
+            {search ? `Sin resultados para "${search}"` : 'Sin productos registrados'}
+          </div>
         ) : (
           <table>
             <thead>
@@ -117,7 +134,9 @@ export default function Products({ showToast }) {
                   <td>{p.category?.name || '—'}</td>
                   <td className="mono">{fmt(p.price)}</td>
                   <td>
-                    <span style={{ color: p.stockCurrent <= p.stockMinimum ? 'var(--danger)' : 'var(--text)' }}>{p.stockCurrent}</span>
+                    <span style={{ color: p.stockCurrent <= p.stockMinimum ? 'var(--danger)' : 'var(--text)' }}>
+                      {p.stockCurrent}
+                    </span>
                     <span style={{ color: 'var(--text-muted)', fontSize: '.78rem' }}> / min {p.stockMinimum}</span>
                   </td>
                   <td>
