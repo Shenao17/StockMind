@@ -1,0 +1,125 @@
+================================================================
+  STOCKMIND — GUÍA DE TESTS
+  Frontend React | Vitest + React Testing Library
+================================================================
+
+REQUISITOS PREVIOS
+------------------
+- Node.js 20 LTS instalado
+- Haber ejecutado "npm install" dentro de la carpeta frontend/
+
+CÓMO EJECUTAR LOS TESTS
+------------------------
+1. Abrir una terminal
+2. Navegar a la carpeta del frontend:
+
+   cd frontend
+
+3. Ejecutar los tests:
+
+   Modo una sola vez:
+   npx vitest run
+
+   Modo watch (re-corre al guardar cambios):
+   npm test
+
+   Ver cobertura de código:
+   npm run test:coverage
+
+RESULTADO ESPERADO
+------------------
+  4 archivos de test
+  32 tests en total
+  32 passed, 0 failed
+
+================================================================
+  QUÉ SE TESTEA Y POR QUÉ
+================================================================
+
+TECNOLOGÍAS USADAS
+------------------
+- Vitest       → Framework de testing, compatible con Vite
+- React Testing Library → Renderiza componentes React en tests
+- jest-dom     → Matchers extra para el DOM (toBeInTheDocument, etc.)
+- jsdom        → Simula el navegador en Node.js
+
+NOTA SOBRE MOCKS
+----------------
+Las llamadas a la API (gateway Node.js) son mockeadas en los tests.
+Esto significa que los tests NO requieren que el backend esté corriendo.
+Se simula la respuesta del servidor para probar el comportamiento
+del frontend de forma aislada.
+
+================================================================
+
+ARCHIVO 1 — Login.test.jsx (10 tests)
+--------------------------------------
+Testea el componente de inicio de sesión.
+
+  Renderizado inicial:
+  ✓ Muestra el título "StockMind"
+  ✓ Muestra el campo de usuario
+  ✓ Muestra el campo de contraseña
+  ✓ No muestra errores al cargar por primera vez
+
+  Validaciones:
+  ✓ Muestra error si se intenta login con ambos campos vacíos
+  ✓ Muestra error si solo se llena el campo de usuario
+  ✓ Muestra error si solo se llena el campo de contraseña
+
+  Interacción con la API (mockeada):
+  ✓ El botón cambia a "Verificando..." mientras espera respuesta
+  ✓ Muestra error cuando la API rechaza las credenciales
+  ✓ Muestra error cuando el servidor no responde
+
+----------------------------------------------------------------
+
+ARCHIVO 2 — Products.test.jsx (12 tests)
+-----------------------------------------
+Testea el catálogo de productos con búsqueda y permisos por rol.
+
+  Renderizado:
+  ✓ Muestra el título "Catálogo de Productos"
+  ✓ Renderiza todos los productos cargados desde la API
+  ✓ Muestra badge CRÍTICO en productos con stock bajo el mínimo
+  ✓ Muestra badge OK en productos con stock suficiente
+
+  Buscador:
+  ✓ Filtra productos correctamente por nombre
+  ✓ Filtra productos correctamente por SKU
+  ✓ Muestra mensaje "Sin resultados" cuando no hay coincidencias
+  ✓ Restaura todos los productos al borrar el texto de búsqueda
+
+  Permisos por rol:
+  ✓ Un vendedor NO ve el botón "Nuevo producto"
+  ✓ Un administrador SÍ ve el botón "Nuevo producto"
+  ✓ Un vendedor NO ve los botones de editar/eliminar
+  ✓ Un administrador SÍ ve los botones de editar/eliminar
+
+----------------------------------------------------------------
+
+ARCHIVO 3 — Modal.test.jsx (5 tests)
+--------------------------------------
+Testea el componente Modal reutilizable usado en todo el sistema.
+
+  ✓ No renderiza nada cuando "open" es false
+  ✓ Muestra el título correctamente cuando "open" es true
+  ✓ Renderiza el contenido hijo que se le pase
+  ✓ Renderiza el footer con los botones de acción
+  ✓ Llama a la función onClose al hacer click en el overlay
+
+----------------------------------------------------------------
+
+ARCHIVO 4 — useToast.test.js (5 tests)
+----------------------------------------
+Testea el hook de notificaciones usado en todas las páginas.
+
+  ✓ Inicia con la lista de toasts vacía
+  ✓ Agrega correctamente un toast al llamar showToast
+  ✓ Puede manejar múltiples toasts simultáneos
+  ✓ Usa el tipo "success" por defecto si no se especifica
+  ✓ Cada toast generado tiene un ID único
+
+================================================================
+  StockMind v1.1.0 — Proyecto Académico
+================================================================
