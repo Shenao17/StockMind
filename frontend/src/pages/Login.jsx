@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 export default function Login() {
   const navigate = useNavigate();
   const { login, isLoggedIn } = useAuth();
+
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -17,17 +18,27 @@ export default function Login() {
   }
 
   async function handleLogin() {
-    if (!username || !password) { setError('Complete todos los campos'); return; }
+    if (!username || !password) {
+      setError('Complete todos los campos');
+      return;
+    }
+
     setLoading(true);
     setError('');
+
     try {
-      const response = await API.auth.login({ username, password });
+      const response = await API.auth.login({
+        username,
+        password,
+      });
+
       if (response?.token) {
         login(response.token, {
-          id:       response.userId,
+          id: response.userId,
           username: response.username,
-          role:     response.role,
+          role: response.role,
         });
+
         navigate('/dashboard', { replace: true });
       } else {
         setError('Respuesta inesperada del servidor');
@@ -41,48 +52,117 @@ export default function Login() {
 
   return (
     <div className="login-wrapper">
-      <div className="login-card">
-        <h1>StockMind</h1>
-        <p>Sistema de gestión de inventario y predicción de demanda</p>
 
-        {error && <div className="login-error visible">{error}</div>}
+      {/* Fondo decorativo */}
+      <div className="login-orb login-orb-one"></div>
+      <div className="login-orb login-orb-two"></div>
+      <div className="login-stars">
+      <span></span>
+      <span></span>
+      <span></span>
+      <span></span>
+      <span></span>
+      <span></span>
+      <span></span>
+      <span></span>
+      </div>
 
-        <div className="form-group">
-          <label htmlFor="username">Usuario</label>
-          <input
-            id="username"
-            type="text"
-            placeholder="Ingrese su usuario"
-            autoComplete="username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-          />
+      <div className="login-content">
+
+        {/* Identidad */}
+        <div className="login-brand">
+          <h1>StockMind</h1>
+          <p>Gestión inteligente de inventario</p>
         </div>
 
-        <div className="form-group">
-          <label htmlFor="password">Contraseña</label>
-          <input
-            id="password"
-            type="password"
-            placeholder="Ingrese su contraseña"
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-          />
+        {/* Tarjeta */}
+        <div className="login-card">
+
+          <div className="login-card-header">
+            <span className="login-eyebrow">Bienvenido</span>
+
+            <h2>Bienvenido de nuevo</h2>
+
+            <p>
+              Ingresa a tu espacio de trabajo para continuar.
+            </p>
+          </div>
+
+          {error && (
+            <div className="login-error visible">
+              <span className="login-error-icon">!</span>
+              <span>{error}</span>
+            </div>
+          )}
+
+          <div className="form-group login-field">
+            <label htmlFor="username">Usuario</label>
+
+            <div className="login-input-wrapper">
+              <span className="login-input-icon">◉</span>
+
+              <input
+                id="username"
+                type="text"
+                placeholder="Ingrese su usuario"
+                autoComplete="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+              />
+            </div>
+          </div>
+
+          <div className="form-group login-field">
+            <label htmlFor="password">Contraseña</label>
+
+            <div className="login-input-wrapper">
+              <span className="login-input-icon">◈</span>
+
+              <input
+                id="password"
+                type="password"
+                placeholder="Ingrese su contraseña"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+              />
+            </div>
+          </div>
+
+          <button
+            className="login-submit"
+            onClick={handleLogin}
+            disabled={loading}
+          >
+            {loading ? (
+              <>
+                <span className="login-spinner"></span>
+                Verificando...
+              </>
+            ) : (
+              <>
+                <span>Iniciar sesión</span>
+                <span className="login-submit-arrow">→</span>
+              </>
+            )}
+          </button>
+
+          <div className="login-footer">
+            <span>StockMind</span>
+            <span className="login-footer-separator">·</span>
+            <span>v1.3.0</span>
+            <span className="login-footer-separator">·</span>
+            <span>AI Agent Experimental</span>
+          </div>
+
         </div>
 
-        <button
-          className="btn btn-primary"
-          style={{ width: '100%' }}
-          onClick={handleLogin}
-          disabled={loading}
-        >
-          {loading ? 'Verificando...' : 'Iniciar sesión'}
-        </button>
+        <p className="login-copyright">
+          Sistema de gestión de inventario
+        </p>
 
-        <p className="version-tag">StockMind 1.2.1 ( En Desarrollo - AI Agent Experimental)</p>
       </div>
     </div>
   );
