@@ -29,7 +29,6 @@
   --surface-hover: rgba(255, 255, 255, 0.065);
   --surface-strong: rgba(255, 255, 255, 0.075);
   --surface-solid: #111319;
-
   --surface-2: rgba(255, 255, 255, 0.055);
   --surface-3: rgba(255, 255, 255, 0.08);
 
@@ -49,7 +48,6 @@
   --accent-hover: #9494ff;
   --accent-light: #a5a5ff;
   --accent-dark: #5656d9;
-
   --accent-dim: rgba(119, 119, 255, 0.11);
   --accent-glow: rgba(119, 119, 255, 0.18);
 
@@ -109,7 +107,6 @@
 
   --glass-blur: blur(18px);
   --glass-blur-heavy: blur(28px);
-
   --glass-bg: rgba(15, 17, 24, 0.68);
   --glass-bg-light: rgba(255, 255, 255, 0.055);
 
@@ -227,9 +224,7 @@ a:hover {
   display: grid;
   grid-template-columns: 240px 1fr;
   grid-template-rows: auto 1fr;
-
   min-height: 100vh;
-
   position: relative;
 
   background:
@@ -277,11 +272,10 @@ a:hover {
 }
 
 
-/* Logo */
+/* Sidebar branding */
 
 .sidebar-logo {
   padding: 0 24px 26px;
-
   border-bottom: 1px solid var(--border);
 }
 
@@ -298,20 +292,16 @@ a:hover {
 
   -webkit-background-clip: text;
   background-clip: text;
-  color: transparent;
 
+  color: transparent;
   letter-spacing: -0.6px;
 }
 
 .sidebar-logo span {
   font-size: 0.68rem;
-
   color: var(--text-muted);
-
   font-family: var(--font-mono);
-
   letter-spacing: 0.08em;
-
   text-transform: uppercase;
 }
 
@@ -320,27 +310,26 @@ a:hover {
 
 .sidebar-nav {
   flex: 1;
-
   padding: 20px 12px;
 
   display: flex;
   flex-direction: column;
-
   gap: 5px;
 }
 
 .nav-section-label {
   font-size: 0.62rem;
-
   color: var(--text-faint);
-
   letter-spacing: 0.13em;
-
   text-transform: uppercase;
 
   padding: 18px 12px 7px;
 
   font-family: var(--font-mono);
+}
+
+.nav-group {
+  width: 100%;
 }
 
 .nav-item {
@@ -358,7 +347,6 @@ a:hover {
   color: var(--text-dim);
 
   font-size: 0.88rem;
-
   font-weight: 500;
 
   transition:
@@ -367,15 +355,12 @@ a:hover {
     transform var(--transition);
 
   cursor: pointer;
-
   text-decoration: none;
 }
 
 .nav-item:hover {
   background: rgba(255, 255, 255, 0.045);
-
   color: var(--text);
-
   transform: translateX(2px);
 }
 
@@ -415,17 +400,35 @@ a:hover {
 
 .nav-item .nav-icon {
   width: 18px;
+  height: 18px;
 
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 
   opacity: 0.75;
 
-  transition: transform var(--transition);
+  transition:
+    transform var(--transition),
+    opacity var(--transition);
 }
 
 .nav-item:hover .nav-icon,
 .nav-item.active .nav-icon {
   opacity: 1;
+}
+
+.nav-icon-svg {
+  width: 18px;
+  height: 18px;
+
+  display: block;
+
+  color: currentColor;
+}
+
+.nav-label {
+  flex: 1;
 }
 
 
@@ -462,11 +465,9 @@ a:hover {
   justify-content: center;
 
   font-family: var(--font-head);
-
   font-size: 0.85rem;
 
   color: var(--accent-light);
-
   font-weight: 700;
 
   flex-shrink: 0;
@@ -488,10 +489,40 @@ a:hover {
 
 .user-role {
   font-size: 0.68rem;
-
   color: var(--text-muted);
-
   font-family: var(--font-mono);
+}
+
+
+/* Logout */
+
+.sidebar-user .btn-icon {
+  border: 1px solid rgba(239, 68, 68, 0.45);
+
+  background:
+    rgba(239, 68, 68, 0.08);
+
+  color: #f87171;
+
+  box-shadow:
+    0 0 12px rgba(239, 68, 68, 0.12),
+    inset 0 0 12px rgba(239, 68, 68, 0.04);
+
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.sidebar-user .btn-icon:hover {
+  border-color: rgba(248, 113, 113, 0.8);
+
+  background:
+    rgba(239, 68, 68, 0.14);
+
+  color: #fca5a5;
+
+  box-shadow:
+    0 0 18px rgba(239, 68, 68, 0.28),
+    inset 0 0 14px rgba(239, 68, 68, 0.06);
 }
 
 
@@ -522,19 +553,14 @@ a:hover {
 
 .topbar-title {
   font-family: var(--font-head);
-
   font-size: 1.15rem;
-
   font-weight: 700;
-
   letter-spacing: -0.2px;
 }
 
 .topbar-actions {
   display: flex;
-
   gap: 10px;
-
   align-items: center;
 }
 
@@ -547,7 +573,6 @@ a:hover {
   padding: 32px;
 
   overflow-y: auto;
-
   min-width: 0;
 
   position: relative;
@@ -557,7 +582,6 @@ a:hover {
   content: '';
 
   position: fixed;
-
   pointer-events: none;
 
   width: 500px;
@@ -623,7 +647,6 @@ a:hover {
   padding: 22px;
 
   position: relative;
-
   overflow: hidden;
 
   transition:
@@ -693,11 +716,9 @@ a:hover {
 
 .stat-label {
   font-size: 0.68rem;
-
   color: var(--text-muted);
 
   text-transform: uppercase;
-
   letter-spacing: 0.08em;
 
   font-family: var(--font-mono);
@@ -709,7 +730,6 @@ a:hover {
   font-family: var(--font-head);
 
   font-size: 2rem;
-
   font-weight: 700;
 
   line-height: 1;
@@ -735,7 +755,6 @@ a:hover {
 
 .stat-sub {
   font-size: 0.76rem;
-
   color: var(--text-dim);
 
   margin-top: 7px;
@@ -748,7 +767,6 @@ a:hover {
 
 .table-container {
   border-radius: var(--radius-lg);
-
   overflow: hidden;
 }
 
@@ -756,9 +774,7 @@ a:hover {
   padding: 18px 22px;
 
   display: flex;
-
   align-items: center;
-
   justify-content: space-between;
 
   border-bottom: 1px solid var(--border);
@@ -768,13 +784,11 @@ a:hover {
   font-family: var(--font-head);
 
   font-size: 1rem;
-
   font-weight: 700;
 }
 
 table {
   width: 100%;
-
   border-collapse: collapse;
 }
 
@@ -792,11 +806,9 @@ thead th {
   color: var(--text-muted);
 
   text-transform: uppercase;
-
   letter-spacing: 0.1em;
 
   font-family: var(--font-mono);
-
   font-weight: 500;
 }
 
@@ -818,7 +830,6 @@ tbody tr:hover {
 
 tbody td {
   padding: 13px 22px;
-
   font-size: 0.87rem;
 }
 
@@ -845,7 +856,6 @@ tbody td {
   border-radius: var(--radius-pill);
 
   font-size: 0.69rem;
-
   font-weight: 600;
 
   font-family: var(--font-mono);
@@ -857,31 +867,41 @@ tbody td {
 
 .badge-success {
   background: var(--success-dim);
+
   border-color: rgba(34, 197, 94, 0.16);
+
   color: var(--success);
 }
 
 .badge-danger {
   background: var(--danger-dim);
+
   border-color: rgba(239, 68, 68, 0.16);
+
   color: var(--danger);
 }
 
 .badge-warning {
   background: var(--warning-dim);
+
   border-color: rgba(245, 158, 11, 0.16);
+
   color: var(--warning);
 }
 
 .badge-accent {
   background: var(--accent-dim);
+
   border-color: rgba(119, 119, 255, 0.16);
+
   color: var(--accent-light);
 }
 
 .badge-muted {
   background: rgba(255, 255, 255, 0.045);
+
   border-color: var(--border);
+
   color: var(--text-dim);
 }
 
@@ -894,7 +914,6 @@ tbody td {
   display: inline-flex;
 
   align-items: center;
-
   justify-content: center;
 
   gap: 7px;
@@ -906,7 +925,6 @@ tbody td {
   font-family: var(--font-ui);
 
   font-size: 0.86rem;
-
   font-weight: 500;
 
   border: 1px solid transparent;
@@ -1065,7 +1083,8 @@ select:focus,
 textarea:focus {
   border-color: rgba(119, 119, 255, 0.5);
 
-  background: rgba(119, 119, 255, 0.035);
+  background:
+    rgba(119, 119, 255, 0.035);
 
   box-shadow:
     0 0 0 3px rgba(119, 119, 255, 0.08);
@@ -1077,7 +1096,6 @@ input::placeholder {
 
 select option {
   background: var(--surface-solid);
-
   color: var(--text);
 }
 
@@ -1095,13 +1113,11 @@ select option {
     rgba(2, 3, 6, 0.72);
 
   backdrop-filter: blur(9px);
-
   -webkit-backdrop-filter: blur(9px);
 
   display: flex;
 
   align-items: center;
-
   justify-content: center;
 
   z-index: 1000;
@@ -1128,7 +1144,6 @@ select option {
     );
 
   backdrop-filter: var(--glass-blur-heavy);
-
   -webkit-backdrop-filter: var(--glass-blur-heavy);
 
   border: 1px solid var(--border-hover);
@@ -1138,7 +1153,6 @@ select option {
   padding: 32px;
 
   width: 100%;
-
   max-width: 520px;
 
   max-height: 90vh;
@@ -1161,7 +1175,6 @@ select option {
   font-family: var(--font-head);
 
   font-size: 1.1rem;
-
   font-weight: 700;
 
   margin-bottom: 24px;
@@ -1202,7 +1215,6 @@ select option {
     rgba(20, 22, 29, 0.82);
 
   backdrop-filter: blur(18px);
-
   -webkit-backdrop-filter: blur(18px);
 
   border: 1px solid var(--border);
@@ -1241,13 +1253,11 @@ select option {
 @keyframes slideIn {
   from {
     transform: translateX(20px);
-
     opacity: 0;
   }
 
   to {
     transform: translateX(0);
-
     opacity: 1;
   }
 }
@@ -1295,7 +1305,6 @@ select option {
   display: flex;
 
   align-items: center;
-
   justify-content: center;
 
   position: relative;
@@ -1352,7 +1361,6 @@ select option {
     );
 
   backdrop-filter: var(--glass-blur-heavy);
-
   -webkit-backdrop-filter: var(--glass-blur-heavy);
 
   border: 1px solid var(--border-hover);
@@ -1362,7 +1370,6 @@ select option {
   padding: 48px 40px;
 
   width: 100%;
-
   max-width: 400px;
 
   box-shadow:
@@ -1383,7 +1390,6 @@ select option {
     );
 
   -webkit-background-clip: text;
-
   background-clip: text;
 
   color: transparent;
@@ -1463,7 +1469,6 @@ select option {
   display: flex;
 
   align-items: center;
-
   justify-content: center;
 
   gap: 12px;
@@ -1569,7 +1574,6 @@ select option {
   display: flex;
 
   align-items: center;
-
   justify-content: center;
 
   font-size: 0.9rem;
@@ -1663,7 +1667,7 @@ select option {
   transition:
     background var(--transition),
     color var(--transition);
-  
+
   font-size: 0.88rem;
 }
 
@@ -1858,7 +1862,6 @@ select option {
   }
 }
 
-
 @media (max-width: 768px) {
   .app-layout {
     grid-template-columns: 1fr;
@@ -1903,7 +1906,6 @@ select option {
   }
 }
 
-
 @media (max-width: 480px) {
   .stats-grid {
     grid-template-columns: 1fr;
@@ -1923,7 +1925,6 @@ select option {
 
   .login-card {
     margin: 16px;
-
     padding: 36px 24px;
   }
 }
