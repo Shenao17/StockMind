@@ -6,13 +6,37 @@
 
 ## Changelog
 
-## [1.2.1] - Solucionado Seed.sql
+### [1.3.0] - Rediseño visual y mejoras en gestión de usuarios
+
 > Septiembre 2026
 
-### Fixed
-- Corregido problema de encoding UTF-8 en `seed.sql` que causaba corrupción de tildes/ñ al importar la base de datos en Docker (mojibake tipo "Ã¡" en vez de "á").
+#### Added
 
-### v1.2.0 — Agente de IA Conversacional (Experimental)
+- Nueva identidad visual para StockMind basada en un estilo Dark Glass / Glassmorphism.
+- Nueva base visual global con superficies translúcidas, bordes, sombras, gradientes y efectos de profundidad.
+- Nueva paleta visual orientada a una experiencia SaaS moderna y tecnológica.
+- Mejoras generales en botones, tarjetas, tablas, formularios, modales, estados y elementos de interfaz.
+
+#### Fixed
+
+- Restaurado el botón **"+ Nuevo usuario"** en el módulo de Usuarios después de la migración de la interfaz original en HTML a React.
+- Corregido el error al crear usuarios causado por `updated_at` con valor `NULL`.
+- `updatedAt` ahora se inicializa correctamente al crear un usuario y se actualiza automáticamente al modificarlo.
+
+---
+
+### [1.2.1] - Solucionado Seed.sql
+
+> Septiembre 2026
+
+#### Fixed
+
+- Corregido problema de encoding UTF-8 en `seed.sql` que causaba corrupción de tildes y caracteres especiales como `ñ` al importar la base de datos en Docker (mojibake tipo `"Ã¡"` en vez de `"á"`).
+
+---
+
+### [1.2.0] - Agente de IA Conversacional (Experimental)
+
 > Mayo 2026
 
 Se integra un asistente de inteligencia artificial conversacional como componente flotante en el frontend, accesible desde cualquier módulo del sistema. El agente opera en modo experimental y no tiene acceso directo a la base de datos en esta versión.
