@@ -24,6 +24,16 @@ const PAGE_TITLES = {
   '/users':       'Gestión de Usuarios',
 };
 
+const PAGE_SUBTITLES = {
+  '/dashboard':   'Vista general de tu operación',
+  '/products':    'Gestiona el catálogo de productos',
+  '/inventory':   'Supervisa el estado de tu inventario',
+  '/sales':       'Consulta y administra tus ventas',
+  '/reports':     'Analiza el rendimiento de tu negocio',
+  '/predictions': 'Anticipa la demanda de tus productos',
+  '/users':       'Administra los usuarios del sistema',
+};
+
 function ProtectedLayout({ showToast }) {
   const { isLoggedIn } = useAuth();
   const location = useLocation();
@@ -31,6 +41,7 @@ function ProtectedLayout({ showToast }) {
   if (!isLoggedIn()) return <Navigate to="/" replace />;
 
   const title = PAGE_TITLES[location.pathname] || 'StockMind';
+  const subtitle = PAGE_SUBTITLES[location.pathname] || 'Gestión inteligente de inventario';
 
   // Topbar actions por página
   const topbarActions = {
@@ -43,13 +54,19 @@ function ProtectedLayout({ showToast }) {
   return (
     <div className="app-layout">
       <Sidebar />
+
       <header className="topbar">
-        <span className="topbar-title">{title}</span>
+        <div className="topbar-heading">
+          <span className="topbar-title">{title}</span>
+          <span className="topbar-subtitle">{subtitle}</span>
+        </div>
+
         <div className="topbar-actions">
           {location.pathname === '/dashboard' && <DateDisplay />}
           {topbarActions}
         </div>
       </header>
+
       <main className="main-content">
         <Routes>
           <Route path="/dashboard"   element={<Dashboard   showToast={showToast} />} />
@@ -62,6 +79,7 @@ function ProtectedLayout({ showToast }) {
           <Route path="*"            element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </main>
+
       <AgentBubble />
     </div>
   );
@@ -69,9 +87,16 @@ function ProtectedLayout({ showToast }) {
 
 function DateDisplay() {
   return (
-    <span style={{ fontSize: '.8rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-      {new Date().toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-    </span>
+    <div className="topbar-date">
+      <span className="topbar-date-text">
+        {new Date().toLocaleDateString('es-CO', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        })}
+      </span>
+    </div>
   );
 }
 
@@ -82,9 +107,18 @@ function ProductsTopbar({ showToast }) {
   const { useAuth: ua } = { useAuth };
   return null; // El botón "+ Nuevo producto" vive dentro de Products.jsx con acceso a su estado
 }
-function InventoryTopbar() { return null; }
-function SalesTopbar() { return null; }
-function PredictionsTopbar() { return null; }
+
+function InventoryTopbar() {
+  return null;
+}
+
+function SalesTopbar() {
+  return null;
+}
+
+function PredictionsTopbar() {
+  return null;
+}
 
 export default function App() {
   const { toasts, showToast } = useToast();
@@ -96,6 +130,7 @@ export default function App() {
           <Route path="/" element={<Login />} />
           <Route path="/*" element={<ProtectedLayout showToast={showToast} />} />
         </Routes>
+
         <ToastContainer toasts={toasts} />
       </BrowserRouter>
     </AuthProvider>
