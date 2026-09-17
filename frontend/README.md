@@ -1,16 +1,104 @@
-# React + Vite
+# StockMind Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Frontend de StockMind, desarrollado con React y Vite.
 
-Currently, two official plugins are available:
+Esta aplicación proporciona la interfaz web para la gestión de inventario, productos, ventas, usuarios, reportes y predicciones del sistema.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Tecnologías
 
-## React Compiler
+- React 19
+- Vite
+- React Router
+- JavaScript
+- CSS
+- Vitest
+- ESLint
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Estructura
 
-## Expanding the ESLint configuration
+frontend/
+├── src/
+│   ├── api/              # Comunicación con el backend/gateway
+│   ├── components/       # Componentes reutilizables
+│   ├── context/          # Contextos globales de React
+│   ├── pages/            # Vistas principales
+│   ├── App.jsx           # Configuración principal de rutas
+│   └── index.css         # Sistema visual global
+├── public/
+├── Dockerfile
+├── package.json
+└── vite.config.js
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Módulos
+
+Actualmente el frontend cuenta con los siguientes módulos:
+
+- Dashboard
+- Productos
+- Inventario
+- Ventas
+- Predicciones
+- Reportes
+- Usuarios
+- Agente de IA conversacional
+
+## Diseño
+
+StockMind utiliza una identidad visual Dark Glass / Glassmorphism, basada en:
+
+- Interfaces oscuras.
+- Superficies translúcidas.
+- Efectos de desenfoque.
+- Bordes y sombras suaves.
+- Gradientes sutiles.
+- Componentes flotantes.
+- Interfaz orientada a una experiencia SaaS moderna.
+
+## Variables de entorno
+
+El frontend utiliza:
+
+VITE_GATEWAY_URL=http://localhost:3000
+
+Esta variable define la URL del Gateway utilizado para las comunicaciones con los servicios del sistema.
+
+## Desarrollo local
+
+Instalar dependencias:
+
+npm install
+
+Iniciar el servidor de desarrollo:
+
+npm run dev
+
+El frontend estará disponible normalmente en:
+
+http://localhost:5173
+
+## Docker
+
+El frontend también puede ejecutarse mediante Docker Compose desde la raíz del proyecto:
+
+docker compose build frontend
+docker compose up -d frontend
+
+Para reconstruir la imagen después de realizar cambios en el código:
+
+docker compose build frontend
+docker compose up -d frontend
+
+## Comandos disponibles
+
+npm run dev
+npm run build
+npm run preview
+npm run lint
+npm test
+npm run test:coverage
+
+## Estado
+
+Frontend en desarrollo activo.
+
+La interfaz continúa evolucionando junto con la arquitectura general de StockMind.
