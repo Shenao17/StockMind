@@ -5,10 +5,10 @@ const express = require('express');
 const axios = require('axios');
 const router = express.Router();
 const { authenticate, requireRole } = require('../middleware/auth.middleware');
+const { authHeader } = require('../utils/authHeader');
 const config = require('../config/config');
 
 const JAVA = config.javaApiUrl;
-const authHeader = (req) => ({ Authorization: req.headers.authorization });
 
 router.get('/', authenticate, requireRole('ADMIN'), async (req, res, next) => {
     try {

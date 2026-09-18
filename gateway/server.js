@@ -5,7 +5,7 @@
  *
  * Responsabilidades:
  * - Punto de entrada único para el frontend
- * - Verificación centralizada de tokens JWT
+ * - Verificación centralizada de tokens JWT (vía cookie httpOnly)
  * - Enrutamiento hacia Java Spring Boot (lógica de negocio)
  * - Enrutamiento hacia Python Flask (analítica predictiva)
  * - CORS, rate limiting y logging
@@ -17,6 +17,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
+const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
 
 // Importar rutas
@@ -36,15 +37,22 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const isDev = process.env.NODE_ENV !== 'production';
 
+// Origen del frontend permitido a mandar/recibir cookies.
+// Usa FRONTEND_URL si la defines en docker-compose (útil al probar desde
+// otro PC/IP en la red); si no, cae a localhost:5173.
+const FRONTEND_ORIGIN = process.env.FRONTEND_URL
+    || (process.env.NODE_ENV === 'production' ? 'https://tu-dominio.com' : 'http://localhost:5173');
+
 // =============================================================================
 // Middlewares globales
 // =============================================================================
 
-// CORS: permite peticiones desde el frontend (ajustar origin en producción)
+// CORS: con cookies httpOnly, el origin ya NO puede ser '*' — debe ser
+// exacto, y credentials:true es obligatorio para que el navegador mande
+// y acepte la cookie entre el frontend (5173) y el gateway (3000).
 app.use(cors({
-    origin: process.env.NODE_ENV === 'production'
-        ? 'https://tu-dominio.com'
-        : '*',
+    origin: FRONTEND_ORIGIN,
+    credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
@@ -52,6 +60,9 @@ app.use(cors({
 // Parser de JSON en el body de las peticiones
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Parser de cookies — necesario para que auth.middleware.js lea req.cookies.token
+app.use(cookieParser());
 
 // Logging de peticiones HTTP en desarrollo
 if (process.env.NODE_ENV !== 'test') {
@@ -62,8 +73,6 @@ if (process.env.NODE_ENV !== 'test') {
 // Rate limiting
 // =============================================================================
 // Límite estricto SOLO para login (protege contra fuerza bruta).
-// No depende de NODE_ENV: incluso en dev conviene mantenerlo realista para
-// probar el comportamiento del frontend ante un 429 real.
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutos
     max: 10,
@@ -76,16 +85,16 @@ const authLimiter = rateLimit({
 // Límite general para el resto de la API.
 // En desarrollo se relaja mucho (max: 5000) para poder entrar/salir de
 // módulos sin agotarlo mientras se prueba. En producción queda en un valor
-// generoso pero real (600 cada 5 min) pensado para navegación normal entre
-// módulos, no para tráfico sostenido de abuso.
+// generoso pero real (600 cada 5 min).
 const apiLimiter = rateLimit({
     windowMs: 5 * 60 * 1000, // 5 minutos
     max: isDev ? 5000 : 600,
     standardHeaders: true,
     legacyHeaders: false,
-    // Si ya pasó por el middleware de auth y hay req.user, limita por usuario
-    // en vez de por IP — evita que una red compartida (oficina, NAT) bloquee
-    // a todos los usuarios por igual.
+    // Nota: como authenticate() se aplica DENTRO de cada archivo de rutas
+    // (no antes de este middleware), req.user todavía no existe aquí —
+    // por ahora esto limita por IP igual que antes. Pendiente reordenar
+    // si se quiere limitar por usuario autenticado.
     keyGenerator: (req) => req.user?.id || req.ip,
     message: { error: 'Demasiadas peticiones. Espera un momento.' }
 });
@@ -111,12 +120,7 @@ app.get('/health', (req, res) => {
 // Todas las rutas pasan por el prefijo /api/
 // =============================================================================
 
-// El limiter estricto de login se aplica ANTES de montar el resto de authRoutes,
-// solo sobre la ruta de login.
 app.use('/api/auth/login', authLimiter);
-
-// El limiter general se aplica a partir de aquí, cubriendo auth/me, users,
-// products, inventory, sales, reports, predictions y agent.
 app.use('/api', apiLimiter);
 
 app.use('/api/auth', authRoutes);
@@ -147,6 +151,7 @@ app.listen(PORT, () => {
     console.log(`  StockMind API Gateway — Puerto ${PORT}`);
     console.log(`  Java Backend: ${process.env.JAVA_API_URL}`);
     console.log(`  Python Analytics: ${process.env.PYTHON_API_URL}`);
+    console.log(`  Frontend permitido (CORS): ${FRONTEND_ORIGIN}`);
     console.log(`  Entorno: ${process.env.NODE_ENV}`);
     console.log('='.repeat(60));
 });

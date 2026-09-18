@@ -5,10 +5,10 @@ const express = require('express');
 const axios = require('axios');
 const router = express.Router();
 const { authenticate, requireRole } = require('../middleware/auth.middleware');
+const { authHeader } = require('../utils/authHeader');
 const config = require('../config/config');
 
 const JAVA = config.javaApiUrl;
-const authHeader = (req) => ({ Authorization: req.headers.authorization });
 
 /** GET /api/reports/sales?from=YYYY-MM-DD&to=YYYY-MM-DD */
 router.get('/sales', authenticate, requireRole('ADMIN'), async (req, res, next) => {

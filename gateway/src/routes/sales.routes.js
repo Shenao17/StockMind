@@ -7,10 +7,10 @@ const express = require('express');
 const axios = require('axios');
 const router = express.Router();
 const { authenticate, requireRole } = require('../middleware/auth.middleware');
+const { authHeader } = require('../utils/authHeader');
 const config = require('../config/config');
 
 const JAVA = config.javaApiUrl;
-const authHeader = (req) => ({ Authorization: req.headers.authorization });
 
 /** GET /api/sales — Listar ventas (con filtros opcionales por fecha) */
 router.get('/', authenticate, async (req, res, next) => {

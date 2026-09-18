@@ -9,6 +9,7 @@ const axios = require('axios');
 const router = express.Router();
 const { authenticate } = require('../middleware/auth.middleware');
 const config = require('../config/config');
+const { authHeader } = require('../utils/authHeader');
 
 const PYTHON = config.pythonApiUrl;
 

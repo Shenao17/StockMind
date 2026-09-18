@@ -1,9 +1,11 @@
 /**
  * StockMind Gateway — Middleware de autenticación JWT
  * =====================================================
- * Verifica el token JWT en el header Authorization de cada petición.
+ * Verifica el token JWT guardado en la cookie httpOnly "token".
  * Si el token es válido, adjunta el payload decodificado a req.user
  * y permite continuar. Si no, retorna 401.
+ *
+ * Requiere cookie-parser montado en server.js ANTES de las rutas.
  *
  * Uso: aplicar en rutas protegidas con authenticate()
  * Uso con rol: aplicar requireRole('ADMIN') después de authenticate()
@@ -14,27 +16,17 @@ const config = require('../config/config');
 
 /**
  * Middleware de autenticación.
- * Extrae el token del header: Authorization: Bearer <token>
+ * Extrae el token de la cookie httpOnly: req.cookies.token
  */
 const authenticate = (req, res, next) => {
-    const authHeader = req.headers['authorization'];
+    const token = req.cookies?.token;
 
-    if (!authHeader) {
+    if (!token) {
         return res.status(401).json({
-            error: 'Token de autorización requerido',
+            error: 'No autenticado. Inicia sesión.',
             code: 'NO_TOKEN'
         });
     }
-
-    const parts = authHeader.split(' ');
-    if (parts.length !== 2 || parts[0] !== 'Bearer') {
-        return res.status(401).json({
-            error: 'Formato de token inválido. Use: Bearer <token>',
-            code: 'INVALID_TOKEN_FORMAT'
-        });
-    }
-
-    const token = parts[1];
 
     try {
         const decoded = jwt.verify(token, config.jwtSecret);
