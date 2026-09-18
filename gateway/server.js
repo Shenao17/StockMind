@@ -34,6 +34,7 @@ const errorHandler = require('./src/middleware/errorHandler.middleware');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const isDev = process.env.NODE_ENV !== 'production';
 
 // =============================================================================
 // Middlewares globales
@@ -57,9 +58,37 @@ if (process.env.NODE_ENV !== 'test') {
     app.use(morgan('dev'));
 }
 
-// Rate limiting: máximo 100 peticiones por IP cada 15 minutos
-//POR IMPLENTAR: Ajustar límites según necesidades reales
+// =============================================================================
+// Rate limiting
+// =============================================================================
+// Límite estricto SOLO para login (protege contra fuerza bruta).
+// No depende de NODE_ENV: incluso en dev conviene mantenerlo realista para
+// probar el comportamiento del frontend ante un 429 real.
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutos
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => req.ip,
+    message: { error: 'Demasiados intentos de inicio de sesión. Intenta más tarde.' }
+});
 
+// Límite general para el resto de la API.
+// En desarrollo se relaja mucho (max: 5000) para poder entrar/salir de
+// módulos sin agotarlo mientras se prueba. En producción queda en un valor
+// generoso pero real (600 cada 5 min) pensado para navegación normal entre
+// módulos, no para tráfico sostenido de abuso.
+const apiLimiter = rateLimit({
+    windowMs: 5 * 60 * 1000, // 5 minutos
+    max: isDev ? 5000 : 600,
+    standardHeaders: true,
+    legacyHeaders: false,
+    // Si ya pasó por el middleware de auth y hay req.user, limita por usuario
+    // en vez de por IP — evita que una red compartida (oficina, NAT) bloquee
+    // a todos los usuarios por igual.
+    keyGenerator: (req) => req.user?.id || req.ip,
+    message: { error: 'Demasiadas peticiones. Espera un momento.' }
+});
 
 // =============================================================================
 // Health check del gateway
@@ -81,6 +110,15 @@ app.get('/health', (req, res) => {
 // Registro de rutas del API
 // Todas las rutas pasan por el prefijo /api/
 // =============================================================================
+
+// El limiter estricto de login se aplica ANTES de montar el resto de authRoutes,
+// solo sobre la ruta de login.
+app.use('/api/auth/login', authLimiter);
+
+// El limiter general se aplica a partir de aquí, cubriendo auth/me, users,
+// products, inventory, sales, reports, predictions y agent.
+app.use('/api', apiLimiter);
+
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/products', productRoutes);
