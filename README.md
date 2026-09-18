@@ -6,6 +6,18 @@
 
 ## Changelog
 
+### [1.3.1] - Rate limiting en el gateway
+> Septiembre 2026
+
+#### Added
+
+- Rate limiting activado en el gateway (antes importado pero sin aplicar).
+- Límite estricto en `/api/auth/login` (10 intentos / 15 min) contra fuerza bruta.
+- Límite general en el resto de `/api` (600 peticiones / 5 min en producción,
+  5000 en desarrollo) para no bloquear la navegación normal entre módulos.
+- Identificación por usuario autenticado (`req.user.id`) cuando hay sesión,
+  con fallback a IP.
+
 ### [1.3.0] - Rediseño visual y mejoras en gestión de usuarios
 
 > Septiembre 2026
