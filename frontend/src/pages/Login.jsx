@@ -32,13 +32,10 @@ export default function Login() {
         password,
       });
 
-      if (response?.token) {
-        login(response.token, {
-          id: response.userId,
-          username: response.username,
-          role: response.role,
-        });
-
+      // El token ya no viaja en el body: el gateway lo puso en una cookie
+      // httpOnly. Aquí solo llega { user: { id, username, role } }.
+      if (response?.user) {
+        login(response.user);
         navigate('/dashboard', { replace: true });
       } else {
         setError('Respuesta inesperada del servidor');
@@ -152,7 +149,7 @@ export default function Login() {
           <div className="login-footer">
             <span>StockMind</span>
             <span className="login-footer-separator">·</span>
-            <span>v1.3.0</span>
+            <span>v1.3.1</span>
             <span className="login-footer-separator">·</span>
             <span>AI Agent Experimental</span>
           </div>

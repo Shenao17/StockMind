@@ -1,46 +1,45 @@
 /**
  * StockMind React — Cliente HTTP centralizado
- * Migrado desde vanilla JS, misma lógica, mismo gateway Node.js (puerto 3000).
+ * El JWT ya NO se guarda en localStorage: vive en una cookie httpOnly que
+ * el navegador maneja solo. Cada fetch va con credentials:'include' para
+ * que la cookie viaje automáticamente; no hay nada que leer/escribir aquí.
  */
 
 const BASE_URL = 'http://localhost:3000/api';
 
 // ── Auth helpers ──────────────────────────────────────────
+let cachedUser = null;
+
 export const Auth = {
-  getToken:     () => localStorage.getItem('sm_token'),
-  getUser:      () => JSON.parse(localStorage.getItem('sm_user') || 'null'),
-  setSession:   (token, user) => {
-    localStorage.setItem('sm_token', token);
-    localStorage.setItem('sm_user', JSON.stringify(user));
-  },
-  clearSession: () => {
-    localStorage.removeItem('sm_token');
-    localStorage.removeItem('sm_user');
-  },
-  isAdmin:    () => Auth.getUser()?.role === 'ADMIN',
-  isLoggedIn: () => !!Auth.getToken(),
+  getUser:    () => cachedUser,
+  setUser:    (user) => { cachedUser = user; },
+  clearUser:  () => { cachedUser = null; },
+  isAdmin:    () => cachedUser?.role === 'ADMIN',
+  isLoggedIn: () => !!cachedUser,
 };
 
 // ── Fetch base ────────────────────────────────────────────
 async function apiRequest(method, endpoint, body = null) {
-  const token = Auth.getToken();
-
-  const headers = {
-    'Content-Type': 'application/json',
-    ...(token && { Authorization: `Bearer ${token}` }),
-  };
+  const headers = { 'Content-Type': 'application/json' };
 
   const options = {
     method,
     headers,
+    credentials: 'include', // manda/recibe la cookie httpOnly del gateway
     ...(body && { body: JSON.stringify(body) }),
   };
 
   try {
     const response = await fetch(`${BASE_URL}${endpoint}`, options);
 
-    if (response.status === 401) {
-      Auth.clearSession();
+    // IMPORTANTE: un 401 en /auth/me es un estado NORMAL cuando todavía no
+    // hay sesión (por ejemplo, al cargar la app por primera vez). Redirigir
+    // aquí causaría un bucle infinito: redirige a '/' -> remonta AuthProvider
+    // -> vuelve a llamar /me -> vuelve a dar 401 -> vuelve a redirigir...
+    // Por eso /auth/me NO dispara el auto-redirect; deja que quien llamó
+    // (AuthContext) decida qué hacer con el 401 vía catch/throw normal.
+    if (response.status === 401 && endpoint !== '/auth/me') {
+      Auth.clearUser();
       window.location.href = '/';
       return null;
     }
@@ -67,8 +66,9 @@ async function apiRequest(method, endpoint, body = null) {
 // ── API pública ───────────────────────────────────────────
 export const API = {
   auth: {
-    login: (data) => apiRequest('POST', '/auth/login', data),
-    me:    ()     => apiRequest('GET',  '/auth/me'),
+    login:  (data) => apiRequest('POST', '/auth/login', data),
+    logout: ()     => apiRequest('POST', '/auth/logout'),
+    me:     ()     => apiRequest('GET',  '/auth/me'),
   },
   users: {
     list:   ()         => apiRequest('GET',    '/users'),
