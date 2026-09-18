@@ -1,203 +1,675 @@
-# StockMind — Roadmap, Errores Conocidos y Decisiones Técnicas
+# StockMind — Roadmap de Desarrollo
 
-> Documento de referencia interna para el equipo de desarrollo.  
-> Refleja el estado real del sistema, decisiones arquitectónicas tomadas, bugs abiertos y funcionalidades planificadas.
-
----
-
-## Estado actual: v1.2.0 (experimental)
-
-| Componente | Estado |
-|-----------|--------|
-| Frontend React 18 + Vite | ✅ Estable |
-| Gateway Node.js | ✅ Estable |
-| Backend Java Spring Boot | ✅ Estable |
-| Microservicio Python Flask | ✅ Estable |
-| Agente IA (AgentBubble) | ⚗️ Experimental |
+> Roadmap general del proyecto StockMind.
+> 
+> Objetivo: construir una aplicación de gestión de inventario moderna, funcional y escalable, manteniendo separadas las capas Frontend, Gateway y API Java Spring Boot.
+>
+> Estado actual: **v1.3.2**
 
 ---
 
-## Errores conocidos y abiertos
+# VERSIONES
 
-### 🔴 ERR-001 — El sistema no inicia en otros equipos (causa desconocida)
+## v1.0.0 — Base funcional
 
-**Descripción:** Al clonar el repositorio en un equipo distinto al de desarrollo y ejecutar `start.bat`, el sistema no arranca correctamente. El error no es consistente ni descriptivo.
-
-**Comportamiento observado:** Los servicios aparentan levantarse pero el login falla o la aplicación no carga en el navegador.
-
-**Hipótesis activas:**
-- Versión de Java distinta a 17 LTS instalada en el equipo destino
-- Puerto 3000, 8080 o 8000 ocupado por otro proceso
-- MySQL no está corriendo o las credenciales en `application.properties` y `config.py` no fueron configuradas correctamente a partir de los `.example`
-- Variable `JWT_SECRET` distinta entre `gateway/.env` y `application.properties`
-- `JAVA_HOME` no configurado en las variables de entorno del sistema
-
-**Intento de solución:** Se intentó contenerizar el sistema con Docker pero el problema persistió — el token JWT no se mantenía entre reinicios de contenedor, posiblemente por inconsistencia del `JWT_SECRET` entre servicios dentro de Docker Compose.
-
-**Estado:** Abierto. Pendiente de reproducir en un entorno controlado limpio.
+- [x] Estructura inicial del proyecto.
+- [x] Frontend funcional.
+- [x] Backend Java Spring Boot.
+- [x] Gateway Node.js / Express.
+- [x] Autenticación.
+- [x] Gestión de usuarios.
+- [x] Gestión de productos.
+- [x] Inventario.
+- [x] Ventas.
+- [x] Predicciones.
+- [x] Comunicación Frontend → Gateway → Java API.
 
 ---
 
-### 🔴 ERR-002 — Creación de usuarios no funciona (regresión post-migración)
+## v1.1.0 — Integración y estabilidad
 
-**Descripción:** Tras la migración del frontend de HTML/CSS/JS vanilla a React 18 en v1.1.0, la funcionalidad de crear nuevos usuarios desde el módulo de Gestión de Usuarios dejó de funcionar correctamente.
-
-**Comportamiento observado:** El Boton de Agregar Usuario desapecio por Completo.
-
-**Causa probable:** Falta de defincion en codigo React.
-
-**Estado:** Parcialmente investigado. Se menciona una posible corrección en el commit de v1.2.0 pero no ha sido verificada de forma exhaustiva.
-
----
-
-### 🟡 ERR-003 — API key de Groq expuesta en el bundle del cliente
-
-**Descripción:** La API key de Groq configurada como variable de entorno de Vite (`VITE_GROQ_API_KEY`) queda embebida en el bundle JavaScript del frontend y es visible desde DevTools → Network o inspeccionando el bundle compilado.
-
-**Impacto:** Cualquier usuario con acceso al frontend puede extraer la key y usarla fuera del sistema.
-
-**Solución planificada (v1.3.0):** Mover las llamadas a Groq a un endpoint proxy en el gateway Node.js. El frontend llamaría a `POST /api/agent/query` y el gateway haría la llamada real a Groq con la key almacenada en el `.env` del servidor.
-
-**Estado:** Abierto. Aceptado como deuda técnica para entorno académico/local.
+- [x] Integración de módulos principales.
+- [x] Manejo inicial de errores.
+- [x] Protección de rutas.
+- [x] Control de roles.
+- [x] Persistencia de información.
+- [x] Correcciones generales de funcionamiento.
 
 ---
 
-### 🟡 ERR-004 — Historial del agente IA no persiste entre sesiones
+## v1.2.0 — Migración y consolidación
 
-**Descripción:** Al cerrar el panel del agente o recargar la página, el historial de conversación se pierde completamente.
-
-**Causa:** El estado del componente `AgentBubble` vive en memoria React y no se persiste en ningún almacenamiento.
-
-**Solución planificada (v1.3.0):** Guardar el historial en `localStorage` con un límite de los últimos 20 mensajes, asociado al `userId` del `AuthContext`.
-
-**Estado:** Abierto. Bajo prioridad.
-
----
-
-### 🟡 ERR-005 — Docker Compose: token JWT no se mantiene
-
-**Descripción:** Al intentar contenerizar el sistema completo con Docker Compose, el login funciona pero las peticiones posteriores fallan con 401. El token generado por Java no es validado correctamente por el gateway.
-
-**Causa probable:** El `JWT_SECRET` no es consistente entre el contenedor del gateway y el contenedor de Java, ya sea por variables de entorno mal inyectadas en el `docker-compose.yml` o por archivos `.env` no montados correctamente.
-
-**Estado:** Abierto. Docker no es requisito del proyecto académico; se depriorizó.
+- [x] Migración progresiva de la interfaz HTML hacia React.
+- [x] Organización de componentes.
+- [x] Contexto de autenticación.
+- [x] Componentes reutilizables.
+- [x] Integración de API desde React.
+- [x] Consolidación de módulos existentes.
+- [x] Correcciones posteriores a la migración.
 
 ---
 
-## Decisiones técnicas documentadas
+## v1.2.1 — Correcciones
 
-### DEC-001 — El frontend nunca llama directamente a Java ni Python
-
-**Decisión:** Todo el tráfico del frontend pasa por el gateway Node.js, sin excepción (salvo `AgentBubble` en v1.2.0).
-
-**Razón:** Centralizar autenticación JWT, CORS y logging en un solo punto. Permite cambiar la implementación interna de Java o Python sin tocar el frontend.
-
----
-
-### DEC-002 — Python como microservicio real, no decorativo
-
-**Decisión:** Python no está en el stack para cumplir un requisito de "usar N tecnologías". Es el único componente con capacidad estadística madura.
-
-**Razón:** scikit-learn, pandas y numpy no tienen equivalente de facilidad y madurez en Java ni Node.js para análisis de series temporales. Su rol es exclusivo y no duplicado.
+- [x] Correcciones de errores introducidos durante la migración.
+- [x] Ajustes de componentes React.
+- [x] Correcciones de datos y estados.
+- [x] Correcciones visuales iniciales.
 
 ---
 
-### DEC-003 — Migración de XAMPP a MySQL Community Server 8.0
+# v1.3.0 — Rediseño Dark Glass / Glassmorphism
 
-**Decisión:** Se abandonó XAMPP como gestor de MySQL y se migró a MySQL Community Server 8.0 instalado de forma independiente.
+## Objetivo
 
-**Razón:** XAMPP presentó inestabilidad recurrente durante el desarrollo — el servicio MySQL se detenía aleatoriamente, corrompía conexiones activas y generaba errores difíciles de diagnosticar. MySQL Community Server resultó significativamente más estable.
+Realizar el rediseño visual completo de StockMind utilizando una estética:
 
----
+- Dark Glass.
+- Glassmorphism.
+- Moderna.
+- Premium.
+- Minimalista.
+- Tecnológica.
+- Consistente entre módulos.
 
-### DEC-004 — BCrypt: prefijo `$2b$` vs `$2a$`
+La prioridad de esta versión es **el diseño y la experiencia visual**, sin modificar innecesariamente la lógica de negocio existente.
 
-**Decisión:** Se normalizó el hash de contraseñas para garantizar compatibilidad entre Python y Java.
-
-**Razón:** Python genera hashes BCrypt con prefijo `$2b$` mientras que Spring Security espera `$2a$`. Esto causaba que las contraseñas creadas desde el seed o desde Python fueran rechazadas por Java. La solución fue estandarizar el prefijo en el seed y en la generación de contraseñas.
-
----
-
-### DEC-005 — AgentBubble llama a Groq directamente desde el cliente
-
-**Decisión:** En v1.2.0 el agente llama a la API de Groq directamente desde el navegador, sin pasar por el gateway.
-
-**Razón:** Decisión de velocidad de implementación para la fase experimental. La arquitectura correcta (proxy en gateway) está planificada para v1.3.0 una vez el agente se estabilice.
-
-**Deuda técnica generada:** API key expuesta en el bundle del cliente (ver ERR-003).
+> **Nota:** durante esta versión se insertaron dos patches aislados (v1.3.1 y v1.3.2) por temas de backend/seguridad que no podían esperar al orden de fases de diseño. El trabajo de diseño de v1.3.0 sigue pendiente desde la Fase 2 (ver "PRÓXIMO PASO" al final del documento).
 
 ---
 
-### DEC-006 — Groq como motor del agente en lugar de Gemini o OpenAI
+# 1.3.0 — Sistema visual global
 
-**Decisión:** Se eligió Groq con el modelo `llama-3.3-70b-versatile` como motor del agente IA.
+## 1. Base visual
 
-**Razón:** Groq ofrece un free tier real y generoso sin requerir tarjeta de crédito activa. Gemini API requiere billing activado en Google Cloud a pesar de tener "free tier". OpenAI no tiene free tier. Groq además ofrece latencia significativamente menor (~500ms) que los competidores.
-
----
-
-## Funcionalidades planificadas
-
-### v1.3.0 — Agente IA con datos reales
-
-- [ ] Mover llamadas a Groq a un endpoint proxy en el gateway (`POST /api/agent/query`) — elimina ERR-003
-- [ ] Darle al agente acceso de solo lectura al backend mediante tool use:
-  - `get_dashboard_summary()` → métricas del día
-  - `get_low_stock_products()` → productos en stock crítico
-  - `get_sales_summary(days)` → resumen de ventas por período
-  - `get_top_products()` → productos más vendidos
-  - `get_prediction(product_id)` → predicción de demanda
-- [ ] Persistencia del historial de conversación en `localStorage` por usuario — elimina ERR-004
-- [ ] El agente puede responder con datos reales en lugar de respuestas orientativas
+- [x] Definir fondo principal oscuro.
+- [x] Definir superficies glass.
+- [x] Definir bordes translúcidos.
+- [x] Definir colores semánticos.
+- [x] Definir color accent.
+- [x] Definir color wine secundario.
+- [x] Definir tipografías.
+- [x] Definir radios.
+- [x] Definir sombras.
+- [x] Definir blur.
+- [x] Definir transiciones.
+- [x] Definir scrollbar.
+- [x] Crear sistema visual reutilizable mediante variables CSS.
 
 ---
 
-### v1.3.0 — Estabilidad y correcciones
+## 2. Componentes globales
 
-- [ ] Investigar y resolver ERR-001 (arranque en otros PCs) — crear guía de diagnóstico paso a paso
-- [ ] Verificar y cerrar ERR-002 (creación de usuarios post-migración React)
-- [ ] Revisión completa del `start.bat` con validaciones de prerequisitos (Java, Python, Node, MySQL)
-
----
-
-### v1.4.0 — Mejoras de inventario y ventas
-
-- [ ] **Módulo de proveedores:** registro de proveedores por producto con contacto y lead time
-- [ ] **Órdenes de compra:** generación de órdenes de reabastecimiento basadas en las recomendaciones del microservicio Python
-- [ ] **Devoluciones de venta:** flujo completo de devolución que revierta stock e inventario
-- [ ] **Exportar reportes a Excel/PDF:** el módulo de reportes actualmente solo muestra datos en pantalla
-- [ ] **Filtros avanzados en ventas:** filtrar historial por vendedor, rango de fechas y estado
+- [x] Rediseñar botones.
+- [x] Rediseñar inputs.
+- [x] Rediseñar selects.
+- [x] Rediseñar textareas.
+- [x] Rediseñar badges.
+- [x] Rediseñar tablas.
+- [x] Rediseñar estados de carga.
+- [x] Rediseñar toasts.
+- [x] Rediseñar modales.
+- [x] Crear estados hover/focus/active.
+- [x] Mantener coherencia visual entre componentes.
 
 ---
 
-### v1.5.0 — Dashboard inteligente
+## 3. Layout principal
 
-- [ ] **Gráficos de tendencia:** visualización de ventas semanales/mensuales con Chart.js o Recharts
-- [ ] **Comparativa de períodos:** ventas esta semana vs semana anterior, este mes vs mes anterior
-- [ ] **Mapa de calor de ventas:** qué días y horas se vende más
-- [ ] **Widget de predicción en dashboard:** mostrar los 3 productos con mayor demanda proyectada directamente en el dashboard sin ir al módulo de predicciones
-
----
-
-### v2.0.0 — Multi-tenant y autenticación avanzada
-
-- [ ] **Multi-tenancy:** soporte para múltiples negocios en la misma instancia, cada uno con su base de datos aislada
-- [ ] **Refresh tokens:** actualmente el JWT expira y fuerza re-login; implementar refresh token silencioso
-- [ ] **2FA opcional:** autenticación de dos factores para cuentas de administrador
-- [ ] **Auditoría completa:** log de quién hizo qué y cuándo en todas las operaciones críticas
-- [ ] **Roles personalizados:** en lugar de solo ADMIN/SELLER, permitir crear roles con permisos granulares
+- [x] Definir estructura general de la aplicación.
+- [x] Sidebar.
+- [x] Topbar.
+- [x] Main content.
+- [x] Sistema responsive inicial.
+- [x] Separación visual entre navegación y contenido.
 
 ---
 
-### Descartado / No planificado
+# 1.3.0 — Correcciones funcionales detectadas durante el rediseño
 
-| Feature | Razón |
-|---------|-------|
-| Aplicación móvil nativa | Fuera del alcance académico; el frontend React es responsive |
-| Modelos LSTM / Prophet | Complejidad desproporcionada para el volumen de datos esperado |
-| Integración con pasarelas de pago | No es un e-commerce; StockMind gestiona inventario, no cobra |
-| WebSockets para tiempo real | Añade complejidad de infraestructura sin beneficio claro en el contexto actual |
+## 4. Usuarios
+
+### 4.1 Botón de agregar usuario
+
+- [x] Detectar pérdida del botón `+ Nuevo usuario` durante la migración HTML → React.
+- [x] Restaurar botón `+ Nuevo usuario`.
+- [x] Mantenerlo integrado con el diseño actual.
+- [x] Mantener su funcionamiento existente.
+- [x] Evitar modificar la API únicamente por el cambio visual.
 
 ---
 
-*Última actualización: v1.2.0 — Mayo 2026*
+### 4.2 Campo `updated_at`
+
+- [x] Detectar problema donde `updated_at` podía quedar en `NULL`.
+- [x] Inicializar correctamente `updatedAt`.
+- [x] Actualizar `updatedAt` cuando corresponda.
+- [x] Evitar inconsistencias entre creación y actualización de usuarios.
+
+---
+
+# v1.3.1 — Rate limiting en el gateway
+
+> Septiembre 2026 · Patch aislado de backend, separado del rediseño visual de 1.3.0.
+
+## Objetivo
+
+Activar rate limiting en el API Gateway (estaba importado pero nunca aplicado, marcado como `//POR IMPLEMENTAR`), diferenciando rutas sensibles de la navegación normal entre módulos.
+
+## Cambios
+
+- [x] Activar `express-rate-limit` en `server.js`.
+- [x] Límite estricto en `/api/auth/login` (10 intentos / 15 min) contra fuerza bruta.
+- [x] Límite general en el resto de `/api` (600 peticiones / 5 min en producción, 5000 en desarrollo) para no bloquear la navegación normal entre módulos mientras se prueba.
+- [x] `keyGenerator` pensado para identificar por usuario autenticado (`req.user.id`) con fallback a IP.
+
+## Pendiente detectado (no bloqueante)
+
+- [ ] El `apiLimiter` se monta antes de que `authenticate` decodifique el JWT dentro de cada archivo de rutas, así que por ahora sigue limitando por IP y no por usuario. Reordenar cuando se retome este módulo.
+
+---
+
+# v1.3.2 — Seguridad de sesión: JWT fuera de localStorage
+
+> Septiembre 2026 · Patch aislado de seguridad, separado del rediseño visual de 1.3.0.
+
+## Objetivo
+
+Sacar el JWT de `localStorage` (vulnerable a robo vía XSS) y moverlo a una cookie `httpOnly`, inaccesible para JavaScript.
+
+## Cambios — Gateway
+
+- [x] `POST /api/auth/login` ya no devuelve el token en el body: lo setea como cookie `httpOnly` (`secure` + `sameSite` según entorno).
+- [x] Nuevo endpoint `POST /api/auth/logout` que limpia la cookie del lado del servidor.
+- [x] `GET /api/auth/me` lee el token desde la cookie (vía `authenticate`) en vez del header `Authorization`.
+- [x] `cookie-parser` agregado a `package.json` y montado en `server.js`.
+- [x] CORS ajustado (`credentials: true`, origin explícito por `FRONTEND_URL`) para permitir cookies entre frontend y gateway.
+- [x] Helper centralizado `utils/authHeader.js`: reconstruye el header `Authorization` hacia Java a partir de la cookie, en un solo lugar en vez de repetirlo en cada archivo de rutas (`products`, `inventory`, `sales`, `users`, `reports`, `predictions`, `agent`).
+
+## Cambios — Frontend
+
+- [x] `api.js`: sin `localStorage`; `credentials: 'include'` en cada fetch; `Auth` ahora solo cachea el `user` en memoria.
+- [x] `AuthContext.jsx`: restaura la sesión llamando a `/api/auth/me` al montar la app (estado `loading` mientras se confirma), en vez de leer un token guardado localmente.
+- [x] `Login.jsx`: `login()` ya no recibe `token`, solo el `user` que devuelve el gateway.
+
+## Bugs encontrados y corregidos durante la migración
+
+- [x] 403 en todas las rutas protegidas: Java no recibía el token porque el gateway seguía leyendo el header `Authorization` (vacío) en vez de la cookie. Corregido centralizando la lógica en `authHeader.js`.
+- [x] Bucle infinito de recarga: un 401 esperado de `/api/auth/me` (sin sesión aún) se trataba igual que un 401 de sesión caída, disparando `window.location.href` en loop. Corregido excluyendo `/auth/me` del auto-redirect.
+
+## Relación con el problema conocido de la "pantalla negra" (sección 6 más abajo)
+
+- [x] Como efecto colateral de este patch, ya no hay un JWT expirado "atascado" en `localStorage` que provoque el estado inconsistente original. Al recargar, `AuthContext` simplemente le pregunta al gateway (`/me`) si la cookie sigue siendo válida.
+- [ ] Pendiente pulir la experiencia puntual: mostrar un mensaje explícito de "tu sesión expiró" en vez de solo devolver a Login en silencio, y confirmar en pruebas reales que no queden loops de redirección en ningún flujo.
+
+---
+
+# 1.3.0 — Autenticación y persistencia de sesión
+
+> Problemas detectados durante las pruebas reales de la aplicación.
+
+## 5. Token JWT almacenado en `localStorage`
+
+### Estado
+
+**Resuelto en v1.3.2.** El JWT ya no se almacena en `localStorage`; vive en una cookie `httpOnly` que JavaScript no puede leer.
+
+### Pendientes restantes
+
+- [ ] Documentar la estrategia definitiva de autenticación (cookie httpOnly + access/refresh) en un README o wiki interno.
+- [ ] Evaluar separar access token (corto) y refresh token, para reducir aún más la ventana de exposición si el JWT_EXPIRATION de 24h se considera demasiado largo.
+
+---
+
+# 1.3.0 — Manejo de token expirado
+
+## 6. Pantalla negra al reabrir la aplicación
+
+### Estado
+
+**Mitigado como efecto colateral de v1.3.2** (ver arriba). Al ya no depender de `localStorage`, el escenario original (token expirado atascado, estado inconsistente, pantalla negra) deja de poder ocurrir de la misma forma: `AuthContext` valida la sesión contra el gateway en cada carga.
+
+### Pendientes restantes
+
+- [ ] Confirmar con pruebas reales (cerrar la app, esperar a que expire el JWT de 24h, reabrir) que redirige a Login limpio y sin loops.
+- [ ] Mostrar un mensaje claro ("tu sesión expiró, vuelve a iniciar sesión") en vez de solo redirigir en silencio.
+- [ ] Evitar llamadas innecesarias a otras rutas mientras `AuthContext` todavía está resolviendo `loading`.
+
+---
+
+# 1.3.0 — Navegación
+
+## 7. Sidebar
+
+### Objetivo
+
+Crear una navegación lateral moderna, flotante y coherente con el sistema Dark Glass.
+
+### Pendientes
+
+- [ ] Rediseñar Sidebar.
+- [ ] Sidebar flotante.
+- [ ] Logo de StockMind.
+- [ ] Iconos de navegación.
+- [ ] Separadores de secciones.
+- [ ] Estado activo.
+- [ ] Glow del elemento activo.
+- [ ] Perfil del usuario.
+- [ ] Rol del usuario.
+- [ ] Botón de logout.
+- [ ] Estados hover.
+- [ ] Estados active.
+- [ ] Transiciones.
+- [ ] Adaptación responsive.
+
+### Archivo principal
+
+`frontend/src/components/layout/Sidebar.jsx`
+
+### Restricción
+
+En esta fase:
+
+- No modificar autenticación.
+- No modificar permisos.
+- No modificar rutas.
+- No modificar APIs.
+
+La fase debe concentrarse en la **presentación y navegación visual**.
+
+---
+
+# 1.3.0 — Topbar
+
+## 8. Topbar
+
+### Pendientes
+
+- [ ] Crear Topbar flotante.
+- [ ] Título de página.
+- [ ] Subtítulo/descripción.
+- [ ] Fecha.
+- [ ] Estado del sistema.
+- [ ] Indicador visual de conexión.
+- [ ] Diseño Glass.
+- [ ] Estados responsive.
+
+---
+
+# 1.3.0 — Dashboard
+
+## 9. Dashboard
+
+### Pendientes
+
+- [ ] Rediseñar tarjetas estadísticas.
+- [ ] Mejorar jerarquía visual.
+- [ ] Aplicar Glassmorphism.
+- [ ] Indicadores de stock.
+- [ ] Indicadores de ventas.
+- [ ] Alertas de stock bajo.
+- [ ] Resumen de actividad.
+- [ ] Estados de carga.
+- [ ] Estados vacíos.
+- [ ] Responsive.
+
+---
+
+# 1.3.0 — Productos
+
+## 10. Products
+
+### Pendientes
+
+- [ ] Rediseñar listado de productos.
+- [ ] Rediseñar encabezado.
+- [ ] Mejorar buscador.
+- [ ] Mejorar filtros.
+- [ ] Rediseñar tabla/listado.
+- [ ] Badges de stock.
+- [ ] Indicadores de stock bajo.
+- [ ] Botón de agregar producto.
+- [ ] Acciones de edición.
+- [ ] Acciones de eliminación.
+- [ ] Modal de creación.
+- [ ] Modal de edición.
+- [ ] Estados de carga.
+- [ ] Estados vacíos.
+- [ ] Responsive.
+
+### Restricción
+
+Primero diseño.
+
+No modificar las APIs ni las funciones existentes hasta que el diseño quede aprobado.
+
+---
+
+# 1.3.0 — Inventario
+
+## 11. Inventory
+
+### Estado
+
+El módulo ya cuenta con funcionalidad existente para:
+
+- Historial de movimientos.
+- Entrada.
+- Salida.
+- Venta.
+- Ajuste.
+- Devolución.
+- Producto.
+- Cantidad.
+- Stock antes.
+- Stock después.
+- Motivo.
+- Usuario.
+- Fecha.
+- Registro de movimientos mediante modal.
+
+### Objetivo de esta fase
+
+Rediseñar visualmente el módulo sin alterar inicialmente su lógica.
+
+### Pendientes
+
+- [ ] Rediseñar encabezado del historial.
+- [ ] Rediseñar botón `+ Registrar movimiento`.
+- [ ] Mejorar visualización de movimientos.
+- [ ] Mejorar badges de tipos de movimiento.
+- [ ] Mejorar visualización de cantidades positivas/negativas.
+- [ ] Mejorar columnas de stock.
+- [ ] Mejorar visualización de usuario y fecha.
+- [ ] Mejorar estados vacíos.
+- [ ] Mejorar estado de carga.
+- [ ] Rediseñar modal de registro.
+- [ ] Mejorar campos del formulario.
+- [ ] Mejorar selección de producto.
+- [ ] Mejorar selección de tipo.
+- [ ] Mejorar campo cantidad.
+- [ ] Mejorar campo motivo.
+- [ ] Adaptar tabla para pantallas pequeñas.
+
+### Restricción
+
+Primero diseño.
+
+No tocar:
+
+- API de inventario.
+- API de productos.
+- Endpoints.
+- Funciones de registro.
+- Estructura de datos.
+
+Hasta finalizar y aprobar la parte visual.
+
+---
+
+# 1.3.0 — Ventas
+
+## 12. Sales
+
+### Pendientes
+
+- [ ] Rediseñar selector de productos.
+- [ ] Rediseñar carrito.
+- [ ] Mejorar tarjetas de productos.
+- [ ] Mejorar cantidades.
+- [ ] Mejorar controles `+ / -`.
+- [ ] Mejorar total.
+- [ ] Mejorar botón de finalizar venta.
+- [ ] Estados vacíos.
+- [ ] Estados de carga.
+- [ ] Responsive.
+- [ ] Aplicar Glassmorphism.
+
+---
+
+# 1.3.0 — Predicciones
+
+## 13. Predictions
+
+### Pendientes
+
+- [ ] Rediseñar selector de productos.
+- [ ] Rediseñar lista lateral.
+- [ ] Mejorar información de predicción.
+- [ ] Mejorar valores calculados.
+- [ ] Mejorar indicador de confianza.
+- [ ] Mejorar barra de confianza.
+- [ ] Mejorar recomendación de cantidad.
+- [ ] Mejorar badge del modelo.
+- [ ] Estados vacíos.
+- [ ] Estados de carga.
+- [ ] Responsive.
+
+---
+
+# 1.3.0 — Responsive
+
+## 14. Adaptación móvil
+
+### Pendientes
+
+- [ ] Revisar Sidebar en móvil.
+- [ ] Revisar Topbar.
+- [ ] Revisar tablas.
+- [ ] Revisar modales.
+- [ ] Revisar formularios.
+- [ ] Revisar botones.
+- [ ] Revisar tarjetas.
+- [ ] Revisar Dashboard.
+- [ ] Revisar Inventory.
+- [ ] Revisar Sales.
+- [ ] Revisar Predictions.
+- [ ] Evitar overflow horizontal innecesario.
+- [ ] Mantener legibilidad en pantallas pequeñas.
+
+---
+
+# 1.3.0 — Calidad y estabilidad
+
+## 15. Revisión general
+
+### Pendientes
+
+- [ ] Revisar errores de consola.
+- [ ] Revisar warnings de React.
+- [ ] Revisar estados de carga.
+- [ ] Revisar estados vacíos.
+- [ ] Revisar manejo de errores.
+- [ ] Revisar responsive.
+- [ ] Revisar navegación.
+- [ ] Revisar modales.
+- [ ] Revisar formularios.
+- [x] Revisar persistencia de sesión. *(cubierto por v1.3.2 — cookie httpOnly + `/me` al montar)*
+- [ ] Revisar expiración del JWT.
+- [ ] Revisar comportamiento al cerrar/reabrir la aplicación.
+- [ ] Revisar que ninguna pantalla quede negra.
+- [ ] Verificar que los cambios visuales no rompan funcionalidades existentes.
+
+---
+
+# ORDEN DE TRABAJO
+
+Para evitar romper funcionalidades existentes, el desarrollo seguirá este orden:
+
+## Fase 1 — Diseño global
+
+- [x] Sistema Dark Glass.
+- [x] Variables CSS.
+- [x] Componentes globales.
+- [x] Base responsive.
+
+## Fase 2 — Sidebar
+
+- [ ] Rediseño visual.
+- [ ] Navegación.
+- [ ] Perfil.
+- [ ] Logout.
+- [ ] Responsive.
+
+## Fase 3 — Topbar
+
+- [ ] Rediseño visual.
+- [ ] Fecha.
+- [ ] Estado.
+- [ ] Responsive.
+
+## Fase 4 — Dashboard
+
+- [ ] Rediseño completo.
+
+## Fase 5 — Productos
+
+- [ ] Rediseño completo.
+
+## Fase 6 — Inventario
+
+- [ ] Rediseño completo.
+
+## Fase 7 — Ventas
+
+- [ ] Rediseño completo.
+
+## Fase 8 — Predicciones
+
+- [ ] Rediseño completo.
+
+## Fase 9 — Autenticación y sesión
+
+- [x] Manejo de JWT expirado. *(resuelto vía cookie httpOnly + `/me`, ver v1.3.2)*
+- [x] Evitar pantalla negra. *(mitigado como efecto colateral de v1.3.2; pendiente pulir mensaje de expiración)*
+- [x] Limpieza automática de sesión inválida. *(vía `/api/auth/logout` y manejo de 401 en `api.js`)*
+- [x] Redirección al Login. *(cubierta por el flujo de `AuthContext` + `Login.jsx`)*
+- [x] Revisar almacenamiento del token. *(migrado a cookie `httpOnly`, v1.3.2)*
+- [ ] Evaluar estrategia de cookies HttpOnly. *(implementada; queda evaluar separar access/refresh token)*
+
+## Fase 10 — Responsive final
+
+- [ ] Revisión completa en desktop.
+- [ ] Revisión tablet.
+- [ ] Revisión móvil.
+
+## Fase 11 — QA
+
+- [ ] Pruebas de navegación.
+- [ ] Pruebas de autenticación.
+- [ ] Pruebas de expiración.
+- [ ] Pruebas de roles.
+- [ ] Pruebas de formularios.
+- [ ] Pruebas de APIs.
+- [ ] Pruebas de errores.
+- [ ] Pruebas visuales.
+- [ ] Pruebas responsive.
+
+---
+
+# REGLA PRINCIPAL DEL DESARROLLO
+
+> **NO tocar funciones, APIs, endpoints ni lógica de negocio cuando el objetivo de la fase sea únicamente diseño.**
+
+Cada módulo se trabajará en dos etapas:
+
+### Etapa A — Diseño
+
+Modificar únicamente:
+
+- JSX necesario para estructura visual.
+- CSS.
+- Componentes visuales.
+- Layout.
+- Estados visuales.
+
+### Etapa B — Funcionalidad
+
+Una vez aprobado el diseño:
+
+- Revisar lógica.
+- Revisar API.
+- Corregir errores.
+- Mejorar validaciones.
+- Mejorar manejo de estados.
+- Integrar nuevas funcionalidades.
+
+---
+
+# PROBLEMAS CONOCIDOS
+
+## [RESUELTO] Botón `+ Nuevo usuario`
+
+El botón se perdió durante la migración HTML → React.
+
+Estado:
+
+**Corregido en v1.3.0**
+
+---
+
+## [RESUELTO] `updated_at` en NULL
+
+Se detectó que `updated_at` podía quedar en `NULL`.
+
+Estado:
+
+**Corregido en v1.3.0**
+
+---
+
+## [RESUELTO] Rate limiting sin aplicar
+
+El rate limiting estaba importado en el gateway pero nunca se aplicaba (`//POR IMPLEMENTAR`).
+
+Estado:
+
+**Corregido en v1.3.1** — límite estricto en login, límite general diferenciado por entorno (dev/prod).
+
+---
+
+## [RESUELTO] JWT almacenado en localStorage
+
+El token permanecía en `localStorage`, accesible desde JavaScript (riesgo de robo vía XSS).
+
+Estado:
+
+**Corregido en v1.3.2** — el JWT ahora vive en una cookie `httpOnly`.
+
+---
+
+## [MITIGADO] Token expirado provoca pantalla negra
+
+Cuando la aplicación se volvía a abrir con un JWT expirado almacenado en `localStorage`, el estado de autenticación no se resolvía correctamente y la aplicación podía quedar en pantalla negra.
+
+Estado:
+
+**Mitigado en v1.3.2** como efecto colateral de sacar el JWT de `localStorage`. Pendiente pulir el mensaje de "sesión expirada" y confirmar con pruebas reales de expiración de 24h.
+
+---
+
+# PRÓXIMO PASO
+
+## v1.3.0 — Fase 2
+
+### Sidebar
+
+Archivo principal:
+
+`frontend/src/components/layout/Sidebar.jsx`
+
+Prioridad:
+
+**DISEÑO**
+
+No modificar todavía:
+
+- APIs.
+- Autenticación.
+- Permisos.
+- Endpoints.
+- Lógica de negocio.
+
+Después:
+
+**Topbar → Dashboard → Products → Inventory → Sales → Predictions → Responsive → QA**

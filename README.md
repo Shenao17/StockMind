@@ -6,6 +6,37 @@
 
 ## Changelog
 
+### [1.3.2] - Seguridad de sesión: JWT fuera de localStorage
+> Septiembre 2026
+
+#### Changed
+
+- El JWT ya no se almacena en `localStorage` ni viaja en el body de
+  `/api/auth/login`: ahora se setea como cookie `httpOnly` desde el
+  gateway, inaccesible para JavaScript (mitiga robo de token vía XSS).
+- `AuthContext` restaura la sesión llamando a `/api/auth/me` al montar
+  la app, en vez de leer el token guardado localmente.
+- Login y logout actualizados en frontend (`api.js`, `AuthContext.jsx`,
+  `Login.jsx`) para trabajar solo con `{ user }`, sin manejar el token.
+
+#### Added
+
+- Endpoint `POST /api/auth/logout` en el gateway, que limpia la cookie
+  del lado del servidor.
+- Helper centralizado `utils/authHeader.js` en el gateway: reconstruye
+  el header `Authorization` hacia Java a partir de la cookie, en un
+  solo lugar en vez de repetirlo en cada archivo de rutas.
+- CORS del gateway ajustado (`credentials: true`, origin explícito)
+  para permitir cookies entre frontend y gateway.
+
+#### Fixed
+
+- 403 en todas las rutas protegidas tras el cambio a cookie (Java no
+  recibía el token porque el gateway seguía leyendo el header
+  `Authorization` vacío en vez de la cookie).
+- Bucle infinito de recarga causado por tratar el 401 esperado de
+  `/api/auth/me` (sin sesión aún) igual que un 401 de sesión caída.
+
 ### [1.3.1] - Rate limiting en el gateway
 > Septiembre 2026
 
