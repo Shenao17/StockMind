@@ -41,13 +41,82 @@ router.post('/login', async (req, res, next) => {
         const { token, userId, username, role } = response.data;
 
         if (!token) {
-            return res.status(502).json({ error: 'El backend no devolvió un token válido' });
+            return res.status(502).json({
+                error: 'No fue posible completar el inicio de sesión.'
+            });
         }
 
-        res.cookie('token', token, { ...COOKIE_OPTIONS, maxAge: 24 * 60 * 60 * 1000 });
-        res.status(response.status).json({ user: { id: userId, username, role } });
+        res.cookie('token', token, {
+            ...COOKIE_OPTIONS,
+            maxAge: 24 * 60 * 60 * 1000
+        });
+
+        res.status(response.status).json({
+            user: {
+                id: userId,
+                username,
+                role
+            }
+        });
+
     } catch (error) {
-        next(error);
+
+        /*
+         * Java respondió con un código HTTP.
+         * Esto significa que la conexión con el backend sí funcionó,
+         * por lo que podemos distinguir autenticación de disponibilidad.
+         */
+        if (error.response) {
+            const status = error.response.status;
+
+            // Credenciales incorrectas.
+            if (status === 401 || status === 403) {
+                return res.status(status).json({
+                    error: 'Usuario o contraseña incorrectos.'
+                });
+            }
+
+            // Error interno del backend Java.
+            if (status >= 500) {
+                return res.status(503).json({
+                    error: 'El servidor no se encuentra disponible en este momento. Puede estar temporalmente fuera de servicio o en mantenimiento.'
+                });
+            }
+
+            // Otros errores controlados.
+            return res.status(status).json({
+                error:
+                    error.response.data?.error ||
+                    'No fue posible completar el inicio de sesión.'
+            });
+        }
+
+        /*
+         * No hubo respuesta de Java.
+         * Puede ser que el servicio esté apagado, haya rechazado
+         * la conexión, haya ocurrido un timeout o no se pueda resolver
+         * la dirección configurada.
+         */
+        if (
+            error.code === 'ECONNREFUSED' ||
+            error.code === 'ECONNABORTED' ||
+            error.code === 'ETIMEDOUT' ||
+            error.code === 'ENOTFOUND' ||
+            error.code === 'ERR_NETWORK'
+        ) {
+            return res.status(503).json({
+                error: 'El servidor no se encuentra disponible en este momento. Puede estar temporalmente fuera de servicio o en mantenimiento.'
+            });
+        }
+
+        /*
+         * Error inesperado.
+         * No exponemos detalles internos del gateway ni de Java
+         * al navegador.
+         */
+        return res.status(503).json({
+            error: 'No fue posible conectar con el servidor. Intenta nuevamente en unos minutos.'
+        });
     }
 });
 
@@ -68,9 +137,13 @@ router.post('/logout', (req, res) => {
 router.get('/me', authenticate, async (req, res, next) => {
     try {
         const response = await axios.get(`${JAVA}/auth/me`, {
-            headers: { Authorization: `Bearer ${req.cookies.token}` }
+            headers: {
+                Authorization: `Bearer ${req.cookies.token}`
+            }
         });
+
         res.status(response.status).json(response.data);
+
     } catch (error) {
         next(error);
     }
