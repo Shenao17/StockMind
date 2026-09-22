@@ -64,7 +64,7 @@ async function apiRequest(method, endpoint, body = null) {
   } catch (error) {
     if (error.name === 'TypeError' && error.message.includes('fetch')) {
       throw new Error(
-        'No se puede conectar con el servidor. Verifique que el gateway esté activo.'
+        'No se puede conectar con el servidor.'
       );
     }
 
