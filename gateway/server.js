@@ -32,6 +32,10 @@ const agentRoutes      = require('./src/routes/agent.routes');
 
 // Importar middlewares
 const errorHandler = require('./src/middleware/errorHandler.middleware');
+const mongoLogger = require('./src/middleware/mongoLogger.middleware');
+
+// Importar conexión a Mongo
+const { connectMongo } = require('./db/mongo');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -64,10 +68,13 @@ app.use(express.urlencoded({ extended: true }));
 // Parser de cookies — necesario para que auth.middleware.js lea req.cookies.token
 app.use(cookieParser());
 
-// Logging de peticiones HTTP en desarrollo
+// Logging de peticiones HTTP en desarrollo (consola)
 if (process.env.NODE_ENV !== 'test') {
     app.use(morgan('dev'));
 }
+
+// Logging de peticiones HTTP hacia MongoDB (persistente, todos los entornos)
+app.use(mongoLogger);
 
 // =============================================================================
 // Rate limiting
@@ -146,14 +153,27 @@ app.use(errorHandler);
 // =============================================================================
 // Inicialización del servidor
 // =============================================================================
-app.listen(PORT, () => {
-    console.log('='.repeat(60));
-    console.log(`  StockMind API Gateway — Puerto ${PORT}`);
-    console.log(`  Java Backend: ${process.env.JAVA_API_URL}`);
-    console.log(`  Python Analytics: ${process.env.PYTHON_API_URL}`);
-    console.log(`  Frontend permitido (CORS): ${FRONTEND_ORIGIN}`);
-    console.log(`  Entorno: ${process.env.NODE_ENV}`);
-    console.log('='.repeat(60));
-});
+// Se conecta a Mongo ANTES de aceptar tráfico, para que el logger nunca
+// se encuentre sin conexión en producción. Si Mongo tarda o falla al
+// arrancar, el gateway no levanta — así te enteras de una vez, en vez
+// de descubrirlo horas después con logs perdidos.
+(async () => {
+    try {
+        await connectMongo();
+    } catch (err) {
+        console.error('❌ No se pudo conectar a MongoDB al iniciar:', err.message);
+        process.exit(1);
+    }
+
+    app.listen(PORT, () => {
+        console.log('='.repeat(60));
+        console.log(`  StockMind API Gateway — Puerto ${PORT}`);
+        console.log(`  Java Backend: ${process.env.JAVA_API_URL}`);
+        console.log(`  Python Analytics: ${process.env.PYTHON_API_URL}`);
+        console.log(`  Frontend permitido (CORS): ${FRONTEND_ORIGIN}`);
+        console.log(`  Entorno: ${process.env.NODE_ENV}`);
+        console.log('='.repeat(60));
+    });
+})();
 
 module.exports = app;

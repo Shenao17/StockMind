@@ -23,6 +23,24 @@ services:
       retries: 15
       start_period: 30s
 
+  mongo:
+    image: mongo:7
+    container_name: stockmind_mongo
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: root
+      MONGO_INITDB_DATABASE: stockmind_logs
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
+
   backend:
     build: ./backend
     container_name: stockmind_backend
@@ -69,9 +87,14 @@ services:
       JWT_SECRET: stockmind_super_secret_key_2024_change_in_production
       NODE_ENV: development
       GROQ_API_KEY: TU_GROQ_API_KEY_AQUI
+      MONGO_URI: mongodb://root:root@mongo:27017/stockmind_logs?authSource=admin
     depends_on:
-      - backend
-      - analytics
+      backend:
+        condition: service_started
+      analytics:
+        condition: service_started
+      mongo:
+        condition: service_healthy
 
   frontend:
     build: ./frontend
@@ -85,3 +108,4 @@ services:
 
 volumes:
   mysql_data:
+  mongo_data:
