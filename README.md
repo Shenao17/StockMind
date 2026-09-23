@@ -6,6 +6,44 @@
 
 ## Changelog
 
+### [1.3.6] - Capa de Logging con MongoDB (Experimental / Reto técnico)
+> Septiembre 2026
+
+Se incorpora MongoDB como capa de logging desacoplada de MySQL, implementada como reto técnico para validar el patrón de **persistencia políglota** (relacional para datos transaccionales, documental para logs y trazabilidad) antes de decidir si se adopta como parte definitiva de la arquitectura.
+
+#### Added
+
+- Nuevo servicio `stockmind_mongo` en `docker-compose.yml`, con volumen persistente y autenticación.
+- Archivo de conexión centralizado `gateway/db/mongo.js`.
+- Middleware `mongoLogger` en el gateway: registra método, ruta, status code, IP y tiempo de respuesta de cada request en la colección `logs`, sin bloquear la respuesta al cliente.
+- Visualización local de los logs vía **MongoDB Compass**, conectando directamente al puerto `27017` expuesto por Docker.
+
+#### Changed
+
+- `server.js` ahora espera la conexión a MongoDB antes de aceptar tráfico; si Mongo falla al iniciar, el gateway no levanta — así se detecta el problema de inmediato en vez de perder logs de forma silenciosa.
+
+#### Nota
+
+- Implementación exploratoria. MongoDB no participa en la lógica de negocio ni en el flujo de datos transaccionales (ventas, inventario, usuarios) — su único rol es registrar eventos operativos del gateway.
+
+---
+
+### [1.3.5] - StockMindGlass Effect
+> Septiembre 2026
+
+#### Changed
+
+- Se incorpora el efecto visual **StockMindGlass** al botón flotante del agente de IA.
+- Se añade refracción y desenfoque suave mediante `GlassElement`, manteniendo una apariencia sutil sobre el fondo oscuro.
+- Se añade una ligera ampliación y elevación del botón al pasar el cursor.
+- Se prepara `GlassElement` para futuras aplicaciones del efecto StockMindGlass en otros componentes de la interfaz.
+
+#### Added
+
+- Nueva base visual **StockMindGlass** para efectos de cristal, basada en refracción mediante `backdrop-filter` y mapas de desplazamiento SVG.
+
+---
+
 ### [1.3.2] - Seguridad de sesión: JWT fuera de localStorage
 > Septiembre 2026
 
@@ -159,6 +197,7 @@ El sistema está construido sobre una arquitectura distribuida por capas:
 | Backend Principal | Java Spring Boot | 8080 |
 | Microservicio Analítico | Python Flask | 8000 |
 | Base de Datos | MySQL | 3306 |
+| Logging / Trazabilidad | MongoDB | 27017 |
 
 ---
 
@@ -181,7 +220,7 @@ Las pequeñas y medianas empresas del sector comercial enfrentan pérdidas recur
 
 **Dimensión académica:** El proyecto integra un stack tecnológico heterogéneo en una arquitectura de microservicios real, demostrando competencias en diseño de sistemas distribuidos, comunicación entre servicios REST y separación de responsabilidades.
 
-**Dimensión técnica:** Cada tecnología cumple un rol específico y no intercambiable. Java Spring Boot provee robustez transaccional. Node.js actúa como gateway sin acoplamiento directo. Python aporta capacidad estadística madura (scikit-learn, statsmodels, pandas) que complementa al stack sin duplicar responsabilidades. React permite una experiencia de usuario fluida mediante SPA con estado global de sesión.
+**Dimensión técnica:** Cada tecnología cumple un rol específico y no intercambiable. Java Spring Boot provee robustez transaccional. Node.js actúa como gateway sin acoplamiento directo. Python aporta capacidad estadística madura (scikit-learn, statsmodels, pandas) que complementa al stack sin duplicar responsabilidades. React permite una experiencia de usuario fluida mediante SPA con estado global de sesión. MongoDB aporta un modelo documental flexible para trazabilidad y logs, sin forzar ese tipo de dato dentro del esquema relacional de MySQL.
 
 **Dimensión empresarial:** La predicción de demanda reduce el costo de capital inmovilizado en inventario entre un 15% y 35% según estudios del sector logístico. StockMind democratiza esta capacidad para empresas sin acceso a soluciones ERP de alto costo.
 
@@ -201,7 +240,8 @@ Desarrollar una plataforma web full stack para la gestión integral de inventari
 4. Construir un microservicio en Python Flask que consuma historial de ventas desde MySQL y genere predicciones de demanda usando regresión lineal o media móvil ponderada.
 5. Diseñar una base de datos MySQL normalizada que soporte transacciones de inventario, ventas y almacenamiento de predicciones.
 6. Desarrollar un frontend en React 18 con Vite que consuma exclusivamente las rutas del gateway Node.js, implementando navegación SPA con React Router y gestión de estado de sesión con Context API.
-7. Documentar el sistema con nivel de detalle suficiente para su reproducción técnica y presentación académica.
+7. Incorporar una capa de logging desacoplada en MongoDB para trazabilidad de requests y errores, sin acoplar ese registro al modelo transaccional.
+8. Documentar el sistema con nivel de detalle suficiente para su reproducción técnica y presentación académica.
 
 ---
 
@@ -218,6 +258,7 @@ Desarrollar una plataforma web full stack para la gestión integral de inventari
 - Recomendaciones automáticas de cantidad a reabastecer
 - Reportes de ventas por período
 - Asistente de IA conversacional integrado (experimental, v1.2.0)
+- Logging de requests, errores y trazabilidad en MongoDB (experimental, v1.3.6)
 
 ### Excluido
 
@@ -227,6 +268,7 @@ Desarrollar una plataforma web full stack para la gestión integral de inventari
 - Modelos de machine learning avanzados (LSTM, Prophet)
 - Multi-tenancy
 - Acceso del agente IA a datos en tiempo real del backend (previsto para v1.3.0)
+- Dashboard visual de consulta de logs (por ahora se inspeccionan vía MongoDB Compass)
 
 ---
 
@@ -247,6 +289,7 @@ Desarrollar una plataforma web full stack para la gestión integral de inventari
 | RF-09 | Predicción | Demanda semanal y mensual por producto |
 | RF-10 | Recomendación | Cantidad sugerida a reabastecer por producto |
 | RF-11 | Agente IA | Asistente conversacional accesible desde cualquier módulo (experimental) |
+| RF-12 | Logging | Registro de cada request (método, ruta, status, IP, tiempo de respuesta) en MongoDB |
 
 ### Requisitos No Funcionales
 
@@ -260,6 +303,7 @@ Desarrollar una plataforma web full stack para la gestión integral de inventari
 | RNF-06 | Escalabilidad | Arquitectura permite agregar microservicios sin refactorizar |
 | RNF-07 | Portabilidad | Cada servicio ejecutable de forma independiente |
 | RNF-08 | Documentación | Todos los endpoints documentados |
+| RNF-09 | Trazabilidad | Registro de requests, errores y eventos operativos en una base NoSQL independiente (MongoDB), desacoplada del modelo transaccional |
 
 ---
 
@@ -278,27 +322,26 @@ Desarrollar una plataforma web full stack para la gestión integral de inventari
 │             API GATEWAY — Node.js + Express               │
 │  · Verificación JWT centralizada                          │
 │  · Proxy/enrutamiento a Java API o Python API            │
-│  · CORS, logging, manejo de errores                      │
+│  · CORS, rate limiting, manejo de errores                │
+│  · Logging de requests → MongoDB                          │
 │  Puerto: 3000                                             │
-└──────────────┬───────────────────────────┬───────────────┘
-               │ HTTP/REST                 │ HTTP/REST
-               ▼                           ▼
-┌──────────────────────────┐  ┌────────────────────────────┐
-│  BACKEND Java Spring Boot│  │  MICROSERVICIO Python Flask │
-│  · Lógica de negocio     │  │  · Análisis de historial    │
-│  · Gestión de usuarios   │  │  · Predicción de demanda    │
-│  · CRUD de productos     │  │  · Recomendaciones stock    │
-│  · Ventas e inventario   │  │  Puerto: 8000               │
-│  Puerto: 8080             │  └────────────┬───────────────┘
-└──────────────┬───────────┘               │
-               │ JDBC/JPA                  │ SQLAlchemy/mysql-connector
-               └───────────────┬───────────┘
-                               ▼
-               ┌───────────────────────────────┐
-               │         MySQL 8.x             │
-               │  stockmind_db                 │
-               │  Puerto: 3306                 │
-               └───────────────────────────────┘
+└──────┬───────────────────────┬────────────────────┬───────┘
+       │ HTTP/REST             │ HTTP/REST           │ driver nativo
+       ▼                       ▼                     ▼
+┌──────────────────┐  ┌──────────────────┐  ┌──────────────────────┐
+│ BACKEND           │  │ MICROSERVICIO    │  │      MongoDB 7.x      │
+│ Java Spring Boot  │  │ Python Flask     │  │   stockmind_logs      │
+│ Puerto: 8080       │  │ Puerto: 8000     │  │   Puerto: 27017       │
+└─────────┬──────────┘  └────────┬─────────┘  │  logs de requests,    │
+          │ JDBC/JPA             │            │  errores, 404, etc.   │
+          │        SQLAlchemy/mysql-connector │  (solo trazabilidad,  │
+          └───────────┬──────────┘            │  no lógica de negocio)│
+                       ▼                       └────────────────────────┘
+          ┌───────────────────────────────┐
+          │         MySQL 8.x             │
+          │  stockmind_db                 │
+          │  Puerto: 3306                 │
+          └───────────────────────────────┘
 ```
 
 ### Principio de diseño
@@ -306,6 +349,8 @@ Desarrollar una plataforma web full stack para la gestión integral de inventari
 El frontend **nunca** consume directamente el backend Java ni el microservicio Python. Todo el tráfico pasa por el gateway Node.js, que actúa como único punto de entrada, aplicando autenticación centralizada y enrutamiento transparente.
 
 El agente de IA (`AgentBubble`) es el único componente que realiza llamadas externas directamente desde el navegador, exclusivamente hacia la API de Groq. No interactúa con el gateway ni con los servicios internos del sistema en esta versión.
+
+MongoDB opera como una rama independiente del gateway, exclusivamente para logging y trazabilidad: ningún módulo funcional (productos, inventario, ventas, predicciones) lee ni escribe en ella. MySQL sigue siendo la única fuente de verdad para los datos de negocio.
 
 ---
 
@@ -323,6 +368,7 @@ El agente de IA (`AgentBubble`) es el único componente que realiza llamadas ext
 | Python | 3.11+ | Microservicio | Ecosistema estadístico sin equivalente |
 | Flask | 3.x | Framework Python | Ligero, ideal para microservicio REST |
 | MySQL | 8.x | Base de datos | ACID compliance, integridad referencial |
+| MongoDB | 7.x | Logging / trazabilidad | Modelo documental flexible para logs y eventos, desacoplado del esquema relacional |
 | pandas | 2.x | Analítica | Manipulación de series temporales |
 | scikit-learn | 1.x | ML | Modelos de regresión y predicción |
 | JWT | — | Autenticación | Stateless, compatible con arquitectura distribuida |
@@ -337,6 +383,7 @@ El agente de IA (`AgentBubble`) es el único componente que realiza llamadas ext
 stockmind/
 ├── README.md
 ├── start.bat
+├── docker-compose.yml               ← Orquesta mysql, mongo, backend, analytics, gateway, frontend
 ├── docs/
 │   ├── architecture.md
 │   ├── api-endpoints.md
@@ -363,6 +410,7 @@ stockmind/
 │       │   └── ui/
 │       │       ├── Modal.jsx
 │       │       ├── ToastContainer.jsx
+│       │       ├── GlassElement.jsx  ← Base visual StockMindGlass (refracción/blur)
 │       │       └── AgentBubble.jsx  ← Agente IA conversacional [experimental]
 │       └── pages/
 │           ├── Login.jsx
@@ -378,11 +426,14 @@ stockmind/
 │   ├── package.json
 │   ├── server.js
 │   ├── .env
+│   ├── db/
+│   │   └── mongo.js                 ← Conexión centralizada a MongoDB
 │   └── src/
 │       ├── config/config.js
 │       ├── middleware/
 │       │   ├── auth.middleware.js
 │       │   ├── logger.middleware.js
+│       │   ├── mongoLogger.middleware.js  ← Registra cada request en MongoDB
 │       │   └── errorHandler.middleware.js
 │       └── routes/
 │           ├── auth.routes.js
@@ -467,6 +518,25 @@ PRODUCTS
                   generated_at
 ```
 
+### Colección de logs (MongoDB)
+
+Independiente del modelo relacional anterior, el gateway registra trazabilidad operativa en una base MongoDB separada (`stockmind_logs`). No tiene relación con las tablas de MySQL ni participa en la lógica de negocio — es solo para depuración y monitoreo.
+
+```js
+// Colección: logs
+{
+  timestamp: ISODate,
+  service: "gateway",
+  level: "info" | "warn" | "error",
+  method: "GET",
+  route: "/api/products/123",
+  statusCode: 404,
+  userId: ObjectId | null,
+  ip: "192.168.1.10",
+  responseTimeMs: 42
+}
+```
+
 ---
 
 ## Endpoints del Sistema
@@ -522,6 +592,8 @@ GET    /api/predictions/:productId  → Predicción por producto
 GET    /api/predictions/recommendations → Recomendaciones generales
 ```
 
+> Los logs de MongoDB no se exponen como endpoint propio en esta versión — se consultan directamente vía MongoDB Compass u otro cliente Mongo.
+
 ---
 
 ## Flujo de Integración
@@ -565,6 +637,17 @@ Groq (Llama 3.3 70B): procesa con contexto del módulo actual
 
 > El agente opera de forma completamente independiente al gateway y los servicios internos. No requiere autenticación JWT para funcionar.
 
+### Flujo 5: Logging de requests (MongoDB)
+
+```
+Cliente → cualquier request → Gateway
+Gateway: procesa la petición normalmente y responde al cliente
+Gateway (en paralelo, sin bloquear la respuesta):
+   mongoLogger registra { método, ruta, statusCode, ip, responseTimeMs } → MongoDB
+```
+
+> Este flujo corre en paralelo al resto — nunca retrasa ni condiciona la respuesta que recibe el cliente.
+
 ---
 
 ## Guía de Instalación y Ejecución
@@ -575,6 +658,7 @@ Groq (Llama 3.3 70B): procesa con contexto del módulo actual
 - Java 17 JDK
 - Python 3.11+
 - MySQL 8.x
+- MongoDB 7.x (o vía Docker)
 - Maven 3.x
 - API Key de Groq (gratuita en [console.groq.com](https://console.groq.com)) — requerida para el agente IA
 
@@ -584,14 +668,34 @@ Ejecutar `start.bat` en la raíz del proyecto. El script levanta todos los servi
 
 > Requiere MySQL Community Server 8.x activo y la base de datos inicializada previamente.
 
-### 1. Base de datos
+### Inicio rápido (Docker)
+
+```bash
+docker compose up --build
+```
+
+Levanta MySQL, MongoDB, backend, analytics, gateway y frontend en un solo comando, con las redes y variables de entorno ya configuradas entre servicios.
+
+### 1. Base de datos (MySQL)
 
 ```bash
 mysql -u root -p < database/schema.sql
 mysql -u root -p stockmind_db < database/seed.sql
 ```
 
-### 2. Backend Java
+### 2. MongoDB (logs)
+
+```bash
+docker run -d --name stockmind_mongo -p 27017:27017 \
+  -e MONGO_INITDB_ROOT_USERNAME=root \
+  -e MONGO_INITDB_ROOT_PASSWORD=root \
+  mongo:7
+# Disponible en localhost:27017
+```
+
+> Si ya levantaste todo con `docker compose up`, este paso queda cubierto automáticamente.
+
+### 3. Backend Java
 
 ```bash
 cd backend
@@ -600,7 +704,7 @@ mvn spring-boot:run
 # Disponible en http://localhost:8080
 ```
 
-### 3. Microservicio Python
+### 4. Microservicio Python
 
 ```bash
 cd analytics
@@ -611,7 +715,7 @@ python app.py
 # Disponible en http://localhost:8000
 ```
 
-### 4. Gateway Node.js
+### 5. Gateway Node.js
 
 ```bash
 cd gateway
@@ -620,7 +724,9 @@ npm start
 # Disponible en http://localhost:3000
 ```
 
-### 5. Frontend React
+> El gateway espera la conexión a MongoDB antes de levantar — si Mongo no está corriendo, el proceso no arranca.
+
+### 6. Frontend React
 
 ```bash
 cd frontend
@@ -636,7 +742,10 @@ PORT=3000
 JAVA_API_URL=http://localhost:8080
 PYTHON_API_URL=http://localhost:8000
 JWT_SECRET=stockmind_super_secret_key_2024
+MONGO_URI=mongodb://root:root@localhost:27017/stockmind_logs?authSource=admin
 ```
+
+> Al correr vía `docker compose`, `MONGO_URI` usa el nombre del servicio interno (`mongo`) en vez de `localhost` — ya viene configurado así en `docker-compose.yml`.
 
 ### Configuración del agente IA (opcional)
 
@@ -656,4 +765,4 @@ VITE_GROQ_API_KEY=tu_api_key_aqui
 
 ---
 
-*Desarrollado como proyecto académico — StockMind v1.2.0 (experimental)*
+*Desarrollado como proyecto académico — StockMind v1.3.6 (experimental)*
