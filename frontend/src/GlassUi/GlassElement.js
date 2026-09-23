@@ -1,12 +1,34 @@
 /**
+ * ============================================================
+ * StockMind — Liquid Glass UI
+ * Archivo: frontend/src/GlassUi/GlassElement.js
+ * Versión: v1.0.3 — Soft Glass Layer
+ * ============================================================
+ *
  * Web Component GlassElement
  *
  * Liquid Glass mediante:
  * - SVG displacement map
  * - feDisplacementMap
  * - backdrop-filter
+ * - blur suave
+ * - micro capa de cristal
  *
  * Adaptado para Vite / React.
+ *
+ * v1.0.3:
+ * - Mantiene intacta la refracción de v1.0.2.
+ * - Reintroduce blur de forma controlada.
+ * - Añade una micro capa transparente de cristal.
+ * - Añade un glow interno extremadamente sutil.
+ * - Sin tint blanco fuerte.
+ * - Sin brightness/saturate adicional.
+ * - Se mantienen intactos:
+ *   - SVG displacement map.
+ *   - feDisplacementMap.
+ *   - depth.
+ *   - strength.
+ *   - chromatic aberration.
  */
 
 import {
@@ -499,7 +521,7 @@ class GlassElement extends HTMLElement {
             this.getAttribute(
                 "background-color"
             ) ||
-            "rgba(255,255,255,0.06)"
+            "transparent"
         );
     }
 
@@ -747,6 +769,9 @@ class GlassElement extends HTMLElement {
             element.style.boxShadow =
                 "none";
 
+            element.style.border =
+                "none";
+
             return;
         }
 
@@ -772,15 +797,15 @@ class GlassElement extends HTMLElement {
 
 
             element.style.background =
-                this.backgroundColor;
+                "transparent";
 
 
             element.style.border =
-                "1px solid rgba(255,255,255,0.18)";
+                "none";
 
 
             element.style.boxShadow =
-                "inset 0 0 4px rgba(255,255,255,0.35)";
+                "none";
 
 
             return;
@@ -790,10 +815,20 @@ class GlassElement extends HTMLElement {
         /*
          * LIQUID GLASS REAL
          *
-         * 1. Blur previo.
-         * 2. Refracción SVG.
-         * 3. Blur posterior.
-         * 4. Ligero aumento de brillo/saturación.
+         * v1.0.3 — SOFT GLASS
+         *
+         * La refracción continúa siendo
+         * exactamente la misma.
+         *
+         * Añadimos únicamente:
+         * - blur suave
+         * - micro tint transparente
+         * - glow interno mínimo
+         *
+         * No añadimos todavía:
+         * - brightness
+         * - saturate
+         * - shine complejo
          */
         const filter =
             getDisplacementFilter({
@@ -807,12 +842,12 @@ class GlassElement extends HTMLElement {
             });
 
 
+        /*
+         * El blur se mantiene deliberadamente
+         * bajo para no matar la refracción.
+         */
         const backdropValue =
-            `blur(${this.blur / 2}px) ` +
-            `url('${filter}') ` +
-            `blur(${this.blur}px) ` +
-            `brightness(1.1) ` +
-            `saturate(1.5)`;
+            `blur(1.5px) url('${filter}')`;
 
 
         element.style.backdropFilter =
@@ -823,27 +858,26 @@ class GlassElement extends HTMLElement {
 
 
         /*
-         * IMPORTANTE:
+         * Micro capa de cristal.
          *
-         * El background NO participa en la
-         * refracción. Solo aporta la densidad
-         * visual del cristal.
+         * Mucho más transparente que el
+         * ejemplo original de Liquid Glass.
          */
         element.style.background =
-            this.backgroundColor;
+            "rgba(255, 255, 255, 0.025)";
 
 
         /*
-         * Borde/reflejo mínimo.
+         * Refuerzo visual mínimo de los bordes.
          *
-         * La refracción sigue siendo la parte
-         * principal del efecto.
+         * Todavía no es el shine final.
          */
         element.style.border =
-            "1px solid rgba(255,255,255,0.14)";
+            "1px solid rgba(255, 255, 255, 0.055)";
+
 
         element.style.boxShadow =
-            "inset 0 0 4px rgba(255,255,255,0.35)";
+            "inset 0 0 3px rgba(255, 255, 255, 0.12)";
     }
 
 
@@ -917,15 +951,13 @@ class GlassElement extends HTMLElement {
                     };
 
                     background:
-                        rgba(255,255,255,0.06);
+                        transparent;
 
                     border:
-                        1px solid
-                        rgba(255,255,255,0.14);
+                        none;
 
                     box-shadow:
-                        inset 0 0 4px
-                        rgba(255,255,255,0.35);
+                        none;
 
                     overflow: hidden;
 

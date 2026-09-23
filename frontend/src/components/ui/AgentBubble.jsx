@@ -429,6 +429,29 @@ const styles = `
     display: block;
     width: 52px;
     height: 52px;
+
+    /*
+     * v1.0.3
+     * Micro-interacción del cristal.
+     *
+     * El escalado ocurre sobre el Web Component
+     * completo, manteniendo la refracción y el
+     * contenido juntos.
+     */
+    transform-origin: center center;
+
+    transition:
+      transform 0.4s cubic-bezier(
+        0.175,
+        0.885,
+        0.32,
+        2.2
+      );
+  }
+
+  .agent-glass-toggle:hover {
+    transform:
+      scale(1.07);
   }
 
   /* ── Botón dentro del cristal ── */
@@ -470,7 +493,11 @@ const styles = `
     inset: 0;
 
     /*
-     * Reflejo muy sutil encima del cristal.
+     * Reflejo temporal.
+     *
+     * Se mantiene muy sutil en v1.0.3.
+     * El shine/reflection definitivo llegará
+     * en la siguiente etapa del Liquid Glass.
      */
     background:
       linear-gradient(
@@ -486,12 +513,21 @@ const styles = `
     opacity: 0.7;
   }
 
+  /*
+   * El crecimiento principal ahora pertenece
+   * al Web Component, no al botón interno.
+   *
+   * Así evitamos que ambos elementos se escalen
+   * simultáneamente.
+   */
   .agent-toggle-btn:hover {
-    transform: translateY(-2px) scale(1.04);
+    transform:
+      translateY(-1px);
   }
 
   .agent-toggle-btn:active {
-    transform: translateY(0) scale(0.97);
+    transform:
+      translateY(0) scale(0.97);
   }
 
   .agent-toggle-btn svg {
@@ -1348,7 +1384,7 @@ export default function AgentBubble() {
               <svg
                 viewBox="0 0 24 24"
               >
-                <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9H6v2zm0-3H6V6h12v2z"/>
+                <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-1.9-2zM18 14H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/>
               </svg>
 
             )}
