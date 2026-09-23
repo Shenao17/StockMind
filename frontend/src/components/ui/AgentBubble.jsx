@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
+
 // ─── Estilos ────────────────────────────────────────────────────────────────
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700&family=Inter:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap');
@@ -38,8 +39,15 @@ const styles = `
   }
 
   @keyframes panelOpen {
-    from { opacity: 0; transform: scale(0.85) translateY(12px); }
-    to   { opacity: 1; transform: scale(1)    translateY(0); }
+    from {
+      opacity: 0;
+      transform: scale(0.85) translateY(12px);
+    }
+
+    to {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
   }
 
   .agent-panel.closing {
@@ -47,8 +55,15 @@ const styles = `
   }
 
   @keyframes panelClose {
-    from { opacity: 1; transform: scale(1)    translateY(0); }
-    to   { opacity: 0; transform: scale(0.88) translateY(8px); }
+    from {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+
+    to {
+      opacity: 0;
+      transform: scale(0.88) translateY(8px);
+    }
   }
 
   /* ── Header ── */
@@ -57,7 +72,11 @@ const styles = `
     align-items: center;
     justify-content: space-between;
     padding: 16px 18px;
-    background: linear-gradient(135deg, #1a0a0e 0%, #110608 100%);
+    background: linear-gradient(
+      135deg,
+      #1a0a0e 0%,
+      #110608 100%
+    );
     border-bottom: 1px solid rgba(139,26,46,0.2);
     flex-shrink: 0;
   }
@@ -72,7 +91,11 @@ const styles = `
     width: 34px;
     height: 34px;
     border-radius: 10px;
-    background: linear-gradient(135deg, #8B1A2E, #5c0f1e);
+    background: linear-gradient(
+      135deg,
+      #8B1A2E,
+      #5c0f1e
+    );
     display: flex;
     align-items: center;
     justify-content: center;
@@ -114,8 +137,13 @@ const styles = `
   }
 
   @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50%       { opacity: 0.4; }
+    0%, 100% {
+      opacity: 1;
+    }
+
+    50% {
+      opacity: 0.4;
+    }
   }
 
   .agent-close-btn {
@@ -168,9 +196,18 @@ const styles = `
     scrollbar-color: rgba(139,26,46,0.2) transparent;
   }
 
-  .agent-messages::-webkit-scrollbar { width: 3px; }
-  .agent-messages::-webkit-scrollbar-track { background: transparent; }
-  .agent-messages::-webkit-scrollbar-thumb { background: rgba(139,26,46,0.25); border-radius: 2px; }
+  .agent-messages::-webkit-scrollbar {
+    width: 3px;
+  }
+
+  .agent-messages::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .agent-messages::-webkit-scrollbar-thumb {
+    background: rgba(139,26,46,0.25);
+    border-radius: 2px;
+  }
 
   .agent-msg {
     display: flex;
@@ -180,12 +217,26 @@ const styles = `
   }
 
   @keyframes msgIn {
-    from { opacity: 0; transform: translateY(6px); }
-    to   { opacity: 1; transform: translateY(0); }
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 
-  .agent-msg.user  { align-self: flex-end; align-items: flex-end; }
-  .agent-msg.agent { align-self: flex-start; align-items: flex-start; }
+  .agent-msg.user {
+    align-self: flex-end;
+    align-items: flex-end;
+  }
+
+  .agent-msg.agent {
+    align-self: flex-start;
+    align-items: flex-start;
+  }
 
   .agent-msg-bubble {
     padding: 9px 13px;
@@ -195,8 +246,12 @@ const styles = `
     word-break: break-word;
   }
 
-  .agent-msg.user  .agent-msg-bubble {
-    background: linear-gradient(135deg, #8B1A2E, #6b1322);
+  .agent-msg.user .agent-msg-bubble {
+    background: linear-gradient(
+      135deg,
+      #8B1A2E,
+      #6b1322
+    );
     color: #f5f5f5;
     border-bottom-right-radius: 4px;
   }
@@ -238,12 +293,24 @@ const styles = `
     animation: typingDot 1.2s ease-in-out infinite;
   }
 
-  .agent-typing span:nth-child(2) { animation-delay: 0.2s; }
-  .agent-typing span:nth-child(3) { animation-delay: 0.4s; }
+  .agent-typing span:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+
+  .agent-typing span:nth-child(3) {
+    animation-delay: 0.4s;
+  }
 
   @keyframes typingDot {
-    0%, 60%, 100% { transform: translateY(0);    opacity: 0.4; }
-    30%           { transform: translateY(-4px); opacity: 1; }
+    0%, 60%, 100% {
+      transform: translateY(0);
+      opacity: 0.4;
+    }
+
+    30% {
+      transform: translateY(-4px);
+      opacity: 1;
+    }
   }
 
   /* ── Chips de sugerencias ── */
@@ -304,9 +371,13 @@ const styles = `
     scrollbar-width: none;
   }
 
-  .agent-input::-webkit-scrollbar { display: none; }
+  .agent-input::-webkit-scrollbar {
+    display: none;
+  }
 
-  .agent-input::placeholder { color: #444; }
+  .agent-input::placeholder {
+    color: #444;
+  }
 
   .agent-input:focus {
     border-color: rgba(139,26,46,0.4);
@@ -317,7 +388,11 @@ const styles = `
     width: 36px;
     height: 36px;
     border-radius: 10px;
-    background: linear-gradient(135deg, #8B1A2E, #6b1322);
+    background: linear-gradient(
+      135deg,
+      #8B1A2E,
+      #6b1322
+    );
     border: none;
     cursor: pointer;
     display: flex;
@@ -333,7 +408,9 @@ const styles = `
     box-shadow: 0 6px 16px rgba(139,26,46,0.5);
   }
 
-  .agent-send-btn:active:not(:disabled) { transform: translateY(0); }
+  .agent-send-btn:active:not(:disabled) {
+    transform: translateY(0);
+  }
 
   .agent-send-btn:disabled {
     opacity: 0.4;
@@ -347,60 +424,130 @@ const styles = `
     fill: #fff;
   }
 
-  /* ── Botón FAB ── */
-  .agent-toggle-btn {
+  /* ── Wrapper Liquid Glass ── */
+  .agent-glass-toggle {
+    display: block;
     width: 52px;
     height: 52px;
+  }
+
+  /* ── Botón dentro del cristal ── */
+  .agent-toggle-btn {
+    width: 100%;
+    height: 100%;
     border-radius: 16px;
-    background: linear-gradient(135deg, #8B1A2E, #5c0f1e);
-    border: 1px solid rgba(139,26,46,0.4);
+
+    /*
+     * El fondo y el efecto de cristal los proporciona
+     * GlassElement.
+     */
+    background: transparent;
+
+    border: none;
+
     cursor: pointer;
+
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow:
-      0 8px 24px rgba(139,26,46,0.45),
-      0 2px 8px rgba(0,0,0,0.4),
-      inset 0 1px 0 rgba(255,255,255,0.08);
-    transition: all 0.2s;
+
     position: relative;
+
+    overflow: hidden;
+
+    padding: 0;
+
+    box-shadow: none;
+
+    transition:
+      transform 0.2s cubic-bezier(0.34,1.56,0.64,1);
+  }
+
+  .agent-toggle-btn::before {
+    content: '';
+
+    position: absolute;
+    inset: 0;
+
+    /*
+     * Reflejo muy sutil encima del cristal.
+     */
+    background:
+      linear-gradient(
+        135deg,
+        rgba(255,255,255,0.16) 0%,
+        rgba(255,255,255,0.035) 35%,
+        transparent 62%
+      );
+
+    pointer-events: none;
+    z-index: 1;
+
+    opacity: 0.7;
   }
 
   .agent-toggle-btn:hover {
     transform: translateY(-2px) scale(1.04);
-    box-shadow:
-      0 12px 32px rgba(139,26,46,0.55),
-      0 4px 12px rgba(0,0,0,0.5),
-      inset 0 1px 0 rgba(255,255,255,0.1);
   }
 
-  .agent-toggle-btn:active { transform: translateY(0) scale(0.98); }
+  .agent-toggle-btn:active {
+    transform: translateY(0) scale(0.97);
+  }
 
   .agent-toggle-btn svg {
     width: 22px;
     height: 22px;
+
     fill: #fff;
-    transition: transform 0.2s;
+
+    position: relative;
+    z-index: 2;
+
+    transition:
+      transform 0.2s ease,
+      filter 0.2s ease;
+
+    filter:
+      drop-shadow(
+        0 1px 4px rgba(0,0,0,0.35)
+      );
   }
 
-  .agent-toggle-btn.open svg { transform: rotate(90deg); }
+  .agent-toggle-btn.open svg {
+    transform: rotate(90deg);
+  }
 
-  /* Notificación badge */
+  /* ── Badge de notificación ── */
   .agent-notif-badge {
     position: absolute;
-    top: -3px;
-    right: -3px;
-    width: 10px;
-    height: 10px;
+    top: 4px;
+    right: 4px;
+
+    width: 8px;
+    height: 8px;
+
     border-radius: 50%;
+
     background: #e84444;
+
     border: 2px solid #0e0e0e;
-    animation: notifPulse 2s ease-in-out infinite;
+
+    animation:
+      notifPulse 2s ease-in-out infinite;
+
+    z-index: 5;
   }
 
   @keyframes notifPulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(232,68,68,0.4); }
-    50%       { box-shadow: 0 0 0 5px rgba(232,68,68,0); }
+    0%, 100% {
+      box-shadow:
+        0 0 0 0 rgba(232,68,68,0.4);
+    }
+
+    50% {
+      box-shadow:
+        0 0 0 5px rgba(232,68,68,0);
+    }
   }
 
   /* ── Disclaimer ── */
@@ -443,9 +590,17 @@ const styles = `
     box-shadow: 0 0 6px rgba(245,158,11,0.6);
   }
 
-  .agent-header-status.offline { color: #e84444; }
-  .agent-header-status.online  { color: #22c55e; }
-  .agent-header-status.checking { color: #f59e0b; }
+  .agent-header-status.offline {
+    color: #e84444;
+  }
+
+  .agent-header-status.online {
+    color: #22c55e;
+  }
+
+  .agent-header-status.checking {
+    color: #f59e0b;
+  }
 
   /* ── Banner offline ── */
   .agent-offline-banner {
@@ -465,8 +620,8 @@ const styles = `
   }
 
   .agent-retry-btn {
-    background: rgba(232,68,68,0.15);
-    border: 1px solid rgba(232,68,68,0.3);
+    background: rgba(232,68,46,0.15);
+    border: 1px solid rgba(232,68,46,0.3);
     color: #e84444;
     font-size: 10px;
     font-family: 'DM Mono', monospace;
@@ -479,37 +634,100 @@ const styles = `
   }
 
   .agent-retry-btn:hover {
-    background: rgba(232,68,68,0.25);
+    background: rgba(232,68,46,0.25);
     color: #fff;
   }
 
-  /* Input deshabilitado por offline */
   .agent-input:disabled {
     opacity: 0.4;
     cursor: not-allowed;
   }
 `;
 
+
 // ─── Constantes ─────────────────────────────────────────────────────────────
 const PAGE_CONTEXT = {
-  '/dashboard':   { label: 'Dashboard', hint: 'Pregúntame sobre métricas o resumen general' },
-  '/products':    { label: 'Productos', hint: 'Pregúntame sobre productos o categorías' },
-  '/inventory':   { label: 'Inventario', hint: 'Pregúntame sobre movimientos o stock' },
-  '/sales':       { label: 'Ventas', hint: 'Pregúntame sobre ventas o clientes' },
-  '/reports':     { label: 'Reportes', hint: 'Pregúntame sobre reportes o tendencias' },
-  '/predictions': { label: 'Predicciones', hint: 'Pregúntame sobre demanda futura' },
-  '/users':       { label: 'Usuarios', hint: 'Pregúntame sobre roles o accesos' },
+  '/dashboard': {
+    label: 'Dashboard',
+    hint: 'Pregúntame sobre métricas o resumen general'
+  },
+
+  '/products': {
+    label: 'Productos',
+    hint: 'Pregúntame sobre productos o categorías'
+  },
+
+  '/inventory': {
+    label: 'Inventario',
+    hint: 'Pregúntame sobre movimientos o stock'
+  },
+
+  '/sales': {
+    label: 'Ventas',
+    hint: 'Pregúntame sobre ventas o clientes'
+  },
+
+  '/reports': {
+    label: 'Reportes',
+    hint: 'Pregúntame sobre reportes o tendencias'
+  },
+
+  '/predictions': {
+    label: 'Predicciones',
+    hint: 'Pregúntame sobre demanda futura'
+  },
+
+  '/users': {
+    label: 'Usuarios',
+    hint: 'Pregúntame sobre roles o accesos'
+  },
 };
 
+
 const SUGGESTIONS_BY_PAGE = {
-  '/dashboard':   ['¿Cómo van las ventas?', 'Resumen del día', '¿Stock crítico?'],
-  '/products':    ['Productos sin stock', '¿Cuál vende más?', 'Precio promedio'],
-  '/inventory':   ['Movimientos recientes', '¿Qué reabastecer?', 'Stock mínimo'],
-  '/sales':       ['Ventas de hoy', 'Mejor producto', 'Total del mes'],
-  '/reports':     ['Reporte semanal', 'Tendencia de ventas', 'Comparar meses'],
-  '/predictions': ['Predicción próxima semana', '¿Qué pedir?', 'Demanda alta'],
-  '/users':       ['Usuarios activos', 'Roles asignados', 'Último acceso'],
+  '/dashboard': [
+    '¿Cómo van las ventas?',
+    'Resumen del día',
+    '¿Stock crítico?'
+  ],
+
+  '/products': [
+    'Productos sin stock',
+    '¿Cuál vende más?',
+    'Precio promedio'
+  ],
+
+  '/inventory': [
+    'Movimientos recientes',
+    '¿Qué reabastecer?',
+    'Stock mínimo'
+  ],
+
+  '/sales': [
+    'Ventas de hoy',
+    'Mejor producto',
+    'Total del mes'
+  ],
+
+  '/reports': [
+    'Reporte semanal',
+    'Tendencia de ventas',
+    'Comparar meses'
+  ],
+
+  '/predictions': [
+    'Predicción próxima semana',
+    '¿Qué pedir?',
+    'Demanda alta'
+  ],
+
+  '/users': [
+    'Usuarios activos',
+    'Roles asignados',
+    'Último acceso'
+  ],
 };
+
 
 const WELCOME_MSG = {
   role: 'agent',
@@ -517,270 +735,627 @@ const WELCOME_MSG = {
   time: now(),
 };
 
+
 function now() {
-  return new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+  return new Date().toLocaleTimeString(
+    'es-CO',
+    {
+      hour: '2-digit',
+      minute: '2-digit'
+    }
+  );
 }
 
-// ─── Llamada al gateway (proxy seguro hacia Groq) ────────────────────────────
-const GATEWAY_URL = import.meta.env.VITE_GATEWAY_URL || 'http://localhost:3000';
+
+// ─── Gateway ────────────────────────────────────────────────────────────────
+const GATEWAY_URL =
+  import.meta.env.VITE_GATEWAY_URL ||
+  'http://localhost:3000';
+
 
 async function callGemini(messages, currentPage) {
   const token = localStorage.getItem('sm_token');
 
-  const res = await fetch(`${GATEWAY_URL}/api/agent/query`, {
-    method: 'POST',
-    headers: {
-      'Content-Type':  'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      messages,
-      currentPage,
-    }),
-  });
+  const res = await fetch(
+    `${GATEWAY_URL}/api/agent/query`,
+    {
+      method: 'POST',
+
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+
+      body: JSON.stringify({
+        messages,
+        currentPage,
+      }),
+    }
+  );
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error || `HTTP ${res.status}`);
+
+    throw new Error(
+      err?.error ||
+      `HTTP ${res.status}`
+    );
   }
 
   const data = await res.json();
-  return data.reply || 'Sin respuesta del agente.';
+
+  return data.reply ||
+    'Sin respuesta del agente.';
 }
 
-// ─── Componente principal ────────────────────────────────────────────────────
+
+// ─── Componente principal ───────────────────────────────────────────────────
 export default function AgentBubble() {
+
   const location = useLocation();
   const { user } = useAuth();
 
-  const [open, setOpen]         = useState(false);
-  const [closing, setClosing]   = useState(false);
-  const [messages, setMessages] = useState([WELCOME_MSG]);
-  const [input, setInput]       = useState('');
-  const [loading, setLoading]   = useState(false);
-  const [showBadge, setShowBadge] = useState(true);
-  // 'unknown' | 'online' | 'offline'
-  const [agentStatus, setAgentStatus] = useState('unknown');
+  const [open, setOpen] =
+    useState(false);
 
-  const messagesEndRef = useRef(null);
-  const inputRef       = useRef(null);
-  const textareaRef    = useRef(null);
+  const [closing, setClosing] =
+    useState(false);
 
-  const currentPage = location.pathname;
-  const suggestions = SUGGESTIONS_BY_PAGE[currentPage] || [];
-  const pageCtx     = PAGE_CONTEXT[currentPage];
+  const [messages, setMessages] =
+    useState([WELCOME_MSG]);
 
-  // Auto-scroll
+  const [input, setInput] =
+    useState('');
+
+  const [loading, setLoading] =
+    useState(false);
+
+  const [showBadge, setShowBadge] =
+    useState(true);
+
+  const [agentStatus, setAgentStatus] =
+    useState('unknown');
+
+
+  const messagesEndRef =
+    useRef(null);
+
+  const inputRef =
+    useRef(null);
+
+  const textareaRef =
+    useRef(null);
+
+
+  const currentPage =
+    location.pathname;
+
+  const suggestions =
+    SUGGESTIONS_BY_PAGE[currentPage] || [];
+
+  const pageCtx =
+    PAGE_CONTEXT[currentPage];
+
+
+  // ── Auto-scroll ────────────────────────────────────────────────────────
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+
+    messagesEndRef.current?.scrollIntoView({
+      behavior: 'smooth'
+    });
+
   }, [messages, loading]);
 
-  // Focus input + check status al abrir
+
+  // ── Focus + status ─────────────────────────────────────────────────────
   useEffect(() => {
+
     if (open) {
+
       setShowBadge(false);
-      setTimeout(() => inputRef.current?.focus(), 300);
+
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 300);
+
       checkStatus();
     }
+
   }, [open]);
 
-  // Auto-resize textarea
+
+  // ── Auto resize textarea ───────────────────────────────────────────────
   useEffect(() => {
+
     if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 90)}px`;
+
+      textareaRef.current.style.height =
+        'auto';
+
+      textareaRef.current.style.height =
+        `${Math.min(
+          textareaRef.current.scrollHeight,
+          90
+        )}px`;
     }
+
   }, [input]);
 
+
   function handleClose() {
+
     setClosing(true);
-    setTimeout(() => { setOpen(false); setClosing(false); }, 180);
+
+    setTimeout(() => {
+      setOpen(false);
+      setClosing(false);
+    }, 180);
   }
+
 
   function handleToggle() {
-    if (open) handleClose();
-    else setOpen(true);
+
+    if (open) {
+      handleClose();
+    } else {
+      setOpen(true);
+    }
   }
 
+
   async function checkStatus() {
+
     setAgentStatus('unknown');
+
     try {
-      const token = localStorage.getItem('sm_token');
-      const res = await fetch(`${GATEWAY_URL}/api/agent/status`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
+
+      const token =
+        localStorage.getItem('sm_token');
+
+      const res =
+        await fetch(
+          `${GATEWAY_URL}/api/agent/status`,
+          {
+            headers: {
+              'Authorization':
+                `Bearer ${token}`,
+            },
+          }
+        );
+
+
       if (res.ok) {
-        const data = await res.json();
-        setAgentStatus(data.available ? 'online' : 'offline');
+
+        const data =
+          await res.json();
+
+        setAgentStatus(
+          data.available
+            ? 'online'
+            : 'offline'
+        );
+
       } else {
+
         setAgentStatus('offline');
       }
+
     } catch {
+
       setAgentStatus('offline');
     }
   }
 
-  async function sendMessage(text) {
-    if (!text.trim() || loading || agentStatus === 'offline') return;
 
-    const userMsg = { role: 'user', text: text.trim(), time: now() };
-    const newMessages = [...messages, userMsg];
+  async function sendMessage(text) {
+
+    if (
+      !text.trim() ||
+      loading ||
+      agentStatus === 'offline'
+    ) {
+      return;
+    }
+
+
+    const userMsg = {
+      role: 'user',
+      text: text.trim(),
+      time: now()
+    };
+
+
+    const newMessages = [
+      ...messages,
+      userMsg
+    ];
+
+
     setMessages(newMessages);
     setInput('');
     setLoading(true);
 
+
     try {
-      const contextMessages = newMessages.slice(-10);
-      const reply = await callGemini(contextMessages, currentPage);
+
+      const contextMessages =
+        newMessages.slice(-10);
+
+      const reply =
+        await callGemini(
+          contextMessages,
+          currentPage
+        );
+
+
       setAgentStatus('online');
-      setMessages(prev => [...prev, { role: 'agent', text: reply, time: now() }]);
+
+
+      setMessages(prev => [
+        ...prev,
+        {
+          role: 'agent',
+          text: reply,
+          time: now()
+        }
+      ]);
+
     } catch (err) {
-      // Detectar si es error de cuota/auth vs error de red
-      const msg = err.message || '';
-      const isQuota = msg.includes('quota') || msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED');
-      const isAuth  = msg.includes('API_KEY') || msg.includes('403') || msg.includes('401');
+
+      const msg =
+        err.message || '';
+
+      const isQuota =
+        msg.includes('quota') ||
+        msg.includes('429') ||
+        msg.includes('RESOURCE_EXHAUSTED');
+
+      const isAuth =
+        msg.includes('API_KEY') ||
+        msg.includes('403') ||
+        msg.includes('401');
+
+
       setAgentStatus('offline');
-      let friendlyMsg = '⚠️ El agente no está disponible en este momento. Intenta más tarde.';
-      if (isQuota) friendlyMsg = '⚠️ Se agotó la cuota de la API. Verifica tu plan en Google AI Studio.';
-      if (isAuth)  friendlyMsg = '⚠️ API key inválida o sin permisos. Revisa la configuración.';
-      setMessages(prev => [...prev, {
-        role: 'agent',
-        text: friendlyMsg,
-        time: now(),
-        error: true,
-      }]);
+
+
+      let friendlyMsg =
+        '⚠️ El agente no está disponible en este momento. Intenta más tarde.';
+
+
+      if (isQuota) {
+        friendlyMsg =
+          '⚠️ Se agotó la cuota de la API. Verifica tu plan en Google AI Studio.';
+      }
+
+
+      if (isAuth) {
+        friendlyMsg =
+          '⚠️ API key inválida o sin permisos. Revisa la configuración.';
+      }
+
+
+      setMessages(prev => [
+        ...prev,
+        {
+          role: 'agent',
+          text: friendlyMsg,
+          time: now(),
+          error: true,
+        }
+      ]);
+
     } finally {
+
       setLoading(false);
-      setTimeout(() => inputRef.current?.focus(), 100);
+
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
     }
   }
 
+
   function handleKeyDown(e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
+
+    if (
+      e.key === 'Enter' &&
+      !e.shiftKey
+    ) {
+
       e.preventDefault();
+
       sendMessage(input);
     }
   }
 
+
   return (
     <>
-      <style>{styles}</style>
+      <style>
+        {styles}
+      </style>
+
       <div className="agent-fab">
 
-        {/* Panel de chat */}
+        {/* ── Panel de chat ─────────────────────────────────────────── */}
         {open && (
-          <div className={`agent-panel ${closing ? 'closing' : ''}`}>
+          <div
+            className={`agent-panel ${
+              closing ? 'closing' : ''
+            }`}
+          >
 
             {/* Header */}
             <div className="agent-header">
+
               <div className="agent-header-left">
-                <div className="agent-avatar">🧠</div>
-                <div className="agent-header-info">
-                  <span className="agent-header-name">StockMind AI</span>
-                  <span className={`agent-header-status ${agentStatus === 'online' ? 'online' : agentStatus === 'offline' ? 'offline' : 'checking'}`}>
-                    <span className={`agent-status-dot ${agentStatus === 'online' ? 'online' : agentStatus === 'offline' ? 'offline' : 'checking'}`} />
-                    {agentStatus === 'online'  && 'en línea · Llama 3.3 · Groq'}
-                    {agentStatus === 'offline' && 'sin conexión · API no disponible'}
-                    {agentStatus === 'unknown' && 'verificando...'}
-                  </span>
+
+                <div className="agent-avatar">
+                  🧠
                 </div>
+
+                <div className="agent-header-info">
+
+                  <span className="agent-header-name">
+                    StockMind AI
+                  </span>
+
+                  <span
+                    className={`agent-header-status ${
+                      agentStatus === 'online'
+                        ? 'online'
+                        : agentStatus === 'offline'
+                          ? 'offline'
+                          : 'checking'
+                    }`}
+                  >
+
+                    <span
+                      className={`agent-status-dot ${
+                        agentStatus === 'online'
+                          ? 'online'
+                          : agentStatus === 'offline'
+                            ? 'offline'
+                            : 'checking'
+                      }`}
+                    />
+
+                    {agentStatus === 'online' &&
+                      'en línea · Llama 3.3 · Groq'}
+
+                    {agentStatus === 'offline' &&
+                      'sin conexión · API no disponible'}
+
+                    {agentStatus === 'unknown' &&
+                      'verificando...'}
+
+                  </span>
+
+                </div>
+
               </div>
-              <button className="agent-close-btn" onClick={handleClose} title="Cerrar">
+
+
+              <button
+                className="agent-close-btn"
+                onClick={handleClose}
+                title="Cerrar"
+              >
                 ✕
               </button>
+
             </div>
+
 
             {/* Banner offline */}
             {agentStatus === 'offline' && (
               <div className="agent-offline-banner">
-                <span>El agente no está disponible ahora</span>
-                <button className="agent-retry-btn" onClick={checkStatus}>↺ Reintentar</button>
+
+                <span>
+                  El agente no está disponible ahora
+                </span>
+
+                <button
+                  className="agent-retry-btn"
+                  onClick={checkStatus}
+                >
+                  ↺ Reintentar
+                </button>
+
               </div>
             )}
 
-            {/* Badge de contexto de página */}
-            {pageCtx && agentStatus !== 'offline' && (
-              <div className="agent-context-badge">
-                <span>📍</span>
-                <span>{pageCtx.label} — {pageCtx.hint}</span>
-              </div>
-            )}
+
+            {/* Contexto */}
+            {pageCtx &&
+              agentStatus !== 'offline' && (
+                <div className="agent-context-badge">
+
+                  <span>📍</span>
+
+                  <span>
+                    {pageCtx.label} — {pageCtx.hint}
+                  </span>
+
+                </div>
+              )}
+
 
             {/* Mensajes */}
             <div className="agent-messages">
+
               {messages.map((msg, i) => (
-                <div key={i} className={`agent-msg ${msg.role} ${msg.error ? 'error' : ''}`}>
-                  <div className="agent-msg-bubble">{msg.text}</div>
-                  <span className="agent-msg-time">{msg.time}</span>
+
+                <div
+                  key={i}
+                  className={`agent-msg ${
+                    msg.role
+                  } ${
+                    msg.error ? 'error' : ''
+                  }`}
+                >
+
+                  <div className="agent-msg-bubble">
+                    {msg.text}
+                  </div>
+
+                  <span className="agent-msg-time">
+                    {msg.time}
+                  </span>
+
                 </div>
+
               ))}
+
+
               {loading && (
                 <div className="agent-typing">
-                  <span /><span /><span />
+                  <span />
+                  <span />
+                  <span />
                 </div>
               )}
+
+
               <div ref={messagesEndRef} />
+
             </div>
 
-            {/* Chips de sugerencias */}
-            {suggestions.length > 0 && !loading && (
-              <div className="agent-suggestions">
-                {suggestions.map((s, i) => (
-                  <button
-                    key={i}
-                    className="agent-chip"
-                    onClick={() => sendMessage(s)}
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
-            )}
+
+            {/* Sugerencias */}
+            {suggestions.length > 0 &&
+              !loading && (
+
+                <div className="agent-suggestions">
+
+                  {suggestions.map((s, i) => (
+
+                    <button
+                      key={i}
+                      className="agent-chip"
+                      onClick={() =>
+                        sendMessage(s)
+                      }
+                    >
+                      {s}
+                    </button>
+
+                  ))}
+
+                </div>
+              )}
+
 
             {/* Disclaimer */}
             <div className="agent-disclaimer">
               ⚠️ Experimental · Puede cometer errores · No compartas datos sensibles
             </div>
 
+
             {/* Input */}
             <div className="agent-input-area">
+
               <textarea
-                ref={el => { inputRef.current = el; textareaRef.current = el; }}
+                ref={el => {
+                  inputRef.current = el;
+                  textareaRef.current = el;
+                }}
                 className="agent-input"
                 placeholder="Escribe tu pregunta..."
                 value={input}
-                onChange={e => setInput(e.target.value)}
+                onChange={e =>
+                  setInput(e.target.value)
+                }
                 onKeyDown={handleKeyDown}
-                disabled={loading || agentStatus === 'offline'}
+                disabled={
+                  loading ||
+                  agentStatus === 'offline'
+                }
                 rows={1}
               />
+
+
               <button
                 className="agent-send-btn"
-                onClick={() => sendMessage(input)}
-                disabled={!input.trim() || loading || agentStatus === 'offline'}
+                onClick={() =>
+                  sendMessage(input)
+                }
+                disabled={
+                  !input.trim() ||
+                  loading ||
+                  agentStatus === 'offline'
+                }
                 title="Enviar"
               >
-                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+
+                <svg
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
                   <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
                 </svg>
+
               </button>
+
             </div>
+
           </div>
         )}
 
-        {/* Botón FAB */}
-        <button
-          className={`agent-toggle-btn ${open ? 'open' : ''}`}
-          onClick={handleToggle}
-          title="Agente StockMind AI"
+
+        {/* ── FAB / LIQUID GLASS ───────────────────────────────────── */}
+        <glass-element
+          className="agent-glass-toggle"
+          width="52"
+          height="52"
+          radius="16"
+          depth="8"
+          blur="3"
+          strength="28"
+          chromatic-aberration="0"
+          background-color="rgba(255,255,255,0.025)"
         >
-          {showBadge && !open && <span className="agent-notif-badge" />}
-          {open ? (
-            <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
-          ) : (
-            <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/></svg>
-          )}
-        </button>
+
+          <button
+            className={`agent-toggle-btn ${
+              open ? 'open' : ''
+            }`}
+            onClick={handleToggle}
+            title="Agente StockMind AI"
+            aria-label={
+              open
+                ? 'Cerrar agente StockMind AI'
+                : 'Abrir agente StockMind AI'
+            }
+          >
+
+            {showBadge && !open && (
+              <span className="agent-notif-badge" />
+            )}
+
+
+            {open ? (
+
+              <svg
+                viewBox="0 0 24 24"
+              >
+                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+              </svg>
+
+            ) : (
+
+              <svg
+                viewBox="0 0 24 24"
+              >
+                <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9H6v2zm0-3H6V6h12v2z"/>
+              </svg>
+
+            )}
+
+          </button>
+
+        </glass-element>
 
       </div>
     </>
