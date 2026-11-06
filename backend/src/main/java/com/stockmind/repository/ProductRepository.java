@@ -49,4 +49,11 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
     Optional<Product> findByIdForUpdate(@Param("id") Long id);
 
     boolean existsBySku(String sku);
+
+    /**
+     * Productos activos de UNA empresa, sin depender de la empresa de la sesión (@TenantId se fija al abrir
+     * la sesión). Solo para el panel de plataforma, que consulta empresas ajenas; SQL nativo a propósito.
+     */
+    @Query(value = "SELECT COUNT(*) FROM products WHERE organization_id = :organizationId AND active = true", nativeQuery = true)
+    long countActiveByOrganizationId(@Param("organizationId") Long organizationId);
 }

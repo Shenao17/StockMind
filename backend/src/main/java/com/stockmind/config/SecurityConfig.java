@@ -68,6 +68,8 @@ public class SecurityConfig {
                 // Equipo de plataforma: cada endpoint exige un PERMISO (no un rol concreto)
                 .requestMatchers(HttpMethod.GET, "/platform/organizations/**").hasAuthority(PERM_VIEW)
                 .requestMatchers(HttpMethod.POST, "/platform/organizations").hasAuthority(PlatformPermission.ORG_CREATE.authority())
+                .requestMatchers(HttpMethod.PATCH, "/platform/organizations/*/contact").hasAuthority(PlatformPermission.ORG_EDIT_CONTACT.authority())
+                .requestMatchers(HttpMethod.PATCH, "/platform/organizations/*/tax-id").hasAuthority(PlatformPermission.SENSITIVE.authority())
                 .requestMatchers(HttpMethod.POST, "/platform/organizations/*/reactivate").hasAuthority(PlatformPermission.ORG_REACTIVATE.authority())
                 .requestMatchers(HttpMethod.POST, "/platform/organizations/*/extend-trial").hasAuthority(PlatformPermission.TRIAL_EXTEND.authority())
                 .requestMatchers(HttpMethod.POST, "/platform/organizations/*/payment-links").hasAuthority(PlatformPermission.PAYMENT_LINK.authority())

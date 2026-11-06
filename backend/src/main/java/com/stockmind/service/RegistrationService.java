@@ -257,7 +257,7 @@ public class RegistrationService {
     }
 
     /** "900.123.456-7" → "900123456-7" (mayúsculas, sin puntos ni espacios). */
-    static String normalizeTaxId(String taxId) {
+    public static String normalizeTaxId(String taxId) {
         return taxId.trim().toUpperCase(Locale.ROOT).replace(".", "").replace(" ", "");
     }
 

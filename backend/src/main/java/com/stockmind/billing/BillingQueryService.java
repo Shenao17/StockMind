@@ -30,6 +30,11 @@ public class BillingQueryService {
 
     /** Debe llamarse con la empresa en el TenantContext (el conteo de productos respeta el filtro). */
     public BillingDTO.SubscriptionView subscriptionOf(Long organizationId) {
+        return subscriptionOf(organizationId, entitlementService.activeProducts());
+    }
+
+    /** Variante para el panel de plataforma: el conteo de productos lo calcula quien llama (sin empresa en sesión). */
+    public BillingDTO.SubscriptionView subscriptionOf(Long organizationId, long activeProducts) {
         Subscription s = subscriptionService.forOrganization(organizationId);
         EntitlementService.Snapshot snap = entitlementService.snapshot(organizationId);
 
@@ -45,6 +50,6 @@ public class BillingQueryService {
             snap.access() == EntitlementService.Access.READ_ONLY,
             snap.access() == EntitlementService.Access.BLOCKED,
             snap.features().stream().sorted().toList(), snap.maxUsers(), snap.maxProducts(),
-            new BillingDTO.Usage(entitlementService.activeUsers(organizationId), entitlementService.activeProducts()));
+            new BillingDTO.Usage(entitlementService.activeUsers(organizationId), activeProducts));
     }
 }
