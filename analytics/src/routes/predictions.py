@@ -53,8 +53,14 @@ def predict(product_id: int):
         }), 404
 
     # Permitir sobreescribir stock para simulaciones
-    stock_current = int(request.args.get("stockCurrent", product_data["stock_current"]))
-    stock_minimum = int(request.args.get("stockMinimum", product_data["stock_minimum"]))
+    try:
+        stock_current = int(request.args.get("stockCurrent", product_data["stock_current"]))
+        stock_minimum = int(request.args.get("stockMinimum", product_data["stock_minimum"]))
+    except (TypeError, ValueError):
+        return jsonify({
+            "error": "stockCurrent y stockMinimum deben ser números enteros",
+            "code": "INVALID_PARAMETER"
+        }), 400
 
     try:
         result = get_prediction_for_product(product_id, stock_current, stock_minimum)
@@ -73,7 +79,6 @@ def predict(product_id: int):
         print(f"[PredictionsRoute] Error generando predicción para producto {product_id}: {e}")
         return jsonify({
             "error": "Error al generar la predicción",
-            "detail": str(e),
             "code": "PREDICTION_ERROR"
         }), 500
 
@@ -113,6 +118,5 @@ def recommend():
         print(f"[PredictionsRoute] Error generando recomendaciones: {e}")
         return jsonify({
             "error": "Error al generar recomendaciones",
-            "detail": str(e),
             "code": "RECOMMENDATION_ERROR"
         }), 500
