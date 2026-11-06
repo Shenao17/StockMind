@@ -7,7 +7,7 @@ export default function Login() {
   const navigate = useNavigate();
   const { login, isLoggedIn } = useAuth();
 
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -18,7 +18,7 @@ export default function Login() {
   }
 
   async function handleLogin() {
-    if (!username || !password) {
+    if (!email.trim() || !password) {
       setError('Complete todos los campos');
       return;
     }
@@ -28,12 +28,12 @@ export default function Login() {
 
     try {
       const response = await API.auth.login({
-        username,
+        email: email.trim(),
         password,
       });
 
       // El token ya no viaja en el body: el gateway lo puso en una cookie
-      // httpOnly. Aquí solo llega { user: { id, username, role } }.
+      // httpOnly. Aquí solo llega { user: { id, username, email, organizationId, role } }.
       if (response?.user) {
         login(response.user);
         navigate('/dashboard', { replace: true });
@@ -93,18 +93,18 @@ export default function Login() {
           )}
 
           <div className="form-group login-field">
-            <label htmlFor="username">Usuario</label>
+            <label htmlFor="email">Correo electrónico</label>
 
             <div className="login-input-wrapper">
               <span className="login-input-icon">◉</span>
 
               <input
-                id="username"
-                type="text"
-                placeholder="Ingrese su usuario"
+                id="email"
+                type="email"
+                placeholder="tucorreo@empresa.com"
                 autoComplete="username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
               />
             </div>

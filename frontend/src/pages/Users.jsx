@@ -86,9 +86,9 @@ export default function Users({ showToast }) {
       data.username = form.username;
       data.password = form.password;
 
-      if (!data.username || !data.password) {
+      if (!data.username || !data.email || !data.password) {
         showToast?.(
-          'Usuario y contraseña son obligatorios',
+          'Correo, nombre de usuario y contraseña son obligatorios',
           'warning'
         );
         return;
@@ -321,6 +321,17 @@ export default function Users({ showToast }) {
         }
       >
         <div className="form-group">
+          <label>Correo electrónico * <span style={{ color: 'var(--text-muted)', fontSize: '.75rem' }}>(con él inicia sesión)</span></label>
+
+          <input
+            type="email"
+            value={form.email}
+            onChange={f('email')}
+            placeholder="usuario@empresa.com"
+          />
+        </div>
+
+        <div className="form-group">
           <label>Nombre de usuario *</label>
 
           <input
@@ -329,17 +340,6 @@ export default function Users({ showToast }) {
             onChange={f('username')}
             placeholder="sin espacios"
             disabled={!!editId}
-          />
-        </div>
-
-        <div className="form-group">
-          <label>Correo electrónico *</label>
-
-          <input
-            type="email"
-            value={form.email}
-            onChange={f('email')}
-            placeholder="usuario@empresa.com"
           />
         </div>
 

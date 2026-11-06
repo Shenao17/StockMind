@@ -26,9 +26,9 @@ describe('Login — renderizado inicial', () => {
     expect(screen.getByRole('heading', { name: /stockmind/i })).toBeInTheDocument();
   });
 
-  it('muestra los campos de usuario y contraseña', () => {
+  it('muestra los campos de correo y contraseña', () => {
     renderLogin();
-    expect(screen.getByPlaceholderText(/ingrese su usuario/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/tucorreo@empresa.com/i)).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/ingrese su contraseña/i)).toBeInTheDocument();
   });
 
@@ -53,10 +53,10 @@ describe('Login — validaciones', () => {
     });
   });
 
-  it('muestra error si solo se llena el usuario', async () => {
+  it('muestra error si solo se llena el correo', async () => {
     renderLogin();
-    fireEvent.change(screen.getByPlaceholderText(/ingrese su usuario/i), {
-      target: { value: 'admin' },
+    fireEvent.change(screen.getByPlaceholderText(/tucorreo@empresa.com/i), {
+      target: { value: 'admin@stockmind.com' },
     });
     fireEvent.click(screen.getByRole('button', { name: /iniciar sesión/i }));
     await waitFor(() => {
@@ -77,12 +77,24 @@ describe('Login — validaciones', () => {
 });
 
 describe('Login — interacción con la API', () => {
+  it('envía el correo (sin espacios sobrantes) y la contraseña, nunca un "username"', async () => {
+    const spy = vi.spyOn(apiModule.API.auth, 'login').mockResolvedValue({
+      user: { id: 1, username: 'ana', email: 'ana@empresa.com', role: 'ADMIN', organizationId: 3 },
+    });
+    renderLogin();
+    fireEvent.change(screen.getByPlaceholderText(/tucorreo@empresa.com/i), { target: { value: '  ana@empresa.com ' } });
+    fireEvent.change(screen.getByPlaceholderText(/ingrese su contraseña/i), { target: { value: 'Clave1234' } });
+    fireEvent.click(screen.getByRole('button', { name: /iniciar sesión/i }));
+    await waitFor(() => expect(spy).toHaveBeenCalledWith({ email: 'ana@empresa.com', password: 'Clave1234' }));
+    expect(mockLogin).toHaveBeenCalledWith(expect.objectContaining({ email: 'ana@empresa.com' }));
+  });
+
   it('cambia el texto del botón a "Verificando..." mientras carga', async () => {
     vi.spyOn(apiModule.API.auth, 'login').mockImplementation(
       () => new Promise((resolve) => setTimeout(() => resolve({ token: 'abc', userId: 1, username: 'admin', role: 'ADMIN' }), 200))
     );
     renderLogin();
-    fireEvent.change(screen.getByPlaceholderText(/ingrese su usuario/i), { target: { value: 'admin' } });
+    fireEvent.change(screen.getByPlaceholderText(/tucorreo@empresa.com/i), { target: { value: 'admin@stockmind.com' } });
     fireEvent.change(screen.getByPlaceholderText(/ingrese su contraseña/i), { target: { value: 'admin123' } });
     fireEvent.click(screen.getByRole('button', { name: /iniciar sesión/i }));
     expect(await screen.findByText(/verificando/i)).toBeInTheDocument();
@@ -91,7 +103,7 @@ describe('Login — interacción con la API', () => {
   it('muestra error cuando la API rechaza las credenciales', async () => {
     vi.spyOn(apiModule.API.auth, 'login').mockRejectedValue(new Error('Credenciales inválidas'));
     renderLogin();
-    fireEvent.change(screen.getByPlaceholderText(/ingrese su usuario/i), { target: { value: 'admin' } });
+    fireEvent.change(screen.getByPlaceholderText(/tucorreo@empresa.com/i), { target: { value: 'admin@stockmind.com' } });
     fireEvent.change(screen.getByPlaceholderText(/ingrese su contraseña/i), { target: { value: 'wrongpass' } });
     fireEvent.click(screen.getByRole('button', { name: /iniciar sesión/i }));
     expect(await screen.findByText(/credenciales inválidas/i)).toBeInTheDocument();
@@ -100,7 +112,7 @@ describe('Login — interacción con la API', () => {
   it('muestra error cuando el servidor no responde', async () => {
     vi.spyOn(apiModule.API.auth, 'login').mockRejectedValue(new Error('No se puede conectar con el servidor'));
     renderLogin();
-    fireEvent.change(screen.getByPlaceholderText(/ingrese su usuario/i), { target: { value: 'admin' } });
+    fireEvent.change(screen.getByPlaceholderText(/tucorreo@empresa.com/i), { target: { value: 'admin@stockmind.com' } });
     fireEvent.change(screen.getByPlaceholderText(/ingrese su contraseña/i), { target: { value: 'admin123' } });
     fireEvent.click(screen.getByRole('button', { name: /iniciar sesión/i }));
     expect(await screen.findByText(/no se puede conectar/i)).toBeInTheDocument();
