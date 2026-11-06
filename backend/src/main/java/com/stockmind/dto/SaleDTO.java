@@ -9,54 +9,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 // =============================================================================
-// ProductDTO — Para crear o actualizar un producto
-// =============================================================================
-class ProductDTO {
-
-    @Data
-    public static class Request {
-        @NotNull(message = "La categoría es obligatoria")
-        private Long categoryId;
-
-        @NotBlank(message = "El nombre es obligatorio")
-        private String name;
-
-        @NotBlank(message = "El SKU es obligatorio")
-        private String sku;
-
-        private String description;
-
-        @NotNull @DecimalMin("0.0")
-        private BigDecimal price;
-
-        @Min(0)
-        private Integer stockCurrent = 0;
-
-        @Min(0)
-        private Integer stockMinimum = 5;
-
-        private String unit = "UNIT";
-    }
-
-    @Data
-    public static class Response {
-        private Long id;
-        private Long categoryId;
-        private String categoryName;
-        private String name;
-        private String sku;
-        private String description;
-        private BigDecimal price;
-        private Integer stockCurrent;
-        private Integer stockMinimum;
-        private String unit;
-        private Boolean active;
-        private Boolean lowStock;
-        private LocalDateTime createdAt;
-    }
-}
-
-// =============================================================================
 // SaleDTO — Para registrar y consultar ventas
 // =============================================================================
 public class SaleDTO {

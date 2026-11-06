@@ -1,5 +1,6 @@
 package com.stockmind.controller;
 
+import com.stockmind.dto.ProductDTO;
 import com.stockmind.exception.ResourceNotFoundException;
 import com.stockmind.model.Category;
 import com.stockmind.model.Product;
@@ -11,7 +12,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -49,22 +49,15 @@ public class ProductController {
     }
 
     @PostMapping
-    public ResponseEntity<?> create(@Valid @RequestBody Map<String, Object> body) {
-        // Los errores (SKU duplicado, número inválido) los resuelve GlobalExceptionHandler
-        Product product = buildProductFromBody(body);
-        Product saved = productService.create(product);
+    public ResponseEntity<Product> create(@Valid @RequestBody ProductDTO.Request body) {
+        Product saved = productService.create(buildProduct(body));
         return ResponseEntity.status(HttpStatus.CREATED).body(saved);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<?> update(@PathVariable Long id,
-                                     @RequestBody Map<String, Object> body) {
-        try {
-            Product updated = buildProductFromBody(body);
-            return ResponseEntity.ok(productService.update(id, updated));
-        } catch (ResourceNotFoundException e) {
-            return ResponseEntity.notFound().build();
-        }
+    public ResponseEntity<Product> update(@PathVariable Long id,
+                                          @Valid @RequestBody ProductDTO.Request body) {
+        return ResponseEntity.ok(productService.update(id, buildProduct(body)));
     }
 
     @DeleteMapping("/{id}")
@@ -74,24 +67,22 @@ public class ProductController {
     }
 
     // ---------------------------------------------------------------------------
-    // Helper privado: construye una entidad Product desde el body del request
+    // Helper privado: construye una entidad Product desde el DTO ya validado
     // ---------------------------------------------------------------------------
-    private Product buildProductFromBody(Map<String, Object> body) {
-        Long categoryId = Long.parseLong(body.get("categoryId").toString());
-        Category category = categoryRepository.findById(categoryId)
-            .orElseThrow(() -> new ResourceNotFoundException("Categoría no encontrada: " + categoryId));
+    private Product buildProduct(ProductDTO.Request body) {
+        Category category = categoryRepository.findById(body.getCategoryId())
+            .orElseThrow(() -> new ResourceNotFoundException(
+                "Categoría no encontrada: " + body.getCategoryId()));
 
         return Product.builder()
             .category(category)
-            .name(body.get("name").toString())
-            .sku(body.get("sku").toString())
-            .description(body.containsKey("description") ? body.get("description").toString() : null)
-            .price(new BigDecimal(body.get("price").toString()))
-            .stockCurrent(body.containsKey("stockCurrent")
-                ? Integer.parseInt(body.get("stockCurrent").toString()) : 0)
-            .stockMinimum(body.containsKey("stockMinimum")
-                ? Integer.parseInt(body.get("stockMinimum").toString()) : 5)
-            .unit(body.containsKey("unit") ? body.get("unit").toString() : "UNIT")
+            .name(body.getName().trim())
+            .sku(body.getSku().trim())
+            .description(body.getDescription())
+            .price(body.getPrice())
+            .stockCurrent(body.getStockCurrent() != null ? body.getStockCurrent() : 0)
+            .stockMinimum(body.getStockMinimum() != null ? body.getStockMinimum() : 5)
+            .unit(body.getUnit() != null ? body.getUnit() : "UNIT")
             .build();
     }
 }
