@@ -9,6 +9,9 @@
  * POST /api/platform/organizations/:id/plan           { planCode, billingCycle, complimentary }
  * POST /api/platform/organizations/:id/payment-links  { planCode, billingCycle }
  * POST /api/platform/organizations/:id/manual-payment { planCode, billingCycle }
+ * GET  /api/platform/organizations/:id/detail         → ficha: datos, plan y uso, usuarios, cobros, línea de tiempo
+ * PATCH /api/platform/organizations/:id/contact        { name, legalName, phone, contactEmail, country }
+ * PATCH /api/platform/organizations/:id/tax-id         { taxId, pin }   (solo el dueño)
  * GET  /api/platform/team                              → miembros (solo el dueño)
  * POST /api/platform/team                              { fullName, email, role, pin }
  * PATCH /api/platform/team/:id                         { role, active, fullName, pin }
@@ -64,6 +67,41 @@ router.get('/organizations/:id', ...guard, async (req, res, next) => {
     try {
         if (!/^\d{1,18}$/.test(req.params.id)) return res.status(400).json({ error: 'Identificador inválido' });
         const r = await axios.get(`${JAVA}/platform/organizations/${req.params.id}`, { headers: authHeader(req) });
+        res.status(r.status).json(r.data);
+    } catch (e) { next(e); }
+});
+
+const validId = (req, res) => {
+    if (!/^\d{1,18}$/.test(req.params.id)) { res.status(400).json({ error: 'Identificador inválido' }); return false; }
+    return true;
+};
+
+router.get('/organizations/:id/detail', ...guard, async (req, res, next) => {
+    try {
+        if (!validId(req, res)) return;
+        const r = await axios.get(`${JAVA}/platform/organizations/${req.params.id}/detail`, { headers: authHeader(req) });
+        res.status(r.status).json(r.data);
+    } catch (e) { next(e); }
+});
+
+router.patch('/organizations/:id/contact', ...guard, async (req, res, next) => {
+    try {
+        if (!validId(req, res)) return;
+        const r = await axios.patch(`${JAVA}/platform/organizations/${req.params.id}/contact`,
+            pick(req.body, ['name', 'legalName', 'phone', 'contactEmail', 'country']), {
+                headers: { ...authHeader(req), 'Content-Type': 'application/json' }
+            });
+        res.status(r.status).json(r.data);
+    } catch (e) { next(e); }
+});
+
+router.patch('/organizations/:id/tax-id', ...guard, async (req, res, next) => {
+    try {
+        if (!validId(req, res)) return;
+        const r = await axios.patch(`${JAVA}/platform/organizations/${req.params.id}/tax-id`,
+            pick(req.body, ['taxId', 'pin']), {
+                headers: { ...authHeader(req), 'Content-Type': 'application/json' }
+            });
         res.status(r.status).json(r.data);
     } catch (e) { next(e); }
 });

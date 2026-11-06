@@ -59,7 +59,7 @@ function createLogger(stream) {
     }, stream);
 }
 
-function createApp({ logger = createLogger() } = {}) {
+function createApp({ logger = createLogger(), authMax } = {}) {
     const app = express();
     const isProd = process.env.NODE_ENV === 'production';
     const isDev = !isProd;
@@ -136,13 +136,17 @@ function createApp({ logger = createLogger() } = {}) {
     app.use(cookieParser());
 
     // ── Rate limiting ────────────────────────────────────────────────────────
-    // Estricto SOLO para login (fuerza bruta), por IP
-    const authLimiter = rateLimit({
+    // Estricto SOLO para adivinar credenciales (login y códigos del segundo factor), por IP.
+    // Cuentan únicamente los intentos FALLIDOS (skipSuccessfulRequests): quien entra bien no gasta el
+    // límite, y un atacante que prueba contraseñas o códigos sí (todo intento erróneo es 4xx).
+    // Las consultas de lectura (p. ej. /mfa/self/status) no pasan por aquí.
+    const failedAttemptsLimiter = rateLimit({
         windowMs: 15 * 60 * 1000,
-        max: 10,
+        max: authMax ?? (isDev ? 100 : 10),
+        skipSuccessfulRequests: true,
         standardHeaders: true,
         legacyHeaders: false,
-        message: { error: 'Demasiados intentos de inicio de sesión. Intenta más tarde.' }
+        message: { error: 'Demasiados intentos fallidos. Intenta más tarde.' }
     });
 
     // General para el resto de la API, por IP. authenticate() corre dentro de cada
@@ -165,8 +169,11 @@ function createApp({ logger = createLogger() } = {}) {
     });
 
     // ── Rutas de la API ──────────────────────────────────────────────────────
-    app.use('/api/auth/login', authLimiter);
-    app.use('/api/auth/mfa', authLimiter);   // segundo factor: mismos límites que el login
+    app.use('/api/auth/login', failedAttemptsLimiter);
+    app.use('/api/auth/mfa/verify', failedAttemptsLimiter);   // segundo factor
+    app.use('/api/auth/mfa/enroll', failedAttemptsLimiter);
+    // Activar/desactivar el 2FA desde el perfil vuelve a pedir la contraseña: mismo límite de fallos (GET status no cuenta)
+    app.use('/api/auth/mfa/self', (req, res, next) => (req.method === 'POST' ? failedAttemptsLimiter(req, res, next) : next()));
     app.use('/api', apiLimiter);
 
     app.use('/api/auth', authRoutes);

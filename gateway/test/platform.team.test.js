@@ -82,3 +82,36 @@ describe('equipo', () => {
         assert.equal(javaCalls.length, 0);
     });
 });
+
+describe('ficha de empresa', () => {
+    const owner = () => tokenFor('PLATFORM_OWNER');
+
+    test('el detalle y las correcciones llegan a Java con id válido y solo los campos permitidos', async () => {
+        javaCalls.length = 0;
+        assert.equal((await req('GET', '/organizations/12/detail', owner())).status, 200);
+        assert.deepEqual(javaCalls[0], { method: 'GET', url: '/platform/organizations/12/detail', body: null });
+
+        javaCalls.length = 0;
+        await req('PATCH', '/organizations/12/contact', owner(), { name: 'N', legalName: 'L', phone: '3001234567',
+            contactEmail: 'a@b.com', country: 'CO', taxId: '1', status: 'ACTIVE', requireMfa: true });
+        assert.deepEqual(javaCalls[0], { method: 'PATCH', url: '/platform/organizations/12/contact',
+            body: { name: 'N', legalName: 'L', phone: '3001234567', contactEmail: 'a@b.com', country: 'CO' } });
+
+        javaCalls.length = 0;
+        await req('PATCH', '/organizations/12/tax-id', owner(), { taxId: '900123456-7', pin: '482915', name: 'x' });
+        assert.deepEqual(javaCalls[0], { method: 'PATCH', url: '/platform/organizations/12/tax-id',
+            body: { taxId: '900123456-7', pin: '482915' } });
+    });
+
+    test('ids no numéricos no llegan a Java; las empresas no entran', async () => {
+        javaCalls.length = 0;
+        for (const p of ['/organizations/abc/detail', '/organizations/1;x/contact', '/organizations/../tax-id']) {
+            const m = p.endsWith('detail') ? 'GET' : 'PATCH';
+            const r = await req(m, p, owner(), m === 'PATCH' ? {} : undefined);
+            assert.ok([400, 404].includes(r.status), `${m} ${p} → ${r.status}`);
+        }
+        assert.equal(javaCalls.length, 0);
+        assert.equal((await req('GET', '/organizations/12/detail', tokenFor('ADMIN'))).status, 403);
+        assert.equal((await req('PATCH', '/organizations/12/tax-id', tokenFor('SELLER'), {})).status, 403);
+    });
+});
