@@ -47,3 +47,5 @@ desktop.ini
 
 # ─── Base de datos ───────────────────────────────────────────────────────────
 *.sql.bak
+# Variables de entorno de Docker Compose (secretos)
+.env

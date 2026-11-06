@@ -1,0 +1,77 @@
+# StockMind — Entorno de desarrollo (recarga automática)
+# ─────────────────────────────────────────────────────────────────────────────
+# Docker Compose combina este archivo con docker-compose.yml automáticamente.
+# Uso:
+#     docker compose up --build --watch
+#
+# Con --watch, al guardar un archivo:
+#   frontend   → se sincroniza y Vite recarga el navegador (HMR)
+#   gateway    → se sincroniza y el contenedor se reinicia (segundos)
+#   analytics  → se sincroniza y el contenedor se reinicia (segundos)
+#   backend    → se reconstruye solo ese servicio (la capa de dependencias
+#                de Maven queda en caché, solo recompila el código)
+# Si cambian package.json / requirements.txt / pom.xml, el servicio se
+# reconstruye para instalar las dependencias nuevas.
+#
+# Producción: usar solo el archivo base →  docker compose -f docker-compose.yml up
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # Bases de datos visibles solo desde tu propia máquina (127.0.0.1),
+  # para usar un cliente SQL / Compass. Nunca se exponen a la red.
+  mysql:
+    ports:
+      - "127.0.0.1:3306:3306"
+
+  mongo:
+    ports:
+      - "127.0.0.1:27017:27017"
+
+  frontend:
+    develop:
+      watch:
+        - action: sync
+          path: ./frontend/src
+          target: /app/src
+        - action: sync
+          path: ./frontend/index.html
+          target: /app/index.html
+        - action: rebuild
+          path: ./frontend/package.json
+
+  gateway:
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./gateway
+          target: /app
+          ignore:
+            - node_modules/
+            - package.json
+            - package-lock.json
+        - action: rebuild
+          path: ./gateway/package.json
+
+  analytics:
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./analytics
+          target: /app
+          ignore:
+            - __pycache__/
+            - "**/__pycache__/"
+            - venv/
+            - requirements.txt
+            - config.py
+        - action: rebuild
+          path: ./analytics/requirements.txt
+
+  backend:
+    develop:
+      watch:
+        - action: rebuild
+          path: ./backend/src
+        - action: rebuild
+          path: ./backend/pom.xml
