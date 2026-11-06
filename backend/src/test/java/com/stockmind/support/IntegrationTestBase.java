@@ -13,17 +13,39 @@ import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 
 import java.math.BigDecimal;
 import java.util.UUID;
 
 /**
- * Base de las pruebas de integración: levanta la aplicación completa con H2 y
- * deja la base vacía antes de cada prueba. Ofrece helpers para crear datos y tokens.
+ * Base de las pruebas de integración: levanta la aplicación completa y deja la
+ * base vacía antes de cada prueba. Ofrece helpers para crear datos y tokens.
+ *
+ * Por defecto usa H2 en memoria (rápido, sin dependencias). Si existe la variable
+ * de entorno MYSQL_TEST_URL, TODA la suite corre contra ese MySQL real, aplicando
+ * las migraciones de Flyway y validando el esquema con Hibernate (así lo hace el CI).
+ *   MYSQL_TEST_URL=jdbc:mysql://host:3306/stockmind_test
+ *   MYSQL_TEST_USER / MYSQL_TEST_PASSWORD
  */
 @SpringBootTest
 @AutoConfigureMockMvc
 public abstract class IntegrationTestBase {
+
+    @DynamicPropertySource
+    static void useRealMysqlWhenConfigured(DynamicPropertyRegistry registry) {
+        String url = System.getenv("MYSQL_TEST_URL");
+        if (url == null || url.isBlank()) {
+            return; // H2 + esquema generado por Hibernate (application.properties de test)
+        }
+        registry.add("spring.datasource.url", () -> url);
+        registry.add("spring.datasource.username", () -> System.getenv().getOrDefault("MYSQL_TEST_USER", "root"));
+        registry.add("spring.datasource.password", () -> System.getenv().getOrDefault("MYSQL_TEST_PASSWORD", ""));
+        registry.add("spring.datasource.driver-class-name", () -> "com.mysql.cj.jdbc.Driver");
+        registry.add("spring.flyway.enabled", () -> "true");
+        registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
+    }
 
     @Autowired protected UserRepository userRepository;
     @Autowired protected ProductRepository productRepository;

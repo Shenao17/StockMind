@@ -31,6 +31,40 @@ jobs:
       # Las pruebas usan H2 en memoria (backend/src/test/resources/application.properties)
       - run: mvn -B test
 
+  backend-mysql:
+    name: Backend + MySQL real (migraciones Flyway)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ci_root_password
+          MYSQL_DATABASE: stockmind_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -uroot -pci_root_password"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      # Toda la suite corre contra MySQL real: aplica las migraciones de Flyway,
+      # Hibernate valida el esquema y se prueba el bloqueo de stock en MySQL.
+      - run: mvn -B test
+        env:
+          MYSQL_TEST_URL: jdbc:mysql://127.0.0.1:3306/stockmind_test?useSSL=false&allowPublicKeyRetrieval=true
+          MYSQL_TEST_USER: root
+          MYSQL_TEST_PASSWORD: ci_root_password
+
   gateway:
     name: Gateway (Node)
     runs-on: ubuntu-latest
