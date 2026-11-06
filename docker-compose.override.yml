@@ -18,15 +18,11 @@
 
 services:
 
-  # Bases de datos visibles solo desde tu propia máquina (127.0.0.1),
-  # para usar un cliente SQL / Compass. Nunca se exponen a la red.
+  # Base de datos visible solo desde tu propia máquina (127.0.0.1),
+  # para usar un cliente SQL. Nunca se expone a la red.
   mysql:
     ports:
       - "127.0.0.1:3306:3306"
-
-  mongo:
-    ports:
-      - "127.0.0.1:27017:27017"
 
   frontend:
     develop:
