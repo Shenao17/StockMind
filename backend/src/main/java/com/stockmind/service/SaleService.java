@@ -9,7 +9,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import com.stockmind.dto.SaleDTO;
+
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
@@ -39,38 +42,42 @@ public class SaleService {
     /**
      * Registra una venta completa con descuento automático de inventario.
      *
-     * @param username  Usuario que realiza la venta (del token JWT)
-     * @param items     Lista de productos, cantidades y precios
-     * @param notes     Notas opcionales de la venta
+     * Reglas de integridad:
+     *  - El precio unitario SIEMPRE se toma de Product.price (nunca del cliente).
+     *  - Cada producto se lee con bloqueo pesimista (SELECT ... FOR UPDATE), por lo
+     *    que dos ventas concurrentes del mismo producto se serializan y el stock
+     *    no puede quedar inconsistente.
+     *  - Los productos se bloquean en orden de ID para evitar deadlocks entre
+     *    ventas que incluyen los mismos productos en distinto orden.
+     *  - Cada movimiento de inventario guarda directamente el ID de su venta.
+     *
+     * @param username Usuario que realiza la venta (del token JWT)
+     * @param request  Líneas (productId, quantity) y notas
      * @return Venta persistida con todos sus detalles
      */
     @Transactional
-    public Sale registerSale(String username,
-                              List<Map<String, Object>> items,
-                              String notes) {
-
-        // 1. Obtener usuario autenticado
+    public Sale registerSale(String username, SaleDTO.Request request) {
         User seller = userRepository.findByUsername(username)
             .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado: " + username));
 
-        // 2. Construir cabecera de la venta
         Sale sale = Sale.builder()
             .user(seller)
-            .notes(notes)
+            .notes(request.getNotes())
             .status(Sale.Status.COMPLETED)
             .details(new ArrayList<>())
             .build();
 
+        List<SaleDTO.ItemRequest> items = new ArrayList<>(request.getItems());
+        items.sort(Comparator.comparing(SaleDTO.ItemRequest::getProductId));
+
         BigDecimal total = BigDecimal.ZERO;
+        List<InventoryMovement> movements = new ArrayList<>();
 
-        // 3. Procesar cada ítem
-        for (Map<String, Object> item : items) {
-            Long productId = Long.parseLong(item.get("productId").toString());
-            Integer quantity = Integer.parseInt(item.get("quantity").toString());
-            BigDecimal unitPrice = new BigDecimal(item.get("unitPrice").toString());
+        for (SaleDTO.ItemRequest item : items) {
+            Long productId = item.getProductId();
+            int quantity = item.getQuantity();
 
-            // 3a. Obtener producto con bloqueo pesimista para evitar race conditions
-            Product product = productRepository.findById(productId)
+            Product product = productRepository.findByIdForUpdate(productId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                     "Producto no encontrado: ID " + productId));
 
@@ -79,7 +86,6 @@ public class SaleService {
                     "El producto '" + product.getName() + "' está inactivo");
             }
 
-            // 3b. Validar stock suficiente
             if (product.getStockCurrent() < quantity) {
                 throw new IllegalStateException(
                     "Stock insuficiente para '" + product.getName() +
@@ -87,25 +93,21 @@ public class SaleService {
                     ", solicitado: " + quantity);
             }
 
-            // 3c. Crear línea de detalle
             SaleDetail detail = SaleDetail.builder()
                 .sale(sale)
                 .product(product)
                 .quantity(quantity)
-                .unitPrice(unitPrice)
+                .unitPrice(product.getPrice())
                 .build();
             detail.calculateSubtotal();
-
             sale.getDetails().add(detail);
             total = total.add(detail.getSubtotal());
 
-            // 3d. Descontar stock
             int stockBefore = product.getStockCurrent();
             product.setStockCurrent(stockBefore - quantity);
             productRepository.save(product);
 
-            // 3e. Registrar movimiento de inventario
-            InventoryMovement movement = InventoryMovement.builder()
+            movements.add(InventoryMovement.builder()
                 .product(product)
                 .user(seller)
                 .type(InventoryMovement.MovementType.SALE)
@@ -113,24 +115,16 @@ public class SaleService {
                 .reason("Venta registrada")
                 .stockBefore(stockBefore)
                 .stockAfter(product.getStockCurrent())
-                .build();
-
-            inventoryMovementRepository.save(movement);
+                .build());
         }
 
         sale.setTotal(total);
         Sale savedSale = saleRepository.save(sale);
 
-        // Actualizar referenceId en los movimientos con el ID de la venta
-        inventoryMovementRepository.findByTypeOrderByCreatedAtDesc(
-                InventoryMovement.MovementType.SALE)
-            .stream()
-            .filter(m -> m.getReferenceId() == null &&
-                         m.getCreatedAt().isAfter(LocalDateTime.now().minusSeconds(5)))
-            .forEach(m -> {
-                m.setReferenceId(savedSale.getId());
-                inventoryMovementRepository.save(m);
-            });
+        for (InventoryMovement movement : movements) {
+            movement.setReferenceId(savedSale.getId());
+            inventoryMovementRepository.save(movement);
+        }
 
         return savedSale;
     }

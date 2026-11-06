@@ -1,5 +1,6 @@
 package com.stockmind.dto;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import lombok.Data;
 
@@ -58,19 +59,30 @@ class ProductDTO {
 // =============================================================================
 // SaleDTO — Para registrar y consultar ventas
 // =============================================================================
-class SaleDTO {
+public class SaleDTO {
 
     @Data
     public static class ItemRequest {
-        @NotNull private Long productId;
-        @Min(1) private Integer quantity;
-        @NotNull @DecimalMin("0.0") private BigDecimal unitPrice;
+        @NotNull(message = "El producto es obligatorio")
+        private Long productId;
+
+        @NotNull(message = "La cantidad es obligatoria")
+        @Min(value = 1, message = "La cantidad mínima es 1")
+        @Max(value = 100000, message = "La cantidad máxima por línea es 100000")
+        private Integer quantity;
+
+        // El precio unitario NO se acepta del cliente: lo fija el servidor
+        // desde Product.price. Si el cliente lo envía, se ignora.
     }
 
     @Data
     public static class Request {
-        @NotNull @Size(min = 1, message = "La venta debe tener al menos un producto")
+        @NotNull(message = "La venta debe tener al menos un producto")
+        @Size(min = 1, max = 200, message = "La venta debe tener entre 1 y 200 productos")
+        @Valid
         private List<ItemRequest> items;
+
+        @Size(max = 255, message = "Las notas no pueden superar 255 caracteres")
         private String notes;
     }
 
