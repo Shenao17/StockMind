@@ -10,6 +10,7 @@ const { tokenFor, startApp, call } = require('./helpers');
 // "Analytics" falso: guarda las cabeceras y la ruta que recibe
 const received = [];
 let upstream;
+let javaFake;
 let app;
 
 before(async () => {
@@ -20,7 +21,15 @@ before(async () => {
             res.end(JSON.stringify({ ok: true }));
         }).listen(0, '127.0.0.1', () => resolve(s));
     });
-    // config se carga en el primer require de las rutas: el upstream se fija antes
+    // Las predicciones exigen la función PREDICTIONS en el plan: un "Java" falso responde que la incluye
+    javaFake = await new Promise(resolve => {
+        const s = http.createServer((req, res) => {
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ features: ['PREDICTIONS'], blocked: false, planName: 'Pro' }));
+        }).listen(0, '127.0.0.1', () => resolve(s));
+    });
+    // config se carga en el primer require de las rutas: los upstreams se fijan antes
+    process.env.JAVA_API_URL = `http://127.0.0.1:${javaFake.address().port}`;
     process.env.PYTHON_API_URL = `http://127.0.0.1:${upstream.address().port}`;
     app = await startApp('/api/predictions', require('../src/routes/predictions.routes'));
 });
@@ -28,6 +37,7 @@ before(async () => {
 after(async () => {
     await app.close();
     await new Promise(r => upstream.close(r));
+    await new Promise(r => javaFake.close(r));
 });
 
 describe('gateway → analytics', () => {

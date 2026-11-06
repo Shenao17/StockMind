@@ -10,6 +10,7 @@ const router = express.Router();
 const { authenticate, requireOrganization } = require('../middleware/auth.middleware');
 const config = require('../config/config');
 const { internalHeaders } = require('../utils/internalHeaders');
+const { requireFeature } = require('../middleware/feature.middleware');
 
 const PYTHON = config.pythonApiUrl;
 
@@ -17,7 +18,7 @@ const PYTHON = config.pythonApiUrl;
  * GET /api/predictions/recommendations
  * Retorna recomendaciones de reabastecimiento para todos los productos
  */
-router.get('/recommendations', authenticate, requireOrganization, async (req, res, next) => {
+router.get('/recommendations', authenticate, requireOrganization, requireFeature('PREDICTIONS'), async (req, res, next) => {
     try {
         const response = await axios.get(`${PYTHON}/recommend`, { headers: internalHeaders(req) });
         res.status(response.status).json(response.data);
@@ -30,7 +31,7 @@ router.get('/recommendations', authenticate, requireOrganization, async (req, re
  * GET /api/predictions/:productId
  * Retorna predicción de demanda semanal y mensual para un producto específico
  */
-router.get('/:productId', authenticate, requireOrganization, async (req, res, next) => {
+router.get('/:productId', authenticate, requireOrganization, requireFeature('PREDICTIONS'), async (req, res, next) => {
     try {
         const { productId } = req.params;
         // Solo dígitos: evita que un valor como "../health" cambie la ruta pedida a Python

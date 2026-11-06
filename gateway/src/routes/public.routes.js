@@ -4,6 +4,9 @@
  * POST /api/public/registrations        → autoregistro de una empresa
  * POST /api/public/verify-email         → confirma el correo con el token recibido
  * POST /api/public/resend-verification  → reenvía el enlace de verificación
+ * GET  /api/public/plans                → planes y precios (para la landing)
+ * GET  /api/public/payments/:reference  → resumen de un enlace de pago
+ * POST /api/public/payments/:reference/simulate → confirma un pago (solo pasarela simulada)
  *
  * Son el blanco natural de los bots, así que cada una pasa por: límite de frecuencia por IP,
  * campo trampa (honeypot) y CAPTCHA, y solo se reenvían a Java los campos esperados.
@@ -13,6 +16,7 @@ const axios = require('axios');
 const rateLimit = require('express-rate-limit');
 const config = require('../config/config');
 const { verifyCaptcha, CaptchaUnavailableError } = require('../utils/captcha');
+const { clearEntitlementCache } = require('../middleware/feature.middleware');
 
 const JAVA = config.javaApiUrl;
 const HOUR = 60 * 60 * 1000;
@@ -25,7 +29,7 @@ const limiter = (max) => rateLimit({
     message: { error: 'Demasiadas solicitudes. Inténtalo de nuevo más tarde.', code: 'RATE_LIMITED' }
 });
 
-const SIGNUP_FIELDS = ['companyName', 'legalName', 'taxId', 'phone', 'country', 'adminEmail', 'password', 'acceptTerms'];
+const SIGNUP_FIELDS = ['companyName', 'legalName', 'taxId', 'phone', 'country', 'adminEmail', 'password', 'acceptTerms', 'planCode'];
 
 const pick = (obj, keys) =>
     Object.fromEntries(keys.filter(k => obj && obj[k] !== undefined).map(k => [k, obj[k]]));
@@ -92,6 +96,35 @@ function createPublicRouter({ registrationLimit = config.registrationRateLimit }
             if (!(await passesCaptcha(req, res))) return;
 
             const r = await axios.post(`${JAVA}/public/resend-verification`, pick(req.body, ['email']));
+            res.status(r.status).json(r.data);
+        } catch (e) { next(e); }
+    });
+
+    // ── Planes y enlaces de pago (sin sesión) ──────────────────────────────────────
+    const REFERENCE = /^[A-Za-z0-9_-]{20,64}$/;
+    const badReference = (res) => res.status(404).json({ error: 'Pago no encontrado' });
+
+    router.get('/plans', limiter(120), async (req, res, next) => {
+        try {
+            const r = await axios.get(`${JAVA}/public/plans`);
+            res.status(r.status).json(r.data);
+        } catch (e) { next(e); }
+    });
+
+    router.get('/payments/:reference', limiter(60), async (req, res, next) => {
+        try {
+            if (!REFERENCE.test(req.params.reference)) return badReference(res);
+            const r = await axios.get(`${JAVA}/public/payments/${req.params.reference}`);
+            res.status(r.status).json(r.data);
+        } catch (e) { next(e); }
+    });
+
+    // Solo funciona con la pasarela SIMULADA (Java responde 404 si no lo está)
+    router.post('/payments/:reference/simulate', limiter(20), async (req, res, next) => {
+        try {
+            if (!REFERENCE.test(req.params.reference)) return badReference(res);
+            const r = await axios.post(`${JAVA}/public/payments/${req.params.reference}/simulate`);
+            clearEntitlementCache();   // el plan cambió: que se vea de inmediato, no tras la caché
             res.status(r.status).json(r.data);
         } catch (e) { next(e); }
     });

@@ -14,6 +14,7 @@ const axios   = require('axios');
 const router  = express.Router();
 const { authenticate } = require('../middleware/auth.middleware');
 const { authHeader } = require('../utils/authHeader');
+const { requireFeature } = require('../middleware/feature.middleware');
 const config = require('../config/config');
 
 const JAVA = config.javaApiUrl;
@@ -191,7 +192,7 @@ router.get('/status', authenticate, (req, res) => {
 });
 
 // ─── POST /api/agent/query ───────────────────────────────────────────────────
-router.post('/query', authenticate, async (req, res, next) => {
+router.post('/query', authenticate, requireFeature('AI_ASSISTANT'), async (req, res, next) => {
   if (!config.agentEnabled) {
     return res.status(503).json({
       error: 'El asistente está en mejora y volverá pronto.',

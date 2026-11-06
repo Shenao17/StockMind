@@ -37,6 +37,7 @@ const dashboardRoutes = require('./src/routes/dashboard.routes');
 const categoryRoutes = require('./src/routes/categories.routes');
 const publicRoutes = require('./src/routes/public.routes');
 const platformRoutes = require('./src/routes/platform.routes');
+const billingRoutes = require('./src/routes/billing.routes');
 const errorHandler = require('./src/middleware/errorHandler.middleware');
 
 // Todas las llamadas a Java/Python (axios) se cortan si el servicio no responde
@@ -110,10 +111,13 @@ function createApp({ logger = createLogger() } = {}) {
     const landingOrigins = (process.env.LANDING_URL || '').split(',').map(o => o.trim()).filter(Boolean);
     app.use(cors((req, callback) => {
         if (req.path.startsWith('/api/public')) {
+            // La propia aplicación (verificación de correo, página de pago) envía credenciales;
+            // la landing, no: nunca recibe permiso para usar cookies.
+            const fromApp = req.headers.origin === FRONTEND_ORIGIN;
             return callback(null, {
                 origin: [FRONTEND_ORIGIN, ...landingOrigins],
-                credentials: false,
-                methods: ['POST', 'OPTIONS'],
+                credentials: fromApp,
+                methods: ['GET', 'POST', 'OPTIONS'],
                 allowedHeaders: ['Content-Type']
             });
         }
@@ -172,6 +176,7 @@ function createApp({ logger = createLogger() } = {}) {
     app.use('/api/reports', reportRoutes);
     app.use('/api/dashboard', dashboardRoutes);
     app.use('/api/categories', categoryRoutes);
+    app.use('/api/billing', billingRoutes);     // plan y pagos de la empresa
     app.use('/api/public', publicRoutes);       // sin sesión: registro y verificación de correo
     app.use('/api/platform', platformRoutes);   // solo PLATFORM_ADMIN
     app.use('/api/predictions', predictionRoutes);

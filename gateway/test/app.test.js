@@ -80,6 +80,12 @@ describe('CORS de la landing', () => {
         assert.notEqual(r.headers.get('access-control-allow-credentials'), 'true');
     });
 
+    test('la propia aplicación sí puede llamar a /api/public con credenciales (verificación y pago)', async () => {
+        const r = await preflight('/api/public/payments/abc', 'http://localhost:5173');
+        assert.equal(r.headers.get('access-control-allow-origin'), 'http://localhost:5173');
+        assert.equal(r.headers.get('access-control-allow-credentials'), 'true');
+    });
+
     test('la landing NO puede usar el resto de la API', async () => {
         const r = await preflight('/api/products', 'https://landing.stockmind.example');
         assert.notEqual(r.headers.get('access-control-allow-origin'), 'https://landing.stockmind.example');
