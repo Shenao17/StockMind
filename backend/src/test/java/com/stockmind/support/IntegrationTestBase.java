@@ -17,6 +17,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -37,6 +38,7 @@ import java.util.UUID;
  */
 @SpringBootTest
 @AutoConfigureMockMvc
+@Import(TestEmailConfig.class)
 public abstract class IntegrationTestBase {
 
     @DynamicPropertySource
@@ -61,6 +63,7 @@ public abstract class IntegrationTestBase {
     @Autowired protected OrganizationRepository organizationRepository;
     @Autowired protected JwtConfig jwtConfig;
     @Autowired protected JdbcTemplate jdbc;
+    @Autowired protected CapturingEmailSender emails;
 
     /** Empresa por defecto de cada prueba (la "A"); el contexto de empresa queda apuntando a ella. */
     protected Organization org;
@@ -68,8 +71,9 @@ public abstract class IntegrationTestBase {
     @BeforeEach
     void cleanDatabaseAndStartTenant() {
         TenantContext.clear();
+        emails.clear();
         // SQL directo (sin filtro de empresa) para vaciar TODAS las empresas, hijos primero
-        for (String table : new String[]{"inventory_movements", "sale_details", "sales", "demand_predictions",
+        for (String table : new String[]{"email_verification_tokens", "inventory_movements", "sale_details", "sales", "demand_predictions",
                 "products", "categories", "users", "organizations"}) {
             try {
                 jdbc.update("DELETE FROM " + table);

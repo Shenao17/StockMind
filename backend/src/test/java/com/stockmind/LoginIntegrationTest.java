@@ -15,6 +15,7 @@ import org.springframework.test.web.servlet.ResultActions;
 
 import java.util.Map;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -106,6 +107,21 @@ class LoginIntegrationTest extends IntegrationTestBase {
         ana.setActive(false);
         userRepository.save(ana);
         login("ana@test.com", PASSWORD).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("Los avisos de cuenta solo se muestran con la contraseña correcta (no se averigua qué correos existen)")
+    void accountNoticesRequireTheRightPassword() throws Exception {
+        ana.setActive(false);
+        userRepository.save(ana);
+        // contraseña incorrecta en un usuario inactivo: mensaje genérico, igual que si no existiera
+        login("ana@test.com", "otra-cosa").andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.error").value("Credenciales inválidas"));
+        login("nadie@test.com", "otra-cosa").andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.error").value("Credenciales inválidas"));
+        // con la contraseña correcta sí se informa
+        login("ana@test.com", PASSWORD).andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.error").value(containsString("inactivo")));
     }
 
     @Test
