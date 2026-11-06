@@ -1,5 +1,5 @@
 /**
- * StockMind Gateway — Rutas del dueño de la plataforma (solo PLATFORM_ADMIN)
+ * StockMind Gateway — Rutas del equipo de plataforma (roles PLATFORM_*; permisos en el backend)
  * ============================================================================
  * GET  /api/platform/organizations               → lista paginada (con suscripción)
  * POST /api/platform/organizations               → alta de empresa (prueba, pago recibido o cortesía)
@@ -9,17 +9,22 @@
  * POST /api/platform/organizations/:id/plan           { planCode, billingCycle, complimentary }
  * POST /api/platform/organizations/:id/payment-links  { planCode, billingCycle }
  * POST /api/platform/organizations/:id/manual-payment { planCode, billingCycle }
+ * GET  /api/platform/team                              → miembros (solo el dueño)
+ * POST /api/platform/team                              { fullName, email, role, pin }
+ * PATCH /api/platform/team/:id                         { role, active, fullName, pin }
+ * POST /api/platform/team/:id/reset-access             { pin }
  */
 const express = require('express');
 const axios = require('axios');
 const router = express.Router();
-const { authenticate, requireRole } = require('../middleware/auth.middleware');
+const { authenticate, requirePlatform } = require('../middleware/auth.middleware');
 const { authHeader } = require('../utils/authHeader');
 const config = require('../config/config');
 const { clearEntitlementCache } = require('../middleware/feature.middleware');
 
 const JAVA = config.javaApiUrl;
-const guard = [authenticate, requireRole('PLATFORM_ADMIN')];
+// Cualquier rol de plataforma pasa el gateway; el backend aplica el permiso de cada acción (403 si no)
+const guard = [authenticate, requirePlatform];
 
 const pick = (obj, keys) =>
     Object.fromEntries(keys.filter(k => obj && obj[k] !== undefined).map(k => [k, obj[k]]));
@@ -74,6 +79,45 @@ router.post('/organizations/:id/:action', ...guard, async (req, res, next) => {
             headers: { ...authHeader(req), 'Content-Type': 'application/json' }
         });
         clearEntitlementCache();   // suspender, cambiar plan, pagos...: el cambio se ve de inmediato
+        res.status(r.status).json(r.data);
+    } catch (e) { next(e); }
+});
+
+// ───────────────────────── Equipo de plataforma ─────────────────────────
+
+router.get('/team', ...guard, async (req, res, next) => {
+    try {
+        const r = await axios.get(`${JAVA}/platform/team`, { headers: authHeader(req) });
+        res.status(r.status).json(r.data);
+    } catch (e) { next(e); }
+});
+
+router.post('/team', ...guard, async (req, res, next) => {
+    try {
+        const r = await axios.post(`${JAVA}/platform/team`, pick(req.body, ['fullName', 'email', 'role', 'pin']), {
+            headers: { ...authHeader(req), 'Content-Type': 'application/json' }
+        });
+        res.status(r.status).json(r.data);
+    } catch (e) { next(e); }
+});
+
+router.patch('/team/:id', ...guard, async (req, res, next) => {
+    try {
+        if (!/^\d{1,18}$/.test(req.params.id)) return res.status(400).json({ error: 'Identificador inválido' });
+        const r = await axios.patch(`${JAVA}/platform/team/${req.params.id}`,
+            pick(req.body, ['role', 'active', 'fullName', 'pin']), {
+                headers: { ...authHeader(req), 'Content-Type': 'application/json' }
+            });
+        res.status(r.status).json(r.data);
+    } catch (e) { next(e); }
+});
+
+router.post('/team/:id/reset-access', ...guard, async (req, res, next) => {
+    try {
+        if (!/^\d{1,18}$/.test(req.params.id)) return res.status(400).json({ error: 'Identificador inválido' });
+        const r = await axios.post(`${JAVA}/platform/team/${req.params.id}/reset-access`, pick(req.body, ['pin']), {
+            headers: { ...authHeader(req), 'Content-Type': 'application/json' }
+        });
         res.status(r.status).json(r.data);
     } catch (e) { next(e); }
 });

@@ -125,7 +125,7 @@ describe('reenvío a Java', () => {
         javaReply = { status: 202, body: { message: 'ok-java' } };
         const r = await post('/registrations', {
             ...FORM, captchaToken: 'ok', website: '',
-            role: 'PLATFORM_ADMIN', organizationId: 1, status: 'ACTIVE', emailVerifiedAt: '2020-01-01'
+            role: 'PLATFORM_OWNER', organizationId: 1, status: 'ACTIVE', emailVerifiedAt: '2020-01-01'
         });
         assert.equal(r.status, 202);
         assert.equal(javaCalls.length, 1);

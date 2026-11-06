@@ -1,4 +1,4 @@
-/** Rutas de plataforma: solo PLATFORM_ADMIN; el alta solo reenvía los campos esperados. */
+/** Rutas de plataforma: solo PLATFORM_OWNER; el alta solo reenvía los campos esperados. */
 const { test, describe, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
@@ -41,8 +41,8 @@ describe('acceso', () => {
                 assert.equal(javaCalls.length, 0);
             });
         }
-        test(`${method} ${path}: PLATFORM_ADMIN pasa`, async () => {
-            const r = await call(app.base, method, path, tokenFor('PLATFORM_ADMIN'));
+        test(`${method} ${path}: PLATFORM_OWNER pasa`, async () => {
+            const r = await call(app.base, method, path, tokenFor('PLATFORM_OWNER'));
             assert.ok([200, 201].includes(r.status), `got ${r.status}`);
         });
     }
@@ -51,7 +51,7 @@ describe('acceso', () => {
 describe('reenvío', () => {
     test('el alta reenvía solo los campos esperados y la sesión del dueño', async () => {
         javaCalls.length = 0;
-        const token = tokenFor('PLATFORM_ADMIN');
+        const token = tokenFor('PLATFORM_OWNER');
         await fetch(`${app.base}/api/platform/organizations`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Cookie: `token=${token}` },
@@ -67,7 +67,7 @@ describe('reenvío', () => {
 
     test('el listado reenvía los parámetros de búsqueda y paginación', async () => {
         javaCalls.length = 0;
-        await call(app.base, 'GET', '/api/platform/organizations?page=1&size=5&status=PENDING', tokenFor('PLATFORM_ADMIN'));
+        await call(app.base, 'GET', '/api/platform/organizations?page=1&size=5&status=PENDING', tokenFor('PLATFORM_OWNER'));
         assert.match(javaCalls[0].url, /page=1/);
         assert.match(javaCalls[0].url, /status=PENDING/);
     });

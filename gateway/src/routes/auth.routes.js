@@ -14,6 +14,7 @@
 
 const express = require('express');
 const axios = require('axios');
+const jwt = require('jsonwebtoken');
 const router = express.Router();
 const { authenticate } = require('../middleware/auth.middleware');
 const config = require('../config/config');
@@ -29,6 +30,82 @@ const COOKIE_OPTIONS = {
     path: '/',
 };
 
+const pick = (obj, keys) =>
+    Object.fromEntries(keys.filter(k => obj && obj[k] !== undefined).map(k => [k, obj[k]]));
+
+/**
+ * Convierte la respuesta de Java en la del gateway.
+ *  - Sesión completa (trae token): se guarda en la cookie httpOnly y se devuelve { user }.
+ *  - Equipo de plataforma sin segundo paso: NO hay token; se devuelve { challenge } para continuar
+ *    en /mfa/verify o /mfa/enroll/*. El token de desafío viaja en el cuerpo (nunca en cookie).
+ */
+function respondWithSession(res, response) {
+    const d = response.data;
+    if (!d.token) {
+        if (d.challengeToken && (d.mfaRequired || d.enrollmentRequired)) {
+            return res.status(200).json({
+                challenge: {
+                    token: d.challengeToken,
+                    mfaRequired: !!d.mfaRequired,
+                    enrollmentRequired: !!d.enrollmentRequired,
+                    mustChangePassword: !!d.mustChangePassword,
+                    fullName: d.fullName || null
+                }
+            });
+        }
+        return res.status(502).json({ error: 'No fue posible completar el inicio de sesión.' });
+    }
+
+    // La cookie dura lo que el token (el equipo de plataforma tiene sesiones más cortas)
+    const exp = jwt.decode(d.token)?.exp;
+    const maxAge = exp ? Math.max(1000, exp * 1000 - Date.now()) : 24 * 60 * 60 * 1000;
+    res.cookie('token', d.token, { ...COOKIE_OPTIONS, maxAge });
+
+    const body = {
+        user: {
+            id: d.userId, username: d.username, email: d.email,
+            organizationId: d.organizationId, role: d.role, fullName: d.fullName || null
+        }
+    };
+    if (Array.isArray(d.backupCodes)) body.backupCodes = d.backupCodes;   // se muestran una sola vez
+    return res.status(200).json(body);
+}
+
+/** Errores de los pasos de verificación: mensajes de Java (códigos/PIN/contraseña), sin detalles internos. */
+function mfaError(error, res, next) {
+    if (error.response && [400, 401, 403].includes(error.response.status)) {
+        return res.status(error.response.status).json({
+            error: error.response.data?.error || 'No se pudo completar la verificación.'
+        });
+    }
+    if (error.response && error.response.status >= 500) {
+        return res.status(503).json({ error: 'El servidor no se encuentra disponible en este momento.' });
+    }
+    return next(error);
+}
+
+router.post('/mfa/verify', async (req, res, next) => {
+    try {
+        const r = await axios.post(`${JAVA}/auth/mfa/verify`, pick(req.body, ['challengeToken', 'code']));
+        return respondWithSession(res, r);
+    } catch (e) { return mfaError(e, res, next); }
+});
+
+router.post('/mfa/enroll/start', async (req, res, next) => {
+    try {
+        const r = await axios.post(`${JAVA}/auth/mfa/enroll/start`, pick(req.body, ['challengeToken']));
+        return res.status(200).json(r.data);
+    } catch (e) { return mfaError(e, res, next); }
+});
+
+router.post('/mfa/enroll/finish', async (req, res, next) => {
+    try {
+        const r = await axios.post(`${JAVA}/auth/mfa/enroll/finish`,
+            pick(req.body, ['challengeToken', 'code', 'pin', 'newPassword']));
+        return respondWithSession(res, r);
+    } catch (e) { return mfaError(e, res, next); }
+});
+
 /**
  * POST /api/auth/login
  * Body: { email, password }
@@ -37,29 +114,8 @@ const COOKIE_OPTIONS = {
  */
 router.post('/login', async (req, res, next) => {
     try {
-        const response = await axios.post(`${JAVA}/auth/login`, req.body);
-        const { token, userId, username, email, organizationId, role } = response.data;
-
-        if (!token) {
-            return res.status(502).json({
-                error: 'No fue posible completar el inicio de sesión.'
-            });
-        }
-
-        res.cookie('token', token, {
-            ...COOKIE_OPTIONS,
-            maxAge: 24 * 60 * 60 * 1000
-        });
-
-        res.status(response.status).json({
-            user: {
-                id: userId,
-                username,
-                email,
-                organizationId,
-                role
-            }
-        });
+        const response = await axios.post(`${JAVA}/auth/login`, pick(req.body, ['email', 'password']));
+        return respondWithSession(res, response);
 
     } catch (error) {
 

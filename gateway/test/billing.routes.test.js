@@ -41,8 +41,8 @@ describe('/api/billing', () => {
         assert.equal((await call(app.base, 'GET', '/api/billing/subscription', null)).status, 401);
     });
 
-    test('PLATFORM_ADMIN (sin empresa) → 403', async () => {
-        const r = await call(app.base, 'GET', '/api/billing/subscription', tokenFor('PLATFORM_ADMIN'));
+    test('PLATFORM_OWNER (sin empresa) → 403', async () => {
+        const r = await call(app.base, 'GET', '/api/billing/subscription', tokenFor('PLATFORM_OWNER'));
         assert.equal(r.status, 403);
         assert.equal(javaCalls.length, 0);
     });

@@ -61,9 +61,9 @@ describe('gateway → analytics', () => {
         assert.equal(received[0].headers['x-internal-key'], process.env.INTERNAL_API_KEY);
     });
 
-    test('un PLATFORM_ADMIN (sin empresa) no puede consultar predicciones', async () => {
+    test('un PLATFORM_OWNER (sin empresa) no puede consultar predicciones', async () => {
         received.length = 0;
-        const r = await call(app.base, 'GET', '/api/predictions/recommendations', tokenFor('PLATFORM_ADMIN'));
+        const r = await call(app.base, 'GET', '/api/predictions/recommendations', tokenFor('PLATFORM_OWNER'));
         assert.equal(r.status, 403);
         assert.equal((await r.json()).code, 'ORGANIZATION_REQUIRED');
         assert.equal(received.length, 0, 'no debe llegar nada a analytics');

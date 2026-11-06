@@ -14,6 +14,9 @@
 const jwt = require('jsonwebtoken');
 const config = require('../config/config');
 
+/** Roles del equipo de plataforma (PLATFORM_OWNER, _BILLING, _SUPPORT, _VIEWER): no tienen empresa. */
+const isPlatformRole = role => typeof role === 'string' && role.startsWith('PLATFORM_');
+
 /**
  * Middleware de autenticación.
  * Extrae el token de la cookie httpOnly: req.cookies.token
@@ -30,9 +33,13 @@ const authenticate = (req, res, next) => {
 
     try {
         const decoded = jwt.verify(token, config.jwtSecret);
-        // Todo usuario salvo PLATFORM_ADMIN pertenece a una empresa. Un token sin 'org'
+        // Los tokens de desafío de la verificación en dos pasos (claim 'typ') no son sesiones
+        if (decoded.typ) {
+            return res.status(401).json({ error: 'Token inválido', code: 'INVALID_TOKEN' });
+        }
+        // Todo usuario salvo el equipo de plataforma pertenece a una empresa. Un token sin 'org'
         // (emitido antes de la multiempresa) se invalida para forzar un nuevo login.
-        if (decoded.role !== 'PLATFORM_ADMIN' && !decoded.org) {
+        if (!isPlatformRole(decoded.role) && !decoded.org) {
             return res.status(401).json({
                 error: 'Sesión desactualizada. Inicia sesión nuevamente.',
                 code: 'INVALID_TOKEN'
@@ -77,7 +84,7 @@ const requireRole = (...roles) => {
 };
 
 /**
- * Exige que el usuario pertenezca a una empresa (todo salvo PLATFORM_ADMIN).
+ * Exige que el usuario pertenezca a una empresa (todo salvo el equipo de plataforma).
  * Se usa en rutas que consultan servicios internos con datos de UNA empresa.
  */
 const requireOrganization = (req, res, next) => {
@@ -90,4 +97,21 @@ const requireOrganization = (req, res, next) => {
     next();
 };
 
-module.exports = { authenticate, requireRole, requireOrganization };
+/**
+ * Exige un rol del equipo de plataforma. El permiso concreto de cada acción lo decide el backend
+ * (Java), que además revalida la cuenta en cada petición.
+ */
+const requirePlatform = (req, res, next) => {
+    if (!req.user) {
+        return res.status(401).json({ error: 'No autenticado', code: 'NOT_AUTHENTICATED' });
+    }
+    if (!isPlatformRole(req.user.role)) {
+        return res.status(403).json({
+            error: 'Acceso denegado. Solo el equipo de la plataforma.',
+            code: 'INSUFFICIENT_ROLE'
+        });
+    }
+    next();
+};
+
+module.exports = { authenticate, requireRole, requireOrganization, requirePlatform, isPlatformRole };

@@ -56,7 +56,7 @@ describe('login', () => {
         const body = await r.json();
         assert.equal(JSON.stringify(body).includes('jwt-de-prueba'), false);
         assert.deepEqual(body.user, {
-            id: 5, username: 'ana', email: 'ana@empresa.com', organizationId: 3, role: 'ADMIN'
+            id: 5, username: 'ana', email: 'ana@empresa.com', organizationId: 3, role: 'ADMIN', fullName: null
         });
         const cookie = r.headers.get('set-cookie');
         assert.match(cookie, /^token=jwt-de-prueba/);

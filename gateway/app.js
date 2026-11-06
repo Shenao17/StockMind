@@ -124,7 +124,7 @@ function createApp({ logger = createLogger() } = {}) {
         callback(null, {
             origin: FRONTEND_ORIGIN,
             credentials: true,
-            methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+            methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
             allowedHeaders: ['Content-Type', 'Authorization']
         });
     }));
@@ -166,6 +166,7 @@ function createApp({ logger = createLogger() } = {}) {
 
     // ── Rutas de la API ──────────────────────────────────────────────────────
     app.use('/api/auth/login', authLimiter);
+    app.use('/api/auth/mfa', authLimiter);   // segundo factor: mismos límites que el login
     app.use('/api', apiLimiter);
 
     app.use('/api/auth', authRoutes);
@@ -178,7 +179,7 @@ function createApp({ logger = createLogger() } = {}) {
     app.use('/api/categories', categoryRoutes);
     app.use('/api/billing', billingRoutes);     // plan y pagos de la empresa
     app.use('/api/public', publicRoutes);       // sin sesión: registro y verificación de correo
-    app.use('/api/platform', platformRoutes);   // solo PLATFORM_ADMIN
+    app.use('/api/platform', platformRoutes);   // equipo de plataforma (PLATFORM_*)
     app.use('/api/predictions', predictionRoutes);
     app.use('/api/agent', agentRoutes); // asistente IA (en reconstrucción)
 

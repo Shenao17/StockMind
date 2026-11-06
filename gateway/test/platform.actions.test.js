@@ -28,7 +28,7 @@ after(async () => {
     await new Promise(r => java.close(r));
 });
 
-const owner = () => tokenFor('PLATFORM_ADMIN');
+const owner = () => tokenFor('PLATFORM_OWNER');
 const post = (path, body, token = owner()) => fetch(`${app.base}/api/platform${path}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: `token=${token}` }, body: JSON.stringify(body ?? {})
 });

@@ -55,8 +55,8 @@ describe('authenticate', () => {
         assert.equal(r.body.code, 'INVALID_TOKEN');
     });
 
-    test('PLATFORM_ADMIN no necesita empresa', async () => {
-        const r = await run(authenticate, { cookies: { token: tokenFor('PLATFORM_ADMIN') } });
+    test('PLATFORM_OWNER no necesita empresa', async () => {
+        const r = await run(authenticate, { cookies: { token: tokenFor('PLATFORM_OWNER') } });
         assert.equal(r.nextCalled, true);
     });
 
