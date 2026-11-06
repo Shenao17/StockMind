@@ -1,14 +1,16 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useSubscription } from '../../context/subscriptionState';
 
 const navItems = [
   { to: '/dashboard', icon: 'dashboard', label: 'Dashboard', section: 'Principal' },
   { to: '/products', icon: 'products', label: 'Productos' },
   { to: '/inventory', icon: 'inventory', label: 'Inventario' },
   { to: '/sales', icon: 'sales', label: 'Ventas' },
-  { to: '/predictions', icon: 'predictions', label: 'Predicciones', section: 'Analítica' },
-  { to: '/reports', icon: 'reports', label: 'Reportes' },
+  { to: '/predictions', icon: 'predictions', label: 'Predicciones', section: 'Analítica', feature: 'PREDICTIONS' },
+  { to: '/reports', icon: 'reports', label: 'Reportes', feature: 'REPORTS' },
   { to: '/users', icon: 'users', label: 'Usuarios', section: 'Administración', adminOnly: true },
+  { to: '/billing', icon: 'billing', label: 'Plan y pagos', section: 'Cuenta' },
 ];
 
 function NavIcon({ type }) {
@@ -58,6 +60,13 @@ function NavIcon({ type }) {
         <path d="M9 17h6" />
       </>
     ),
+    billing: (
+      <>
+        <rect x="3" y="6" width="18" height="12" rx="2" />
+        <path d="M3 10h18" />
+        <path d="M7 15h3" />
+      </>
+    ),
     users: (
       <>
         <circle cx="12" cy="8" r="3.5" />
@@ -84,6 +93,7 @@ function NavIcon({ type }) {
 
 export default function Sidebar() {
   const { user, logout, isAdmin } = useAuth();
+  const { hasFeature } = useSubscription();
 
   return (
     <aside className="sidebar">
@@ -122,6 +132,10 @@ export default function Sidebar() {
                 <span className="nav-label">
                   {item.label}
                 </span>
+
+                {item.feature && !hasFeature(item.feature) && (
+                  <span className="nav-lock" title="No incluido en tu plan" aria-label="No incluido en tu plan">🔒</span>
+                )}
               </NavLink>
             </div>
           );

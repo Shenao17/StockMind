@@ -62,6 +62,43 @@ describe('API — parámetros de listados', () => {
     expect(new URL(urlOf(f), 'http://localhost').searchParams.get('size')).toBe('15');
   });
 
+  it('expone facturación, pagos públicos y panel de plataforma', async () => {
+    let f = mockFetch();
+    await API.billing.subscription();
+    expect(urlOf(f)).toMatch(/\/billing\/subscription$/);
+    vi.unstubAllGlobals();
+
+    f = mockFetch();
+    await API.billing.checkout({ planCode: 'PRO', billingCycle: 'MONTHLY' });
+    expect(urlOf(f)).toMatch(/\/billing\/checkout$/);
+    expect(JSON.parse(f.mock.calls[0][1].body)).toEqual({ planCode: 'PRO', billingCycle: 'MONTHLY' });
+    vi.unstubAllGlobals();
+
+    f = mockFetch();
+    await API.public.simulatePayment('ref123');
+    expect(urlOf(f)).toMatch(/\/public\/payments\/ref123\/simulate$/);
+    vi.unstubAllGlobals();
+
+    f = mockFetch();
+    await API.platform.action(7, 'extend-trial', { days: 5 });
+    expect(urlOf(f)).toMatch(/\/platform\/organizations\/7\/extend-trial$/);
+    vi.unstubAllGlobals();
+
+    f = mockFetch();
+    await API.platform.organizations({ page: 1, status: 'PENDING', search: '' });
+    const url = new URL(urlOf(f), 'http://localhost');
+    expect(url.searchParams.get('status')).toBe('PENDING');
+    expect(url.searchParams.has('search')).toBe(false);
+  });
+
+  it('los errores del servidor conservan el código (p. ej. PLAN_LIMIT_REACHED)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false, status: 402, json: async () => ({ error: 'Límite de plan', code: 'PLAN_LIMIT_REACHED' }),
+      headers: { get: () => 'application/json' },
+    }));
+    await expect(API.users.create({})).rejects.toMatchObject({ message: 'Límite de plan', code: 'PLAN_LIMIT_REACHED', status: 402 });
+  });
+
   it('expone categorías y resumen del dashboard', async () => {
     let f = mockFetch();
     await API.categories.list();

@@ -4167,3 +4167,56 @@ select option {
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+/* ── Plan, facturación y panel de plataforma ── */
+.plan-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  margin-bottom: 16px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(99, 102, 241, 0.12);
+}
+.plan-banner-warning { background: rgba(245, 158, 11, 0.14); border-color: rgba(245, 158, 11, 0.4); }
+.plan-banner-danger { background: rgba(232, 68, 68, 0.14); border-color: rgba(232, 68, 68, 0.4); }
+
+.upgrade-prompt { text-align: center; padding: 64px 24px; max-width: 520px; margin: 0 auto; }
+.upgrade-prompt .upgrade-icon { font-size: 2.4rem; margin-bottom: 12px; }
+.upgrade-prompt p { color: var(--text-muted); margin: 10px 0 20px; }
+
+.nav-lock { margin-left: auto; font-size: 0.75rem; opacity: 0.8; }
+
+.plan-current { display: flex; justify-content: space-between; gap: 24px; padding: 16px; flex-wrap: wrap; }
+.plan-current-name { font-size: 1.3rem; font-weight: 600; }
+.plan-current-sub { color: var(--text-muted); font-size: 0.85rem; margin-top: 4px; }
+.plan-usage { min-width: 260px; display: grid; gap: 10px; }
+.usage-head { display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 4px; }
+.usage-bar { height: 6px; border-radius: 4px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
+.usage-fill { height: 100%; background: var(--accent, #6366f1); }
+.usage-fill.full { background: #e84444; }
+
+.cycle-toggle { display: flex; gap: 6px; }
+.plans-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; padding: 16px; }
+.plan-card {
+  display: flex; flex-direction: column; gap: 10px; padding: 18px; border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12); background: rgba(255, 255, 255, 0.03);
+}
+.plan-card.current { border-color: var(--accent, #6366f1); }
+.plan-card h3 { margin: 0; }
+.plan-price { font-size: 1.6rem; font-weight: 600; }
+.plan-price span { font-size: 0.8rem; font-weight: 400; color: var(--text-muted); }
+.plan-tax { font-size: 0.8rem; color: var(--text-muted); }
+.plan-list { margin: 0; padding-left: 18px; font-size: 0.85rem; flex: 1; }
+.plan-note, .plan-footnote { font-size: 0.78rem; color: var(--text-muted); }
+.plan-footnote { padding: 0 16px 14px; }
+
+.pay-summary { width: 100%; margin: 12px 0 18px; border-collapse: collapse; }
+.pay-summary td { padding: 6px 0; }
+.pay-summary td:last-child { text-align: right; }
+.pay-total td { border-top: 1px solid rgba(255, 255, 255, 0.15); font-weight: 600; padding-top: 10px; }
+
+.platform-layout { grid-template-columns: 1fr; }

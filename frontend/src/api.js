@@ -57,7 +57,8 @@ async function apiRequest(method, endpoint, body = null) {
 
     if (!response.ok) {
       const errorMsg = data?.error || data || `Error HTTP ${response.status}`;
-      throw new Error(errorMsg);
+      // `code` y `status` permiten distinguir p. ej. PLAN_LIMIT_REACHED o SUBSCRIPTION_READ_ONLY (402)
+      throw Object.assign(new Error(errorMsg), { code: data?.code, status: response.status });
     }
 
     return data;
@@ -136,9 +137,28 @@ export const API = {
       apiRequest('POST', '/sales', data),
   },
 
-  // Endpoints públicos (sin sesión): verificación del correo al registrarse
+  // Endpoints públicos (sin sesión): verificación del correo y enlaces de pago
   public: {
-    verifyEmail: (token) => apiRequest('POST', '/public/verify-email', { token }),
+    verifyEmail:     (token) => apiRequest('POST', '/public/verify-email', { token }),
+    plans:           ()      => apiRequest('GET',  '/public/plans'),
+    payment:         (ref)   => apiRequest('GET',  `/public/payments/${ref}`),
+    simulatePayment: (ref)   => apiRequest('POST', `/public/payments/${ref}/simulate`),
+  },
+
+  // Plan y pagos de la empresa
+  billing: {
+    subscription: ()     => apiRequest('GET',  '/billing/subscription'),
+    plans:        ()     => apiRequest('GET',  '/billing/plans'),
+    payments:     ()     => apiRequest('GET',  '/billing/payments'),
+    checkout:     (data) => apiRequest('POST', '/billing/checkout', data),
+  },
+
+  // Panel del dueño de la plataforma (solo PLATFORM_ADMIN)
+  platform: {
+    organizations: (params)         => apiRequest('GET',  `/platform/organizations${qs(params)}`),
+    create:        (data)           => apiRequest('POST', '/platform/organizations', data),
+    // action: suspend | reactivate | cancel | extend-trial | plan | payment-links | manual-payment
+    action:        (id, action, body) => apiRequest('POST', `/platform/organizations/${id}/${action}`, body || {}),
   },
 
   categories: {

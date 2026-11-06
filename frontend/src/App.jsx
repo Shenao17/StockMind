@@ -6,6 +6,13 @@ import Sidebar from './components/layout/Sidebar';
 
 import Login from './pages/Login';
 import VerifyEmail from './pages/VerifyEmail';
+import Pay from './pages/Pay';
+import Billing from './pages/Billing';
+import Platform from './pages/Platform';
+import { SubscriptionProvider } from './context/SubscriptionContext';
+import { useSubscription } from './context/subscriptionState';
+import PlanBanner from './components/ui/PlanBanner';
+import FeatureGate from './components/ui/FeatureGate';
 import Dashboard from './pages/Dashboard';
 import Products from './pages/Products';
 import Inventory from './pages/Inventory';
@@ -23,6 +30,8 @@ const PAGE_TITLES = {
   '/reports':     'Reportes',
   '/predictions': 'Predicción de Demanda',
   '/users':       'Gestión de Usuarios',
+  '/billing':     'Plan y facturación',
+  '/platform':    'Panel de plataforma',
 };
 
 const PAGE_SUBTITLES = {
@@ -33,13 +42,49 @@ const PAGE_SUBTITLES = {
   '/reports':     'Analiza el rendimiento de tu negocio',
   '/predictions': 'Anticipa la demanda de tus productos',
   '/users':       'Administra los usuarios del sistema',
+  '/billing':     'Tu plan, tu uso y tus cobros',
+  '/platform':    'Empresas, planes y cobros de StockMind',
 };
 
 function ProtectedLayout({ showToast }) {
-  const { isLoggedIn } = useAuth();
-  const location = useLocation();
+  const { isLoggedIn, user, logout } = useAuth();
 
   if (!isLoggedIn()) return <Navigate to="/" replace />;
+
+  // El dueño de la plataforma no tiene empresa: solo ve su panel
+  if (user.role === 'PLATFORM_ADMIN') {
+    return (
+      <div className="app-layout platform-layout">
+        <header className="topbar">
+          <div className="topbar-heading">
+            <span className="topbar-title">{PAGE_TITLES['/platform']}</span>
+            <span className="topbar-subtitle">{PAGE_SUBTITLES['/platform']}</span>
+          </div>
+          <div className="topbar-actions">
+            <span className="mono" style={{ fontSize: '.8rem' }}>{user.email}</span>
+            <button className="btn btn-ghost btn-sm" onClick={logout}>Cerrar sesión</button>
+          </div>
+        </header>
+        <main className="main-content">
+          <Routes>
+            <Route path="/platform" element={<Platform showToast={showToast} />} />
+            <Route path="*" element={<Navigate to="/platform" replace />} />
+          </Routes>
+        </main>
+      </div>
+    );
+  }
+
+  return (
+    <SubscriptionProvider>
+      <CompanyLayout showToast={showToast} />
+    </SubscriptionProvider>
+  );
+}
+
+function CompanyLayout({ showToast }) {
+  const location = useLocation();
+  const { blocked } = useSubscription();
 
   const title = PAGE_TITLES[location.pathname] || 'StockMind';
   const subtitle = PAGE_SUBTITLES[location.pathname] || 'Gestión inteligente de inventario';
@@ -69,13 +114,16 @@ function ProtectedLayout({ showToast }) {
       </header>
 
       <main className="main-content">
+        <PlanBanner />
         <Routes>
+          <Route path="/billing"     element={<Billing     showToast={showToast} />} />
+          {blocked && <Route path="*" element={<Navigate to="/billing" replace />} />}
           <Route path="/dashboard"   element={<Dashboard   showToast={showToast} />} />
           <Route path="/products"    element={<Products    showToast={showToast} />} />
           <Route path="/inventory"   element={<Inventory   showToast={showToast} />} />
           <Route path="/sales"       element={<Sales       showToast={showToast} />} />
-          <Route path="/reports"     element={<Reports     showToast={showToast} />} />
-          <Route path="/predictions" element={<Predictions showToast={showToast} />} />
+          <Route path="/reports"     element={<FeatureGate feature="REPORTS"><Reports showToast={showToast} /></FeatureGate>} />
+          <Route path="/predictions" element={<FeatureGate feature="PREDICTIONS"><Predictions showToast={showToast} /></FeatureGate>} />
           <Route path="/users"       element={<Users       showToast={showToast} />} />
           <Route path="*"            element={<Navigate to="/dashboard" replace />} />
         </Routes>
@@ -130,6 +178,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Login />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
+          <Route path="/pay/:reference" element={<Pay />} />
           <Route path="/*" element={<ProtectedLayout showToast={showToast} />} />
         </Routes>
 

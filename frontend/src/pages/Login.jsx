@@ -5,15 +5,17 @@ import { useAuth } from '../context/AuthContext';
 
 export default function Login() {
   const navigate = useNavigate();
-  const { login, isLoggedIn } = useAuth();
+  const { login, isLoggedIn, user } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const homeFor = (u) => (u?.role === 'PLATFORM_ADMIN' ? '/platform' : '/dashboard');
+
   if (isLoggedIn()) {
-    navigate('/dashboard', { replace: true });
+    navigate(homeFor(user), { replace: true });
     return null;
   }
 
@@ -36,7 +38,7 @@ export default function Login() {
       // httpOnly. Aquí solo llega { user: { id, username, email, organizationId, role } }.
       if (response?.user) {
         login(response.user);
-        navigate('/dashboard', { replace: true });
+        navigate(homeFor(response.user), { replace: true });
       } else {
         setError('Respuesta inesperada del servidor');
       }

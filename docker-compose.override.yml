@@ -68,6 +68,8 @@ services:
     environment:
       # Perfil dev: carga datos de ejemplo si la base está vacía (DevDataSeeder)
       SPRING_PROFILES_ACTIVE: dev
+      # Pasarela de pagos SIMULADA (solo desarrollo): el enlace de pago tiene un botón de prueba
+      STOCKMIND_PAYMENTS_PROVIDER: simulated
     develop:
       watch:
         - action: rebuild

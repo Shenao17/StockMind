@@ -38,6 +38,8 @@ services:
       APP_PUBLIC_URL: ${FRONTEND_URL:-http://localhost:5173}
       PLATFORM_ADMIN_EMAIL: ${PLATFORM_ADMIN_EMAIL:-}
       PLATFORM_ADMIN_PASSWORD: ${PLATFORM_ADMIN_PASSWORD:-}
+      # Pasarela de pagos: vacío = pagos desactivados; 'simulated' solo en desarrollo (ver override)
+      STOCKMIND_PAYMENTS_PROVIDER: ${STOCKMIND_PAYMENTS_PROVIDER:-}
     depends_on:
       mysql:
         condition: service_healthy
