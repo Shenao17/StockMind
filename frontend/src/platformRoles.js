@@ -28,4 +28,7 @@ export const AUDIT_LABELS = {
   MFA_DISABLED: 'Un usuario desactivó el 2FA',
   MFA_RESET_BY_ADMIN: '2FA reiniciado por el administrador',
   COMPANY_USER_MFA_RESET: '2FA reiniciado por la plataforma',
+  TEAM_MEMBER_CREATED: 'Miembro del equipo agregado',
+  TEAM_MEMBER_UPDATED: 'Miembro del equipo modificado',
+  TEAM_ACCESS_RESET: 'Acceso de un miembro reiniciado',
 };

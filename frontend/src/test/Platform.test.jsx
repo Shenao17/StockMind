@@ -115,11 +115,10 @@ describe('Platform', () => {
     expect(await screen.findByText(/aún no hay empresas/i)).toBeInTheDocument();
   });
 
-  it('un rol de soporte no ve crear empresa, ni acciones sensibles, ni la pestaña Equipo', async () => {
+  it('un rol de soporte no ve crear empresa ni acciones sensibles', async () => {
     setup(envelope([org()]), SUPPORT_PERMS);
     await screen.findByText('Ferretería El Tornillo');
     expect(screen.queryByRole('button', { name: /nueva empresa/i })).toBeNull();
-    expect(screen.queryByRole('tab', { name: /equipo/i })).toBeNull();
     const options = within(screen.getByLabelText(/acción para ferretería/i)).getAllByRole('option').map((o) => o.textContent);
     expect(options).toEqual(['Acciones…', 'Extender prueba', 'Reactivar']);
   });
@@ -131,11 +130,4 @@ describe('Platform', () => {
     expect(screen.queryByLabelText(/acción para/i)).toBeNull();
   });
 
-  it('el dueño ve la pestaña Equipo y la abre', async () => {
-    vi.spyOn(apiModule.API.platform.team, 'list').mockResolvedValue([]);
-    setup();
-    await screen.findByText('Ferretería El Tornillo');
-    fireEvent.click(screen.getByRole('tab', { name: /equipo/i }));
-    expect(await screen.findByText(/equipo de la plataforma/i)).toBeInTheDocument();
-  });
 });

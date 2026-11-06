@@ -10,6 +10,11 @@ import Pay from './pages/Pay';
 import Billing from './pages/Billing';
 import Platform from './pages/Platform';
 import PlatformCompany from './pages/PlatformCompany';
+import PlatformSummary from './pages/PlatformSummary';
+import PlatformPayments from './pages/PlatformPayments';
+import PlatformAudit from './pages/PlatformAudit';
+import PlatformTeam from './pages/PlatformTeam';
+import PlatformNav from './components/PlatformNav';
 import Security from './pages/Security';
 import { isPlatformRole, PLATFORM_ROLE_LABELS } from './platformRoles';
 import { SubscriptionProvider } from './context/SubscriptionContext';
@@ -52,8 +57,11 @@ const PAGE_SUBTITLES = {
 };
 
 function ProtectedLayout({ showToast }) {
-  const { isLoggedIn, user, logout } = useAuth();
+  const { isLoggedIn, user, logout, loading } = useAuth();
 
+  // Mientras se confirma la sesión (cookie) no se redirige: así al recargar una pantalla interior
+  // (p. ej. /platform/payments) se vuelve a ella en vez de pasar por el login y caer en el inicio.
+  if (loading) return <div className="loading-state"><div className="spinner" /> Cargando...</div>;
   if (!isLoggedIn()) return <Navigate to="/" replace />;
 
   // El dueño de la plataforma no tiene empresa: solo ve su panel
@@ -71,9 +79,14 @@ function ProtectedLayout({ showToast }) {
           </div>
         </header>
         <main className="main-content">
+          <PlatformNav />
           <Routes>
-            <Route path="/platform" element={<Platform showToast={showToast} />} />
+            <Route path="/platform" element={<PlatformSummary showToast={showToast} />} />
+            <Route path="/platform/companies" element={<Platform showToast={showToast} />} />
             <Route path="/platform/orgs/:id" element={<PlatformCompany showToast={showToast} />} />
+            <Route path="/platform/payments" element={<PlatformPayments showToast={showToast} />} />
+            <Route path="/platform/audit" element={<PlatformAudit showToast={showToast} />} />
+            <Route path="/platform/team" element={<PlatformTeam showToast={showToast} />} />
             <Route path="*" element={<Navigate to="/platform" replace />} />
           </Routes>
         </main>

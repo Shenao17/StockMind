@@ -176,6 +176,10 @@ export const API = {
     create:        (data)           => apiRequest('POST', '/platform/organizations', data),
     // action: suspend | reactivate | cancel | extend-trial | plan | payment-links | manual-payment
     action:        (id, action, body) => apiRequest('POST', `/platform/organizations/${id}/${action}`, body || {}),
+    // Resumen con métricas, cobros de todas las empresas y auditoría (filtros y paginación en el servidor)
+    summary:       ()               => apiRequest('GET', '/platform/summary'),
+    payments:      (params)         => apiRequest('GET', `/platform/payments${qs(params)}`),
+    audit:         (params)         => apiRequest('GET', `/platform/audit${qs(params)}`),
     // Ficha de empresa y correcciones (contacto: dueño y soporte; NIT: solo el dueño, con su PIN)
     detail:        (id)             => apiRequest('GET',   `/platform/organizations/${id}/detail`),
     updateContact: (id, data)       => apiRequest('PATCH', `/platform/organizations/${id}/contact`, data),

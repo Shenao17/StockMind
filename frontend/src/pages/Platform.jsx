@@ -5,7 +5,6 @@ import Modal from '../components/ui/Modal';
 import Pagination from '../components/ui/Pagination';
 import { useDebounce } from '../hooks/useDebounce';
 import { useAuth } from '../context/AuthContext';
-import PlatformTeam from './PlatformTeam';
 
 const PAGE_SIZE = 10;
 
@@ -34,7 +33,6 @@ export default function Platform({ showToast }) {
   const perms = user?.permissions || [];
   const can = (p) => perms.includes(p);
   const allowedActions = ACTIONS.filter((a) => can(a.perm));
-  const [tab, setTab] = useState('companies');
   const [data, setData] = useState({ content: [], page: 0, totalElements: 0, totalPages: 0 });
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
@@ -127,13 +125,6 @@ export default function Platform({ showToast }) {
 
   return (
     <>
-      {can('TEAM_MANAGE') && (
-        <div className="platform-tabs" role="tablist">
-          <button role="tab" aria-selected={tab === 'companies'} className="btn btn-ghost btn-sm" onClick={() => setTab('companies')}>Empresas</button>
-          <button role="tab" aria-selected={tab === 'team'} className="btn btn-ghost btn-sm" onClick={() => setTab('team')}>Equipo</button>
-        </div>
-      )}
-      {tab === 'team' && can('TEAM_MANAGE') ? <PlatformTeam showToast={showToast} /> : (<>
       <div className="table-container">
         <div className="table-header">
           <h2>Empresas</h2>
@@ -235,7 +226,6 @@ export default function Platform({ showToast }) {
         <button className="btn btn-ghost btn-sm" style={{ marginTop: 8 }}
           onClick={() => { navigator.clipboard?.writeText(link); showToast?.('Enlace copiado'); }}>Copiar</button>
       </Modal>
-      </>)}
     </>
   );
 }

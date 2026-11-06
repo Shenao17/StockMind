@@ -56,7 +56,7 @@ export default function PlatformCompany({ showToast }) {
     return () => { cancelled = true; };
   }, [id, reloadKey]);
 
-  if (error) return <div className="loading-state">{error} · <Link to="/platform">Volver</Link></div>;
+  if (error) return <div className="loading-state">{error} · <Link to="/platform/companies">Volver</Link></div>;
   if (!detail) return <div className="loading-state"><div className="spinner" /> Cargando...</div>;
 
   const org = detail.organization;
@@ -107,7 +107,7 @@ export default function PlatformCompany({ showToast }) {
 
   return (
     <>
-      <p style={{ marginBottom: 12 }}><Link to="/platform">← Empresas</Link></p>
+      <p style={{ marginBottom: 12 }}><Link to="/platform/companies">← Empresas</Link></p>
 
       <div className="table-container" style={{ padding: 20, marginBottom: 16 }}>
         <div className="table-header" style={{ padding: 0, marginBottom: 12 }}>
