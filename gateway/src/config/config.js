@@ -13,5 +13,7 @@ module.exports = {
     pythonApiUrl: process.env.PYTHON_API_URL || 'http://localhost:8000',
     jwtSecret: process.env.JWT_SECRET,
     nodeEnv: process.env.NODE_ENV || 'development',
-    groqApiKey: process.env.GROQ_API_KEY || ''
+    groqApiKey: process.env.GROQ_API_KEY || '',
+    // El asistente IA está en reconstrucción: apagado salvo AGENT_ENABLED=true
+    agentEnabled: process.env.AGENT_ENABLED === 'true'
 };

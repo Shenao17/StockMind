@@ -13,6 +13,7 @@ const express = require('express');
 const axios   = require('axios');
 const router  = express.Router();
 const { authenticate } = require('../middleware/auth.middleware');
+const { authHeader } = require('../utils/authHeader');
 const config = require('../config/config');
 
 const JAVA = config.javaApiUrl;
@@ -178,6 +179,9 @@ Reglas generales:
 
 // ─── GET /api/agent/status ───────────────────────────────────────────────────
 router.get('/status', authenticate, (req, res) => {
+  if (!config.agentEnabled) {
+    return res.json({ available: false, maintenance: true });
+  }
   const configured = !!config.groqApiKey && config.groqApiKey.length > 10;
   res.json({
     available: configured,
@@ -188,6 +192,13 @@ router.get('/status', authenticate, (req, res) => {
 
 // ─── POST /api/agent/query ───────────────────────────────────────────────────
 router.post('/query', authenticate, async (req, res, next) => {
+  if (!config.agentEnabled) {
+    return res.status(503).json({
+      error: 'El asistente está en mejora y volverá pronto.',
+      code: 'AGENT_MAINTENANCE'
+    });
+  }
+
   try {
     const { messages, currentPage } = req.body;
 
@@ -199,7 +210,7 @@ router.post('/query', authenticate, async (req, res, next) => {
 
     // 1. Detectar intención y consultar datos reales si aplica
     const intents     = detectIntent(messages);
-    const dataContext = await buildDataContext(intents, req.headers.authorization);
+    const dataContext = await buildDataContext(intents, authHeader(req).Authorization);
 
     // 2. Construir mensajes para Groq
     const groqMessages = [

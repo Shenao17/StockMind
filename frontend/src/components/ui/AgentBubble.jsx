@@ -678,6 +678,53 @@ const styles = `
     opacity: 0.4;
     cursor: not-allowed;
   }
+
+  /* ── Aviso de mantenimiento ── */
+  .agent-maintenance {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 10px;
+    padding: 28px 24px;
+    font-family: 'Inter', sans-serif;
+  }
+
+  .agent-maintenance-icon {
+    font-size: 34px;
+    animation: agentMaintFloat 3s ease-in-out infinite;
+  }
+
+  .agent-maintenance-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #f5f5f5;
+  }
+
+  .agent-maintenance-text {
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: rgba(255,255,255,0.62);
+    max-width: 280px;
+  }
+
+  .agent-maintenance-tag {
+    margin-top: 4px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 10.5px;
+    font-family: 'DM Mono', monospace;
+    color: #f59e0b;
+    background: rgba(245,158,11,0.1);
+    border: 1px solid rgba(245,158,11,0.25);
+  }
+
+  @keyframes agentMaintFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+  }
 `;
 
 
@@ -790,16 +837,14 @@ const GATEWAY_URL =
 
 
 async function callGemini(messages, currentPage) {
-  const token = localStorage.getItem('sm_token');
-
   const res = await fetch(
     `${GATEWAY_URL}/api/agent/query`,
     {
       method: 'POST',
+      credentials: 'include', // cookie httpOnly de sesión
 
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
       },
 
       body: JSON.stringify({
@@ -945,18 +990,10 @@ export default function AgentBubble() {
 
     try {
 
-      const token =
-        localStorage.getItem('sm_token');
-
       const res =
         await fetch(
           `${GATEWAY_URL}/api/agent/status`,
-          {
-            headers: {
-              'Authorization':
-                `Bearer ${token}`,
-            },
-          }
+          { credentials: 'include' }
         );
 
 
@@ -966,9 +1003,11 @@ export default function AgentBubble() {
           await res.json();
 
         setAgentStatus(
-          data.available
-            ? 'online'
-            : 'offline'
+          data.maintenance
+            ? 'maintenance'
+            : data.available
+              ? 'online'
+              : 'offline'
         );
 
       } else {
@@ -988,7 +1027,7 @@ export default function AgentBubble() {
     if (
       !text.trim() ||
       loading ||
-      agentStatus === 'offline'
+      ['offline', 'maintenance'].includes(agentStatus)
     ) {
       return;
     }
@@ -1163,6 +1202,9 @@ export default function AgentBubble() {
                     {agentStatus === 'offline' &&
                       'sin conexión · API no disponible'}
 
+                    {agentStatus === 'maintenance' &&
+                      'en mejora · volvemos pronto'}
+
                     {agentStatus === 'unknown' &&
                       'verificando...'}
 
@@ -1221,7 +1263,25 @@ export default function AgentBubble() {
             {/* Mensajes */}
             <div className="agent-messages">
 
-              {messages.map((msg, i) => (
+              {agentStatus === 'maintenance' && (
+                <div className="agent-maintenance">
+                  <div className="agent-maintenance-icon">🛠️✨</div>
+                  <div className="agent-maintenance-title">
+                    Estamos afinando a tu asistente
+                  </div>
+                  <div className="agent-maintenance-text">
+                    StockMind AI está en una renovación interna para ser
+                    más rápido, más preciso y cuidar mejor tus datos.
+                    Lo estamos construyendo pensando en ti, y volverá
+                    muy pronto con mejoras. ¡Gracias por tu paciencia!
+                  </div>
+                  <span className="agent-maintenance-tag">
+                    En mejora continua
+                  </span>
+                </div>
+              )}
+
+              {agentStatus !== 'maintenance' && messages.map((msg, i) => (
 
                 <div
                   key={i}
@@ -1261,7 +1321,8 @@ export default function AgentBubble() {
 
             {/* Sugerencias */}
             {suggestions.length > 0 &&
-              !loading && (
+              !loading &&
+              agentStatus !== 'maintenance' && (
 
                 <div className="agent-suggestions">
 
@@ -1306,7 +1367,7 @@ export default function AgentBubble() {
                 onKeyDown={handleKeyDown}
                 disabled={
                   loading ||
-                  agentStatus === 'offline'
+                  ['offline', 'maintenance'].includes(agentStatus)
                 }
                 rows={1}
               />
@@ -1320,7 +1381,7 @@ export default function AgentBubble() {
                 disabled={
                   !input.trim() ||
                   loading ||
-                  agentStatus === 'offline'
+                  ['offline', 'maintenance'].includes(agentStatus)
                 }
                 title="Enviar"
               >
