@@ -1,15 +1,10 @@
 -- =============================================================================
--- StockMind — Script de creación de base de datos
--- Base de datos: stockmind_db
+-- StockMind — V1: esquema base (migración Flyway)
+-- La base de datos la crea Docker/MySQL (MYSQL_DATABASE); Flyway solo crea las tablas.
+-- Esta migración NO se debe editar una vez aplicada: los cambios van en V2, V3...
 -- Motor: MySQL 8.x
 -- Descripción: Schema completo con tablas, relaciones, índices y restricciones
 -- =============================================================================
-
-CREATE DATABASE IF NOT EXISTS stockmind_db
-    CHARACTER SET utf8mb4
-    COLLATE utf8mb4_unicode_ci;
-
-USE stockmind_db;
 
 -- =============================================================================
 -- TABLA: users
@@ -55,7 +50,7 @@ CREATE TABLE products (
     unit          VARCHAR(20)    NOT NULL DEFAULT 'UNIT',  -- UNIT, KG, LT, BOX
     active        BOOLEAN        NOT NULL DEFAULT TRUE,
     created_at    DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at    DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    updated_at    TIMESTAMP      DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT pk_products PRIMARY KEY (id),
     CONSTRAINT fk_products_category FOREIGN KEY (category_id)
         REFERENCES categories(id) ON DELETE RESTRICT ON UPDATE CASCADE,

@@ -1,16 +1,12 @@
 -- =============================================================================
--- StockMind — Datos iniciales (seed)
+-- StockMind — Datos de ejemplo SOLO PARA DESARROLLO (perfil Spring "dev")
+-- Los carga DevDataSeeder únicamente si la tabla users está vacía. Nunca en producción.
 -- Incluye: usuario admin, categorías de ejemplo y productos de prueba
 -- Contraseña admin: admin123 (hash BCrypt)
 -- =============================================================================
 
-USE stockmind_db;
 SET NAMES utf8mb4;
 
-ALTER TABLE products
-MODIFY COLUMN updated_at TIMESTAMP
-DEFAULT CURRENT_TIMESTAMP
-ON UPDATE CURRENT_TIMESTAMP;
 -- =============================================================================
 -- Usuarios iniciales
 -- Password: admin123 (BCrypt hash)

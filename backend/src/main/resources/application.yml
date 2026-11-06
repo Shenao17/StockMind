@@ -1,0 +1,17 @@
+# StockMind — Configuración base (sin secretos)
+# Datos de conexión y secretos llegan por variables de entorno (docker-compose / .env)
+# o por un application.properties local (ignorado por git; ver application.properties.example).
+spring:
+  jpa:
+    hibernate:
+      # El esquema lo gestiona Flyway; Hibernate solo VALIDA que las entidades coincidan.
+      ddl-auto: validate
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    # Bases ya existentes (creadas antes de Flyway con schema.sql): se toma el esquema
+    # actual como versión 1 en lugar de intentar recrearlo.
+    baseline-on-migrate: true
+    baseline-version: "1"
+    # Nunca permitir borrar la base desde Flyway
+    clean-disabled: true
