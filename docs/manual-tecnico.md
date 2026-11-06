@@ -126,7 +126,8 @@ Gateway Node.js :3000 ──► Backend Java Spring Boot :8080 ──► MySQL :
 | `/api/agent/*` | Groq | sesión; apagado salvo `AGENT_ENABLED=true` |
 | `/api/billing/*` | Java | plan y pagos de la empresa (checkout solo ADMIN); siguen disponibles aunque el plan esté vencido |
 | `/api/public/*` | Java | **sin sesión**: registro, verificación, planes y enlaces de pago (ver 5.4 y 6) |
-| `/api/platform/*` | Java | solo `PLATFORM_ADMIN` (empresas y acciones, ver 6.5) |
+| `/api/platform/*` | Java | solo roles `PLATFORM_*` (el permiso fino lo decide el backend; ver 5.6 y 6.5) |
+| `/api/auth/mfa/*` | Java | público (usa un token de desafío en el cuerpo); mismo límite que el login |
 | `/health` | — | público, sin datos internos |
 
 **CORS:** el origen del frontend (`FRONTEND_URL`) con `credentials: true`. La landing (otro dominio, `LANDING_URL`) solo puede llamar a `/api/public/*` y **sin cookies**.
@@ -189,7 +190,7 @@ Controller → Service → Repository → MySQL
 | `GET /products`, `/products/low-stock`, `/products/{id}`, `GET /categories`, `GET /sales`, `GET /sales/{id}`, `POST /sales`, `GET /inventory/movements`, `GET /dashboard/summary` | ADMIN, SELLER |
 | `POST/PUT/DELETE /products`, `POST /inventory/movements`, `/users/**`, `/reports/**` | ADMIN |
 | `POST /public/registrations`, `/public/verify-email`, `/public/resend-verification` | público |
-| `/platform/**` | PLATFORM_ADMIN |
+| `/platform/**` | permiso `PERM_*` según el rol de plataforma |
 
 Cualquier otra ruta exige ADMIN o SELLER. Un token sin rol válido, o de ADMIN/SELLER sin empresa, no concede nada.
 
@@ -263,11 +264,12 @@ El SKU de producto, el nombre de categoría y el `username` son únicos **por em
 
 | Rol | Alcance |
 |-----|---------|
-| `PLATFORM_ADMIN` | Dueño de la plataforma. **Sin empresa.** Solo accede a `/platform/**`; no ve datos de negocio de ninguna empresa |
+| `PLATFORM_OWNER` | Dueño de la plataforma. **Sin empresa.** Solo accede a `/platform/**`; no ve datos de negocio de ninguna empresa |
+| `PLATFORM_BILLING` / `PLATFORM_SUPPORT` / `PLATFORM_VIEWER` | Equipo de plataforma (cobranza, soporte, consulta). Sin empresa; permisos limitados (ver 5.6 y `docs/PANEL_PLATAFORMA.md`) |
 | `ADMIN` | Administrador de **una** empresa: gestiona sus usuarios, productos, inventario y reportes |
 | `SELLER` | Vendedor de una empresa: consulta y registra ventas |
 
-Un ADMIN de empresa no puede crear ni asignar `PLATFORM_ADMIN`, y no puede desactivarse, eliminarse ni cambiarse el rol a sí mismo.
+Un ADMIN de empresa no puede crear ni asignar un rol de plataforma, y no puede desactivarse, eliminarse ni cambiarse el rol a sí mismo.
 
 ---
 
@@ -280,7 +282,8 @@ Un ADMIN de empresa no puede crear ni asignar `PLATFORM_ADMIN`, y no puede desac
 | Tabla | Descripción |
 |-------|-------------|
 | `organizations` | Empresas cliente: nombre, NIT (único), contacto, país, estado, origen, fin de prueba, aceptación de términos |
-| `users` | Usuarios; `organization_id` es NULL solo para `PLATFORM_ADMIN`; `email_verified_at` |
+| `users` | Usuarios; `organization_id` es NULL solo para el equipo de plataforma; `email_verified_at`; columnas de 2FA/PIN (V5) |
+| `platform_backup_codes` | Códigos de respaldo del 2FA (solo el hash SHA-256; un solo uso) |
 | `categories`, `products` | Catálogo de cada empresa |
 | `sales`, `sale_details` | Ventas y sus líneas |
 | `inventory_movements` | Libro de movimientos de inventario |
@@ -292,7 +295,7 @@ Un ADMIN de empresa no puede crear ni asignar `PLATFORM_ADMIN`, y no puede desac
 | `audit_log` | Acciones sensibles del panel de plataforma (quién, qué, sobre qué empresa) |
 | `flyway_schema_history` | Control de migraciones |
 
-**Estados de empresa:** `PENDING` (sin verificar el correo), `ACTIVE`, `SUSPENDED`, `CANCELLED`. Solo `ACTIVE` puede iniciar sesión. **Origen:** `SELF_SIGNUP` o `PLATFORM_ADMIN`.
+**Estados de empresa:** `PENDING` (sin verificar el correo), `ACTIVE`, `SUSPENDED`, `CANCELLED`. Solo `ACTIVE` puede iniciar sesión. **Origen:** `SELF_SIGNUP` o `PLATFORM_ADMIN` (creada desde el panel).
 
 **Integridad:** claves foráneas con `ON DELETE RESTRICT` (salvo detalles de venta y tokens, que usan `CASCADE`); restricciones `CHECK` de stock no negativo y precios; índices por empresa en las consultas frecuentes.
 
@@ -306,6 +309,7 @@ El esquema lo gestiona **Flyway** desde el backend; Hibernate solo valida (`ddl-
 | `V2__organizations_multitenancy.sql` | `organizations`, `organization_id` en todas las tablas, unicidades por empresa, empresa inicial (id 1) con los datos existentes |
 | `V3__registration_and_verification.sql` | Verificación de correo, fin de prueba y términos |
 | `V4__plans_subscriptions_payments.sql` | Planes (borrador de precios), suscripciones, pagos y auditoría; las empresas existentes quedan con una suscripción de cortesía (Business) |
+| `V5__platform_roles_mfa.sql` | Roles de plataforma (`PLATFORM_ADMIN` pasa a `PLATFORM_OWNER`), columnas de 2FA/PIN/sesiones en `users` y `platform_backup_codes` |
 
 - **Una migración aplicada no se edita** (Flyway detecta el cambio por checksum y no arranca): los cambios van en una versión nueva.
 - Una base anterior a Flyway se "baselinea" en V1 sin tocar datos (`baseline-on-migrate`), y después aplica V2 y V3. `clean` está deshabilitado.
@@ -342,8 +346,9 @@ Firmado con HS256 y el secreto `JWT_SECRET` (idéntico en gateway y backend, ≥
 |-------|-----------|
 | `sub` | Correo del usuario (único en la plataforma) |
 | `id` | Id del usuario |
-| `role` | `PLATFORM_ADMIN`, `ADMIN` o `SELLER` |
-| `org` | Id de la empresa (ausente solo en `PLATFORM_ADMIN`) |
+| `role` | `PLATFORM_OWNER`/`_BILLING`/`_SUPPORT`/`_VIEWER`, `ADMIN` o `SELLER` |
+| `org` | Id de la empresa (ausente solo en el equipo de plataforma) |
+| `typ` | Solo en los tokens de **desafío** del 2FA (`MFA`/`ENROLL`): no son sesiones |
 
 No hay revocación ni *refresh*: un usuario desactivado o una empresa suspendida conservan acceso hasta que expire el token. El control del estado de la suscripción en cada petición (con una caché corta) está previsto para la fase de planes.
 
@@ -351,7 +356,7 @@ No hay revocación ni *refresh*: un usuario desactivado o una empresa suspendida
 
 ```
 1. El navegador envía la cookie automáticamente
-2. Gateway: jwt.verify → req.user; exige 'org' salvo PLATFORM_ADMIN; aplica requireRole
+2. Gateway: jwt.verify → req.user; exige 'org' salvo roles PLATFORM_* y rechaza tokens con `typ`; aplica requireRole
 3. Gateway reenvía a Java con Authorization: Bearer <token> (utils/authHeader.js)
 4. Java: JwtAuthFilter valida de nuevo, fija el rol y la empresa (TenantContext) y aplica las reglas por ruta
 5. Hacia analytics: el gateway envía X-Internal-Key y X-Organization-Id (del token verificado)
@@ -364,7 +369,7 @@ Un único servicio (`RegistrationService`) con dos entradas:
 | | Autoregistro (landing) | Panel de plataforma |
 |---|---|---|
 | Endpoint | `POST /api/public/registrations` | `POST /api/platform/organizations` |
-| Quién | cualquiera (con CAPTCHA) | `PLATFORM_ADMIN` |
+| Quién | cualquiera (con CAPTCHA) | equipo de plataforma con permiso de crear |
 | Estado inicial | `PENDING` | `ACTIVE` |
 | Correo del administrador | sin verificar → recibe enlace | verificado |
 | Prueba gratis | 14 días al verificar el correo | no aplica (se define en la fase de planes) |
@@ -379,11 +384,25 @@ Un único servicio (`RegistrationService`) con dos entradas:
 
 **Correo:** la interfaz `EmailSender` tiene hoy dos implementaciones sin proveedor real: `DevEmailSender` (perfil `dev`: escribe el enlace en el log) y `NoopEmailSender` (resto: registra un error para que la falta de proveedor no pase desapercibida y **no** registra el enlace). Para producción se agrega una implementación con un proveedor (SMTP, SES, Resend, ...) sin tocar el resto.
 
-**Dueño de la plataforma:** `PlatformAdminBootstrap` crea el primer `PLATFORM_ADMIN` al arrancar si hay `PLATFORM_ADMIN_EMAIL` y `PLATFORM_ADMIN_PASSWORD` y todavía no existe uno. Falla si la configuración está incompleta, la contraseña no cumple la política o el correo ya pertenece a un usuario de empresa. Nunca registra la contraseña.
+**Dueño de la plataforma:** `PlatformAdminBootstrap` crea el primer `PLATFORM_OWNER` al arrancar si hay `PLATFORM_ADMIN_EMAIL` y `PLATFORM_ADMIN_PASSWORD` (y opcional `PLATFORM_ADMIN_NAME`) y todavía no existe uno. En su primer ingreso configura el 2FA y su PIN (5.6). Falla si la configuración está incompleta, la contraseña no cumple la política o el correo ya pertenece a un usuario de empresa. Nunca registra la contraseña.
 
 ### 5.5 Contraseñas y datos de entrada
 
 Contraseña: 8–72 caracteres con al menos una letra y un número (BCrypt). Todos los cuerpos de entrada se validan con DTOs; los errores devuelven mensajes por campo.
+
+---
+
+### 5.6 Equipo de plataforma: roles, 2FA y PIN
+
+Detalle de producto en [`PANEL_PLATAFORMA.md`](PANEL_PLATAFORMA.md). Resumen técnico:
+
+- **Roles y permisos:** `PLATFORM_OWNER/BILLING/SUPPORT/VIEWER`. `PlatformPermission` define la matriz; `JwtAuthFilter` concede `ROLE_x` y los `PERM_*` del rol, y `SecurityConfig` exige el permiso en cada ruta `/platform/**` (rutas no listadas: `denyAll`). `SENSITIVE` = suspender, cancelar, cambiar plan, pago manual y pruebas > 7 días (solo Dueño por ahora).
+- **Sesión revalidada:** para roles de plataforma el filtro consulta la base en cada petición (cuenta activa, mismo rol, `sessions_valid_from` anterior a la emisión del token). Desactivar, cambiar rol o reiniciar acceso cierra sesiones al instante. Sesión de 2 h (`stockmind.platform.session-minutes`).
+- **Login en dos pasos:** `POST /auth/login` de un usuario de plataforma devuelve `challengeToken` (JWT con `typ=MFA` o `ENROLL`, sin rol, 5/15 min) en vez de sesión. `POST /auth/mfa/verify` (código TOTP o de respaldo), `/auth/mfa/enroll/start` (secreto + URI `otpauth`) y `/auth/mfa/enroll/finish` (primer código + PIN + contraseña nueva si era temporal → sesión y 8 códigos de respaldo). El gateway pone la cookie solo al recibir la sesión y con la misma duración del token.
+- **TOTP:** RFC 6238 (SHA-1, 6 dígitos, 30 s, ±1 paso) implementado sin dependencias (`TotpService`, probado con los vectores del RFC). Se guarda el último paso usado (no se reutiliza). Secreto cifrado con AES-256-GCM (`MfaCrypto`, llave `STOCKMIND_MFA_KEY`).
+- **PIN:** 6–10 dígitos, BCrypt. Se exige en cada mutación de `/platform/team` (`PinException` → 403 `PIN_INVALID`, sin cerrar la sesión). Bloqueo de 15 min tras 5 fallos (código y PIN por separado).
+- **Equipo (`/platform/team`, permiso `TEAM_MANAGE`):** listar, alta (contraseña temporal, `must_change_password`), cambiar rol/estado/nombre, reiniciar acceso. No se tocan dueños ni la propia cuenta. Todo auditado.
+- **Perfil:** `GET /auth/me` devuelve también `fullName` y `permissions`; el frontend los usa solo para mostrar u ocultar controles.
 
 ---
 
@@ -434,7 +453,7 @@ Flujo: `POST /billing/checkout` (ADMIN) crea un cobro `PENDING` con la referenci
 - `POST /platform/organizations/{id}/manual-payment` registra un pago recibido por fuera (p. ej. acordado por teléfono) y activa el plan.
 - **Facturación electrónica DIAN:** aún no integrada; debe estar lista antes del primer cobro real.
 
-### 6.5 Panel de plataforma (`/api/platform/*`, solo `PLATFORM_ADMIN`)
+### 6.5 Panel de plataforma (`/api/platform/*`, roles `PLATFORM_*` con permiso)
 
 | Acción | Efecto |
 |--------|--------|
@@ -507,7 +526,8 @@ El `.env` no se versiona; `.env.example` es la plantilla. Docker Compose lo lee 
 | `LANDING_URL` | no | Origen(es) de la landing, separados por coma (solo `/api/public`) |
 | `TRUST_PROXY` | no | Número de proxies delante del gateway |
 | `VITE_GATEWAY_URL` | no | URL del gateway para el frontend |
-| `PLATFORM_ADMIN_EMAIL`, `PLATFORM_ADMIN_PASSWORD` | no | Primer dueño de la plataforma (vacías = no se crea) |
+| `PLATFORM_ADMIN_EMAIL`, `PLATFORM_ADMIN_PASSWORD`, `PLATFORM_ADMIN_NAME` | no | Primer dueño de la plataforma (vacías = no se crea; nombre opcional) |
+| `STOCKMIND_MFA_KEY` | prod: sí | Llave que cifra los secretos TOTP; vacía = derivada de `JWT_SECRET` (solo desarrollo) |
 | `CAPTCHA_PROVIDER`, `TURNSTILE_SECRET` | prod | Anti-bots del registro público |
 | `STOCKMIND_PAYMENTS_PROVIDER` | no | `simulated` = pasarela de pruebas (solo desarrollo); vacío = pagos desactivados (503) |
 | `GROQ_API_KEY`, `AGENT_ENABLED` | no | Asistente IA (apagado por defecto) |
@@ -541,10 +561,10 @@ Reiniciar la base con los datos de ejemplo: `docker compose down -v` y volver a 
 
 | Servicio | Herramienta | Pruebas | Cómo ejecutar |
 |----------|-------------|--------:|---------------|
-| Backend | JUnit + MockMvc (H2 por defecto) | 129 | `mvn test` en `backend/` |
-| Backend contra **MySQL real** | idem, con `MYSQL_TEST_URL` | 129 | `MYSQL_TEST_URL=jdbc:mysql://host:3306/db MYSQL_TEST_USER=... MYSQL_TEST_PASSWORD=... mvn test` |
-| Gateway | `node:test` (sin dependencias) | 140 | `npm test` en `gateway/` |
-| Frontend | Vitest + Testing Library | 85 | `npx vitest run` en `frontend/` |
+| Backend | JUnit + MockMvc (H2 por defecto) | 151 | `mvn test` en `backend/` |
+| Backend contra **MySQL real** | idem, con `MYSQL_TEST_URL` | 151 | `MYSQL_TEST_URL=jdbc:mysql://host:3306/db MYSQL_TEST_USER=... MYSQL_TEST_PASSWORD=... mvn test` |
+| Gateway | `node:test` (sin dependencias) | 154 | `npm test` en `gateway/` |
+| Frontend | Vitest + Testing Library | 101 | `npx vitest run` en `frontend/` |
 | Analytics | pytest | 65 (+4 contra MySQL real) | `python -m pytest` en `analytics/` (con `ANALYTICS_MYSQL_HOST` corre también el aislamiento sobre MySQL) |
 
 Cobertura destacada: roles y tokens, validaciones, ventas con **concurrencia** (nunca se vende más del stock), **aislamiento entre empresas** (listados, por id, escrituras cruzadas, reportes, usuarios, analytics), login, registro y verificación, planes (solo lectura, bloqueo, funciones y límites), pagos idempotentes, ciclo diario, panel de plataforma, paginación y orden permitido, cabeceras de seguridad, CORS, límites y logs sin datos sensibles.
@@ -577,16 +597,17 @@ Cobertura destacada: roles y tokens, validaciones, ventas con **concurrencia** (
 ├── StockmindApplication
 ├── billing/     EntitlementService · SubscriptionService · SubscriptionLifecycleService/Job
 │                PaymentService · PaymentProvider (+ Simulated) · BillingQueryService · AuditService
-├── bootstrap/   PlatformAdminBootstrap                       # primer PLATFORM_ADMIN desde el entorno
+├── bootstrap/   PlatformAdminBootstrap                       # primer PLATFORM_OWNER desde el entorno
 ├── config/      JwtConfig · SecurityConfig (+ JwtAuthFilter) · SubscriptionAccessFilter · DevDataSeeder
-├── controller/  Auth · Billing · Category · Dashboard · Inventory · Platform · Product
+├── controller/  Auth · Billing · Category · Dashboard · Inventory · Platform · PlatformTeam · Product
 │                PublicBilling · PublicRegistration · Report · Sale · User
 ├── dto/         BillingDTO · InventoryDTO · LoginRequest/Response · PageResponse · PlatformDTO
-│                ProductDTO · RegistrationDTO · SaleDTO · UserDTO
-├── exception/   ConflictException · ResourceNotFoundException · GlobalExceptionHandler
+│                ProductDTO · RegistrationDTO · SaleDTO · TeamDTO · UserDTO
+├── exception/   ConflictException · PinException · ResourceNotFoundException · GlobalExceptionHandler
+├── platform/    PlatformPermission · PlatformSecurityService · TotpService · MfaCrypto   # roles, 2FA y PIN
 ├── mail/        EmailSender · DevEmailSender · NoopEmailSender
 ├── model/       AuditLog · Category · EmailVerificationToken · InventoryMovement · Organization
-│                Payment · Plan · Product · Sale · SaleDetail · Subscription · User
+│                Payment · Plan · PlatformBackupCode · Product · Sale · SaleDetail · Subscription · User
 ├── repository/  *Repository (+ spec/ con los filtros combinables)
 ├── service/     Auth · Dashboard · Inventory · Product · Registration · Sale
 ├── tenant/      TenantContext · TenantIdentifierResolver

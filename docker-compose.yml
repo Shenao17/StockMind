@@ -38,6 +38,8 @@ services:
       APP_PUBLIC_URL: ${FRONTEND_URL:-http://localhost:5173}
       PLATFORM_ADMIN_EMAIL: ${PLATFORM_ADMIN_EMAIL:-}
       PLATFORM_ADMIN_PASSWORD: ${PLATFORM_ADMIN_PASSWORD:-}
+      PLATFORM_ADMIN_NAME: ${PLATFORM_ADMIN_NAME:-}
+      STOCKMIND_MFA_KEY: ${STOCKMIND_MFA_KEY:-}
       # Pasarela de pagos: vacío = pagos desactivados; 'simulated' solo en desarrollo (ver override)
       STOCKMIND_PAYMENTS_PROVIDER: ${STOCKMIND_PAYMENTS_PROVIDER:-}
     depends_on:
