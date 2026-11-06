@@ -50,13 +50,10 @@ public class ProductController {
 
     @PostMapping
     public ResponseEntity<?> create(@Valid @RequestBody Map<String, Object> body) {
-        try {
-            Product product = buildProductFromBody(body);
-            Product saved = productService.create(product);
-            return ResponseEntity.status(HttpStatus.CREATED).body(saved);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        }
+        // Los errores (SKU duplicado, número inválido) los resuelve GlobalExceptionHandler
+        Product product = buildProductFromBody(body);
+        Product saved = productService.create(product);
+        return ResponseEntity.status(HttpStatus.CREATED).body(saved);
     }
 
     @PutMapping("/{id}")

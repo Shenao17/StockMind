@@ -1,11 +1,14 @@
 package com.stockmind.controller;
 
+import com.stockmind.dto.UserDTO;
 import com.stockmind.exception.ResourceNotFoundException;
 import com.stockmind.model.User;
 import com.stockmind.repository.UserRepository;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
@@ -34,9 +37,9 @@ public class UserController {
     }
 
     @PostMapping
-    public ResponseEntity<?> create(@RequestBody Map<String, Object> body) {
-        String username = body.get("username").toString();
-        String email    = body.get("email").toString();
+    public ResponseEntity<?> create(@Valid @RequestBody UserDTO.CreateRequest body) {
+        String username = body.getUsername().trim();
+        String email    = body.getEmail().trim().toLowerCase();
 
         if (userRepository.existsByUsername(username)) {
             return ResponseEntity.badRequest()
@@ -50,8 +53,8 @@ public class UserController {
         User user = User.builder()
             .username(username)
             .email(email)
-            .passwordHash(passwordEncoder.encode(body.get("password").toString()))
-            .role(User.Role.valueOf(body.getOrDefault("role", "SELLER").toString()))
+            .passwordHash(passwordEncoder.encode(body.getPassword()))
+            .role(body.getRole())
             .active(true)
             .build();
 
@@ -60,23 +63,48 @@ public class UserController {
 
     @PutMapping("/{id}")
     public ResponseEntity<?> update(@PathVariable Long id,
-                                     @RequestBody Map<String, Object> body) {
+                                     @Valid @RequestBody UserDTO.UpdateRequest body,
+                                     Authentication authentication) {
         User user = userRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
 
-        if (body.containsKey("email"))    user.setEmail(body.get("email").toString());
-        if (body.containsKey("role"))     user.setRole(User.Role.valueOf(body.get("role").toString()));
-        if (body.containsKey("active"))   user.setActive(Boolean.parseBoolean(body.get("active").toString()));
-        if (body.containsKey("password")) user.setPasswordHash(
-            passwordEncoder.encode(body.get("password").toString()));
+        // Evita que un administrador se quede sin acceso a sí mismo
+        boolean isSelf = user.getUsername().equals(authentication.getName());
+        if (isSelf && (Boolean.FALSE.equals(body.getActive())
+                || (body.getRole() != null && body.getRole() != user.getRole()))) {
+            throw new IllegalStateException(
+                "No puedes desactivar tu propia cuenta ni cambiar tu propio rol");
+        }
+
+        if (body.getEmail() != null && !body.getEmail().isBlank()) {
+            String email = body.getEmail().trim().toLowerCase();
+            boolean takenByOther = userRepository.findByEmail(email)
+                .filter(other -> !other.getId().equals(user.getId()))
+                .isPresent();
+            if (takenByOther) {
+                return ResponseEntity.badRequest()
+                    .body(Map.of("error", "El correo electrónico ya está registrado"));
+            }
+            user.setEmail(email);
+        }
+        if (body.getRole() != null)     user.setRole(body.getRole());
+        if (body.getActive() != null)   user.setActive(body.getActive());
+        if (body.getPassword() != null) user.setPasswordHash(
+            passwordEncoder.encode(body.getPassword()));
 
         return ResponseEntity.ok(userRepository.save(user));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Map<String, String>> delete(@PathVariable Long id) {
+    public ResponseEntity<Map<String, String>> delete(@PathVariable Long id,
+                                                       Authentication authentication) {
         User user = userRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
+
+        if (user.getUsername().equals(authentication.getName())) {
+            throw new IllegalStateException("No puedes desactivar tu propia cuenta");
+        }
+
         user.setActive(false);
         userRepository.save(user);
         return ResponseEntity.ok(Map.of("message", "Usuario desactivado correctamente"));
