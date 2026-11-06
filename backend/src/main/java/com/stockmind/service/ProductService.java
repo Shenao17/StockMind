@@ -1,9 +1,13 @@
 package com.stockmind.service;
 
+import com.stockmind.dto.PageResponse;
 import com.stockmind.exception.ResourceNotFoundException;
 import com.stockmind.model.Product;
 import com.stockmind.repository.ProductRepository;
+import com.stockmind.repository.spec.ProductSpecs;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -19,6 +23,18 @@ public class ProductService {
 
     public List<Product> findAll() {
         return productRepository.findByActiveTrue();
+    }
+
+    /** Listado sin paginar (compatibilidad), con los mismos filtros opcionales. */
+    public List<Product> list(String search, Long categoryId, boolean lowStock) {
+        return productRepository.findAll(
+            ProductSpecs.filter(search, categoryId, lowStock), Sort.by("id"));
+    }
+
+    /** Listado paginado con filtros. */
+    public PageResponse<Product> search(String search, Long categoryId, boolean lowStock, Pageable pageable) {
+        return PageResponse.of(productRepository.findAll(
+            ProductSpecs.filter(search, categoryId, lowStock), pageable));
     }
 
     public Product findById(Long id) {

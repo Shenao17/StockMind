@@ -1,19 +1,24 @@
 package com.stockmind.controller;
 
+import com.stockmind.dto.PageResponse;
 import com.stockmind.dto.UserDTO;
 import com.stockmind.exception.ResourceNotFoundException;
 import com.stockmind.model.User;
 import com.stockmind.repository.UserRepository;
+import com.stockmind.repository.spec.UserSpecs;
+import com.stockmind.util.Paging;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * UserController — CRUD de usuarios del sistema
@@ -31,9 +36,29 @@ public class UserController {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
+    private static final Set<String> SORT_FIELDS = Set.of("id", "username", "email", "role", "createdAt");
+
+    /**
+     * GET /users
+     * Filtros: search (usuario o correo), role, active
+     * Paginación opcional: page (base 0), size (1-100), sort, dir (asc|desc)
+     *  - Con page o size → { content, page, size, totalElements, totalPages }
+     *  - Sin ellos       → arreglo con todos los usuarios (comportamiento anterior)
+     */
     @GetMapping
-    public ResponseEntity<List<User>> getAll() {
-        return ResponseEntity.ok(userRepository.findAll());
+    public ResponseEntity<?> getAll(@RequestParam(required = false) String search,
+                                    @RequestParam(required = false) User.Role role,
+                                    @RequestParam(required = false) Boolean active,
+                                    @RequestParam(required = false) Integer page,
+                                    @RequestParam(required = false) Integer size,
+                                    @RequestParam(required = false) String sort,
+                                    @RequestParam(required = false) String dir) {
+        var spec = UserSpecs.filter(search, role, active);
+        if (Paging.isRequested(page, size)) {
+            Pageable pageable = Paging.of(page, size, sort, dir, SORT_FIELDS, Sort.by("username"));
+            return ResponseEntity.ok(PageResponse.of(userRepository.findAll(spec, pageable)));
+        }
+        return ResponseEntity.ok(userRepository.findAll(spec, Sort.by("id")));
     }
 
     @PostMapping

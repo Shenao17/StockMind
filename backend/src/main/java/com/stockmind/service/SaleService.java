@@ -3,12 +3,15 @@ package com.stockmind.service;
 import com.stockmind.exception.ResourceNotFoundException;
 import com.stockmind.model.*;
 import com.stockmind.repository.*;
+import com.stockmind.repository.spec.SaleSpecs;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import com.stockmind.dto.PageResponse;
 import com.stockmind.dto.SaleDTO;
 
 import java.util.ArrayList;
@@ -126,6 +129,13 @@ public class SaleService {
         }
 
         return savedSale;
+    }
+
+    /** Listado paginado con filtros opcionales (fechas, estado, vendedor). */
+    public PageResponse<Sale> search(LocalDateTime from, LocalDateTime to,
+                                     Sale.Status status, Long userId, Pageable pageable) {
+        return PageResponse.of(saleRepository.findAll(
+            SaleSpecs.filter(from, to, status, userId), pageable));
     }
 
     public List<Sale> findAll() {

@@ -6,14 +6,18 @@ import com.stockmind.model.Category;
 import com.stockmind.model.Product;
 import com.stockmind.repository.CategoryRepository;
 import com.stockmind.service.ProductService;
+import com.stockmind.util.Paging;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * ProductController — CRUD de productos
@@ -33,9 +37,29 @@ public class ProductController {
     private final ProductService productService;
     private final CategoryRepository categoryRepository;
 
+    private static final Set<String> SORT_FIELDS =
+        Set.of("id", "name", "sku", "price", "stockCurrent", "createdAt");
+
+    /**
+     * GET /products
+     * Filtros: search (nombre o SKU), categoryId, lowStock
+     * Paginación opcional: page (base 0), size (1-100), sort, dir (asc|desc)
+     *  - Con page o size → { content, page, size, totalElements, totalPages }
+     *  - Sin ellos       → arreglo completo (compatibilidad con pantallas que aún lo necesitan)
+     */
     @GetMapping
-    public ResponseEntity<List<Product>> getAll() {
-        return ResponseEntity.ok(productService.findAll());
+    public ResponseEntity<?> getAll(@RequestParam(required = false) String search,
+                                    @RequestParam(required = false) Long categoryId,
+                                    @RequestParam(defaultValue = "false") boolean lowStock,
+                                    @RequestParam(required = false) Integer page,
+                                    @RequestParam(required = false) Integer size,
+                                    @RequestParam(required = false) String sort,
+                                    @RequestParam(required = false) String dir) {
+        if (Paging.isRequested(page, size)) {
+            Pageable pageable = Paging.of(page, size, sort, dir, SORT_FIELDS, Sort.by("name"));
+            return ResponseEntity.ok(productService.search(search, categoryId, lowStock, pageable));
+        }
+        return ResponseEntity.ok(productService.list(search, categoryId, lowStock));
     }
 
     @GetMapping("/low-stock")
