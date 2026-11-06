@@ -71,7 +71,7 @@ TRIAL (14 días) ──► aviso día 9 (faltan 5) y día 13 (falta 1)
 - **Alta por teléfono:** el panel de plataforma crea la empresa y genera un **link de pago**; al confirmarse el pago, el plan queda activo. Decide si estas empresas reciben o no la prueba de 14 días (propuesta: no, porque ya hubo conversación comercial y pago acordado).
 - **Pagos simulados (ahora):** una interfaz `PaymentProvider` con una implementación `Simulated` que genera un enlace interno y un "webhook" de prueba. Cuando contrates la pasarela (p. ej. Wompi) se agrega otra implementación sin cambiar el resto.
 
-**Piezas técnicas de la Fase 3** (orden sugerido): tablas `plans`, `subscriptions` y `payments` · estados y límites por plan (`requireFeature` / `requireLimit` en el servidor) · comprobación del estado de la suscripción en cada petición con una caché corta (30–60 s) · tarea programada diaria para avisos y cambios de estado · `PaymentProvider` simulado · panel de plataforma (pausar, reactivar, cambiar plan, ver actividad).
+**Estado de implementación (Fase 3):** ✔ hecho en el código: planes, suscripciones y estados, solo lectura en gracia, bloqueo al suspender, funciones y límites por plan, pagos con pasarela simulada y enlaces de pago, ciclo diario con avisos, panel de plataforma con auditoría y pantallas de plan/pago. ◐ pendiente: pasarela real con webhook firmado, facturación electrónica DIAN, proveedor de correo real (hoy los avisos solo se escriben en el log en desarrollo), y confirmar los precios. Detalle técnico en `docs/manual-tecnico.md`, sección 6.
 
 ---
 

@@ -28,6 +28,11 @@ La v1.4.0 convierte StockMind de una aplicación de un solo negocio en una plata
 - Servicio de analítica aislado por empresa y autenticado con clave interna.
 - Registro de empresas: autoregistro con verificación de correo y prueba gratis, y alta desde el panel de plataforma.
 
+**Planes y suscripciones (Fase 3)**
+- Planes (Starter, Pro, Business) con precios + IVA, funciones y límites; suscripción por empresa con prueba gratis, gracia, suspensión y cancelación.
+- El plan se aplica en el servidor: modo solo lectura al vencer, bloqueo al suspender, funciones y límites por plan.
+- Cobros con una pasarela simulada (intercambiable por una real), enlaces de pago, ciclo diario con avisos de fin de prueba y panel de plataforma con auditoría.
+
 **Eliminado**
 - **MongoDB** (solo guardaba logs que nadie leía). Los logs pasan a la salida estándar en JSON.
 - `morgan` (reemplazado por `pino-http`).
@@ -75,6 +80,11 @@ Gateway Node.js :3000 ──► Backend Java Spring Boot :8080 ──► MySQL :
 |---------|--------|
 | `pages/Login.jsx` | Inicio de sesión por **correo electrónico** |
 | `pages/VerifyEmail.jsx` | Destino del enlace de verificación de correo (`/verify-email?token=...`) |
+| `pages/Billing.jsx` | Plan actual, uso frente a límites, planes con IVA y historial de cobros |
+| `pages/Pay.jsx` | Página pública de pago (`/pay/:referencia`) |
+| `pages/Platform.jsx` | Panel del dueño de la plataforma: empresas, planes, enlaces de pago, suspensión |
+| `context/SubscriptionContext.jsx` + `subscriptionState.js` | Plan de la empresa; alimenta el banner, los candados y la pantalla de bloqueo |
+| `components/ui/PlanBanner.jsx`, `FeatureGate.jsx` | Aviso de prueba/vencimiento y pantalla "mejora tu plan" |
 | `pages/Dashboard.jsx` | Resumen general (datos de `/api/dashboard/summary`) |
 | `pages/Products.jsx` | Catálogo: búsqueda y filtro por categoría en el servidor, paginado |
 | `pages/Inventory.jsx` | Movimientos: filtro por tipo, paginado |
@@ -112,10 +122,11 @@ Gateway Node.js :3000 ──► Backend Java Spring Boot :8080 ──► MySQL :
 | `/api/sales` | Java | ADMIN/SELLER |
 | `/api/dashboard/summary` | Java | ADMIN/SELLER |
 | `/api/reports` | Java | ADMIN |
-| `/api/predictions/*` | **Python** | ADMIN/SELLER (requiere empresa) |
+| `/api/predictions/*` | **Python** | ADMIN/SELLER; exige la función `PREDICTIONS` del plan |
 | `/api/agent/*` | Groq | sesión; apagado salvo `AGENT_ENABLED=true` |
-| `/api/public/*` | Java | **sin sesión**: registro y verificación (ver 5.4) |
-| `/api/platform/*` | Java | solo `PLATFORM_ADMIN` |
+| `/api/billing/*` | Java | plan y pagos de la empresa (checkout solo ADMIN); siguen disponibles aunque el plan esté vencido |
+| `/api/public/*` | Java | **sin sesión**: registro, verificación, planes y enlaces de pago (ver 5.4 y 6) |
+| `/api/platform/*` | Java | solo `PLATFORM_ADMIN` (empresas y acciones, ver 6.5) |
 | `/health` | — | público, sin datos internos |
 
 **CORS:** el origen del frontend (`FRONTEND_URL`) con `credentials: true`. La landing (otro dominio, `LANDING_URL`) solo puede llamar a `/api/public/*` y **sin cookies**.
@@ -275,6 +286,10 @@ Un ADMIN de empresa no puede crear ni asignar `PLATFORM_ADMIN`, y no puede desac
 | `inventory_movements` | Libro de movimientos de inventario |
 | `demand_predictions` | Predicciones (las escribe analytics) |
 | `email_verification_tokens` | Hash SHA-256 de los tokens de verificación (nunca el token real) |
+| `plans`, `plan_features` | Planes (precios en COP sin IVA, límites) y sus funciones premium |
+| `subscriptions` | Una por empresa: plan, estado, ciclo, fechas de prueba/periodo/gracia, cortesía |
+| `payments` | Cobros: neto, IVA, total, proveedor, estado y referencia impredecible del enlace de pago |
+| `audit_log` | Acciones sensibles del panel de plataforma (quién, qué, sobre qué empresa) |
 | `flyway_schema_history` | Control de migraciones |
 
 **Estados de empresa:** `PENDING` (sin verificar el correo), `ACTIVE`, `SUSPENDED`, `CANCELLED`. Solo `ACTIVE` puede iniciar sesión. **Origen:** `SELF_SIGNUP` o `PLATFORM_ADMIN`.
@@ -290,6 +305,7 @@ El esquema lo gestiona **Flyway** desde el backend; Hibernate solo valida (`ddl-
 | `V1__baseline_schema.sql` | Esquema inicial |
 | `V2__organizations_multitenancy.sql` | `organizations`, `organization_id` en todas las tablas, unicidades por empresa, empresa inicial (id 1) con los datos existentes |
 | `V3__registration_and_verification.sql` | Verificación de correo, fin de prueba y términos |
+| `V4__plans_subscriptions_payments.sql` | Planes (borrador de precios), suscripciones, pagos y auditoría; las empresas existentes quedan con una suscripción de cortesía (Business) |
 
 - **Una migración aplicada no se edita** (Flyway detecta el cambio por checksum y no arranca): los cambios van en una versión nueva.
 - Una base anterior a Flyway se "baselinea" en V1 sin tocar datos (`baseline-on-migrate`), y después aplica V2 y V3. `clean` está deshabilitado.
@@ -371,7 +387,88 @@ Contraseña: 8–72 caracteres con al menos una letra y un número (BCrypt). Tod
 
 ---
 
-## 6. Manejo de errores
+## 6. Planes, suscripciones y pagos
+
+> Los precios y límites de los planes son un **borrador** (ver `docs/PLANES_Y_PRECIOS.md` y `StockMind_Modelo_Financiero.xlsx`). Están en la tabla `plans`: se cambian con una migración, sin tocar el código.
+
+### 6.1 Planes
+
+| Plan | Sin IVA/mes | Usuarios | Productos | Funciones premium |
+|------|------------:|---------:|----------:|-------------------|
+| `STARTER` | $59.900 | 2 | 300 | — |
+| `PRO` | $119.900 | 5 | 3.000 | `REPORTS`, `PREDICTIONS`, `EXPORT` |
+| `BUSINESS` | $249.900 | 15 | 20.000 | además `AI_ASSISTANT`, `API` |
+
+Inventario, ventas y dashboard van en todos. El plan anual cobra 10 meses de 12. El IVA (19 %, `stockmind.billing.iva-rate`) se suma al precio y se muestra siempre desglosado (neto + IVA = total). `EXPORT`, `AI_ASSISTANT` y `API` existen como banderas, pero las funciones aún no están construidas.
+
+### 6.2 Estados de la suscripción
+
+```
+TRIAL ──(paga)──► ACTIVE ──(vence el periodo)──► GRACE ──(7 días sin pagar)──► SUSPENDED ──(90 días)──► CANCELLED
+  └─(vence la prueba)────────────────────────────►┘                    └──(paga)──► ACTIVE
+```
+
+| Estado | Acceso | Empresa (`organizations.status`) |
+|--------|--------|----------------------------------|
+| `TRIAL`, `ACTIVE` | completo | `ACTIVE` |
+| `GRACE` | **solo lectura**: cualquier cambio responde 402 `SUBSCRIPTION_READ_ONLY` | `ACTIVE` |
+| `SUSPENDED` | ninguno (402 `SUBSCRIPTION_BLOCKED`, incluso con un token vigente); no puede iniciar sesión | `SUSPENDED` |
+| `CANCELLED` | ninguno | `CANCELLED` |
+
+La prueba (14 días) empieza al **verificar el correo** (autoregistro) o desde el alta (plataforma). Las suscripciones de **cortesía** (`complimentary`) tienen acceso completo sin vencimiento. Una empresa sin suscripción se bloquea (falla cerrado).
+
+### 6.3 Cómo se aplica el plan
+
+- **`SubscriptionAccessFilter`** (backend, después de la autenticación): aplica solo lectura, bloqueo y funciones premium por ruta (`/reports` → `REPORTS`). `/billing` y `/auth` quedan siempre disponibles: son la vía para pagar.
+- **Límites:** `EntitlementService.assertCanAddUser/Product` (crear o reactivar usuarios; crear productos) → 402 `PLAN_LIMIT_REACHED`.
+- **Funciones que no pasan por Java** (predicciones → Python, asistente → Groq): el gateway consulta `/billing/subscription` y la guarda 30 s por empresa (`feature.middleware.js`), y la vacía cuando un pago o una acción de plataforma cambia el plan. Falla cerrado si no puede consultar.
+- **Caché del backend:** `EntitlementService` guarda el estado 30 s por empresa y se vacía en cada cambio; con varias réplicas un cambio puede tardar hasta ese tiempo en verse en las demás.
+- El frontend (`SubscriptionContext`) solo muestra avisos, candados y la pantalla de bloqueo: **no es la protección**.
+
+### 6.4 Pagos
+
+Flujo: `POST /billing/checkout` (ADMIN) crea un cobro `PENDING` con la referencia (24 bytes aleatorios) y devuelve la URL de pago → la pasarela confirma → `PaymentService.markPaid(referencia)` activa el plan. `markPaid` es **idempotente** (un webhook repetido no extiende el plan dos veces). Renovar antes de vencer suma el nuevo periodo al final del actual. El enlace vence a las 48 h (la caducidad se deriva de `expires_at`).
+
+- **`PaymentProvider`** abstrae la pasarela. Hoy solo existe `SimulatedPaymentProvider`, activo con `STOCKMIND_PAYMENTS_PROVIDER=simulated` (el override de desarrollo lo define): el "checkout" es la página `/pay/{referencia}` con un botón de prueba. **Sin esa variable no hay proveedor y los cobros responden 503**: un enlace de pago nunca puede "pagarse" solo en producción.
+- Para cobrar de verdad se agrega una implementación (p. ej. Wompi) que crea el cobro, devuelve su URL y confirma con un **webhook firmado**; el resto no cambia.
+- `POST /platform/organizations/{id}/manual-payment` registra un pago recibido por fuera (p. ej. acordado por teléfono) y activa el plan.
+- **Facturación electrónica DIAN:** aún no integrada; debe estar lista antes del primer cobro real.
+
+### 6.5 Panel de plataforma (`/api/platform/*`, solo `PLATFORM_ADMIN`)
+
+| Acción | Efecto |
+|--------|--------|
+| Alta de empresa | modo `TRIAL` (prueba desde hoy), `PAID` (pago ya recibido: se registra) o `COMPLIMENTARY` (cortesía) |
+| `suspend` / `reactivate` / `cancel` | cambia el estado de la suscripción y de la empresa; reactivar devuelve el acceso según lo que le quede vigente (prueba, periodo pagado, cortesía) o, si nada, una gracia nueva |
+| `extend-trial` | suma 1–90 días; en gracia o suspendida reinicia la prueba desde hoy |
+| `plan` | cambio de plan acordado, sin cobro |
+| `payment-links` | enlace de pago (48 h) para enviar al cliente |
+| `manual-payment` | registra un pago recibido por fuera |
+
+Una empresa sin verificar el correo no puede suspenderse ni reactivarse (409 `ORGANIZATION_PENDING`). **Toda acción queda en `audit_log`.**
+
+### 6.6 Ciclo diario
+
+`SubscriptionLifecycleJob` (06:00, `stockmind.billing.cron`) ejecuta `SubscriptionLifecycleService.run()`, idempotente:
+
+- **Avisos** al correo de contacto de la empresa a ≤5 y ≤1 día del fin de la prueba o del periodo (`EmailSender.sendBillingNotice`: `TRIAL_ENDING`, `RENEWAL_REMINDER`, `GRACE_STARTED`, `SUSPENDED`), una vez cada uno.
+- Prueba o periodo vencido → `GRACE` (7 días); gracia vencida → `SUSPENDED` (y la empresa pasa a `SUSPENDED`); suspendida más de 90 días → `CANCELLED`.
+- Si el servidor estuvo apagado, una sola corrida pone las suscripciones al día.
+- Se omiten las cortesías y las pruebas sin fecha (correo aún sin verificar).
+- Pensado para **una sola instancia** del backend: con réplicas hay que añadir un bloqueo (p. ej. ShedLock) para no duplicar avisos.
+
+### 6.7 Endpoints
+
+| Ruta | Rol |
+|------|-----|
+| `GET /billing/subscription` | ADMIN, SELLER: plan, estado, días de prueba, funciones, límites y uso |
+| `GET /billing/plans` | ADMIN, SELLER |
+| `GET /billing/payments`, `POST /billing/checkout` | ADMIN |
+| `GET /public/plans`, `GET /public/payments/{ref}`, `POST /public/payments/{ref}/simulate` | público (el último solo con la pasarela simulada) |
+
+---
+
+## 7. Manejo de errores
 
 Formato JSON uniforme: `{ "error": "mensaje", "timestamp": "...", "details": { campo: mensaje } }` (`details` solo en validaciones; el gateway añade `code` en algunos casos).
 
@@ -381,6 +478,7 @@ Formato JSON uniforme: `{ "error": "mensaje", "timestamp": "...", "details": { c
 | 400 | Validación, JSON mal formado, regla de negocio (stock insuficiente, SKU duplicado, rol no permitido) |
 | 401 | Sin sesión, token inválido o desactualizado, credenciales incorrectas |
 | 403 | Rol insuficiente o sin empresa |
+| 402 | Plan: `SUBSCRIPTION_READ_ONLY`, `SUBSCRIPTION_BLOCKED`, `FEATURE_NOT_IN_PLAN`, `PLAN_LIMIT_REACHED` |
 | 404 | Recurso inexistente **o de otra empresa** |
 | 409 | Datos ya registrados (NIT, correo) |
 | 413 | Cuerpo demasiado grande |
@@ -392,7 +490,7 @@ Un error inesperado **nunca** devuelve su mensaje interno al cliente.
 
 ---
 
-## 7. Configuración de entornos
+## 8. Configuración de entornos
 
 ### 7.1 Variables de entorno (`.env` en la raíz)
 
@@ -411,9 +509,10 @@ El `.env` no se versiona; `.env.example` es la plantilla. Docker Compose lo lee 
 | `VITE_GATEWAY_URL` | no | URL del gateway para el frontend |
 | `PLATFORM_ADMIN_EMAIL`, `PLATFORM_ADMIN_PASSWORD` | no | Primer dueño de la plataforma (vacías = no se crea) |
 | `CAPTCHA_PROVIDER`, `TURNSTILE_SECRET` | prod | Anti-bots del registro público |
+| `STOCKMIND_PAYMENTS_PROVIDER` | no | `simulated` = pasarela de pruebas (solo desarrollo); vacío = pagos desactivados (503) |
 | `GROQ_API_KEY`, `AGENT_ENABLED` | no | Asistente IA (apagado por defecto) |
 
-Ajustes opcionales del gateway: `REGISTRATION_RATE_LIMIT` (5), `UPSTREAM_TIMEOUT_MS` (15000), `BODY_LIMIT` (100kb), `LOG_LEVEL` (info). El backend admite `stockmind.trial-days`, `stockmind.verification-hours` y `stockmind.terms-version` (en `application.yml`).
+Ajustes opcionales del gateway: `ENTITLEMENT_CACHE_SECONDS` (30), `REGISTRATION_RATE_LIMIT` (5), `UPSTREAM_TIMEOUT_MS` (15000), `BODY_LIMIT` (100kb), `LOG_LEVEL` (info). El backend admite `stockmind.trial-days`, `stockmind.verification-hours`, `stockmind.terms-version` y `stockmind.billing.*` (IVA, días de gracia y retención, vigencia del enlace de pago, caché, cron) en `application.yml`.
 
 Archivos locales no versionados: `.env`, `backend/src/main/resources/application.properties` (opcional, plantilla `.example`) y `analytics/config.py` (opcional: dentro de Docker se genera desde el entorno).
 
@@ -423,7 +522,7 @@ Archivos locales no versionados: `.env`, `backend/src/main/resources/application
 docker compose up --build --watch
 ```
 
-`docker-compose.override.yml` (solo desarrollo) activa el perfil `dev` del backend (datos de ejemplo y enlaces de verificación en el log), publica MySQL en `127.0.0.1:3306` y define las reglas de `--watch`: el frontend sincroniza `src` (Vite recarga), el gateway y analytics sincronizan y se reinician, y el backend se reconstruye. Si `--watch` deja de reaccionar, reconstruir a mano: `docker compose up -d --build <servicio>`.
+`docker-compose.override.yml` (solo desarrollo) activa el perfil `dev` del backend (datos de ejemplo y enlaces de verificación en el log) y la pasarela de pagos simulada, publica MySQL en `127.0.0.1:3306` y define las reglas de `--watch`: el frontend sincroniza `src` (Vite recarga), el gateway y analytics sincronizan y se reinician, y el backend se reconstruye. Si `--watch` deja de reaccionar, reconstruir a mano: `docker compose up -d --build <servicio>`.
 
 Reiniciar la base con los datos de ejemplo: `docker compose down -v` y volver a levantar (borra los datos de desarrollo).
 
@@ -438,23 +537,23 @@ Reiniciar la base con los datos de ejemplo: `docker compose down -v` y volver a 
 
 ---
 
-## 8. Pruebas y CI
+## 9. Pruebas y CI
 
 | Servicio | Herramienta | Pruebas | Cómo ejecutar |
 |----------|-------------|--------:|---------------|
-| Backend | JUnit + MockMvc (H2 por defecto) | 85 | `mvn test` en `backend/` |
-| Backend contra **MySQL real** | idem, con `MYSQL_TEST_URL` | 85 | `MYSQL_TEST_URL=jdbc:mysql://host:3306/db MYSQL_TEST_USER=... MYSQL_TEST_PASSWORD=... mvn test` |
-| Gateway | `node:test` (sin dependencias) | 122 | `npm test` en `gateway/` |
-| Frontend | Vitest + Testing Library | 55 | `npx vitest run` en `frontend/` |
+| Backend | JUnit + MockMvc (H2 por defecto) | 129 | `mvn test` en `backend/` |
+| Backend contra **MySQL real** | idem, con `MYSQL_TEST_URL` | 129 | `MYSQL_TEST_URL=jdbc:mysql://host:3306/db MYSQL_TEST_USER=... MYSQL_TEST_PASSWORD=... mvn test` |
+| Gateway | `node:test` (sin dependencias) | 140 | `npm test` en `gateway/` |
+| Frontend | Vitest + Testing Library | 85 | `npx vitest run` en `frontend/` |
 | Analytics | pytest | 65 (+4 contra MySQL real) | `python -m pytest` en `analytics/` (con `ANALYTICS_MYSQL_HOST` corre también el aislamiento sobre MySQL) |
 
-Cobertura destacada: roles y tokens, validaciones, ventas con **concurrencia** (nunca se vende más del stock), **aislamiento entre empresas** (listados, por id, escrituras cruzadas, reportes, usuarios, analytics), login, registro y verificación, paginación y orden permitido, cabeceras de seguridad, CORS, límites y logs sin datos sensibles.
+Cobertura destacada: roles y tokens, validaciones, ventas con **concurrencia** (nunca se vende más del stock), **aislamiento entre empresas** (listados, por id, escrituras cruzadas, reportes, usuarios, analytics), login, registro y verificación, planes (solo lectura, bloqueo, funciones y límites), pagos idempotentes, ciclo diario, panel de plataforma, paginación y orden permitido, cabeceras de seguridad, CORS, límites y logs sin datos sensibles.
 
 **CI** (`.github/workflows/ci.yml`): cinco trabajos en cada push a `main` y pull request (backend con H2, backend con MySQL real y migraciones, gateway, frontend con *build*, analytics con MySQL real). `npm run lint` del frontend aún no está en el CI por 2 errores preexistentes en `AgentBubble.jsx`.
 
 ---
 
-## 9. Dependencias y versiones
+## 10. Dependencias y versiones
 
 **Gateway** (Node 20): express ^4.18, axios ^1.6, cors, helmet ^8, pino ^10, pino-http ^11, express-rate-limit ^7, jsonwebtoken ^9, cookie-parser, dotenv.
 
@@ -470,22 +569,24 @@ Cobertura destacada: roles y tokens, validaciones, ventas con **concurrencia** (
 
 ---
 
-## 10. Estructura del código
+## 11. Estructura del código
 
 ### 10.1 Backend (`com.stockmind`)
 
 ```
 ├── StockmindApplication
+├── billing/     EntitlementService · SubscriptionService · SubscriptionLifecycleService/Job
+│                PaymentService · PaymentProvider (+ Simulated) · BillingQueryService · AuditService
 ├── bootstrap/   PlatformAdminBootstrap                       # primer PLATFORM_ADMIN desde el entorno
-├── config/      JwtConfig · SecurityConfig (+ JwtAuthFilter) · DevDataSeeder
-├── controller/  Auth · Category · Dashboard · Inventory · Platform · Product
-│                PublicRegistration · Report · Sale · User
-├── dto/         InventoryDTO · LoginRequest/Response · PageResponse · ProductDTO
-│                RegistrationDTO · SaleDTO · UserDTO
+├── config/      JwtConfig · SecurityConfig (+ JwtAuthFilter) · SubscriptionAccessFilter · DevDataSeeder
+├── controller/  Auth · Billing · Category · Dashboard · Inventory · Platform · Product
+│                PublicBilling · PublicRegistration · Report · Sale · User
+├── dto/         BillingDTO · InventoryDTO · LoginRequest/Response · PageResponse · PlatformDTO
+│                ProductDTO · RegistrationDTO · SaleDTO · UserDTO
 ├── exception/   ConflictException · ResourceNotFoundException · GlobalExceptionHandler
 ├── mail/        EmailSender · DevEmailSender · NoopEmailSender
-├── model/       Category · EmailVerificationToken · InventoryMovement · Organization
-│                Product · Sale · SaleDetail · User
+├── model/       AuditLog · Category · EmailVerificationToken · InventoryMovement · Organization
+│                Payment · Plan · Product · Sale · SaleDetail · Subscription · User
 ├── repository/  *Repository (+ spec/ con los filtros combinables)
 ├── service/     Auth · Dashboard · Inventory · Product · Registration · Sale
 ├── tenant/      TenantContext · TenantIdentifierResolver
@@ -502,8 +603,8 @@ gateway/
 ├── src/
 │   ├── config/config.js      # valida JWT_SECRET e INTERNAL_API_KEY
 │   ├── middleware/           # auth.middleware.js (authenticate, requireRole, requireOrganization)
-│   │                         # errorHandler.middleware.js
-│   ├── routes/               # agent · auth · categories · dashboard · inventory · platform
+│   │                         # feature.middleware.js (requireFeature por plan) · errorHandler.middleware.js
+│   ├── routes/               # agent · auth · billing · categories · dashboard · inventory · platform
 │   │                         # predictions · products · public · reports · sales · users
 │   └── utils/                # authHeader.js · internalHeaders.js · captcha.js
 └── test/                     # node:test: auth, rutas, app, logs, CAPTCHA, errores...
@@ -520,18 +621,18 @@ analytics/
 
 ---
 
-## 11. Pendientes conocidos
+## 12. Pendientes conocidos
 
 | Área | Pendiente |
 |------|-----------|
-| Planes | Planes, suscripciones, límites por plan, control del estado en cada petición, cobro (hoy simulado), avisos de fin de prueba |
-| Panel de plataforma | Interfaz del superadmin: ver actividad, pausar, reactivar, cambiar plan, cancelar |
+| Planes | Pasarela de pagos real (Wompi u otra) con webhook firmado y facturación electrónica DIAN; **correo real** para los avisos de prueba y vencimiento; precios definitivos; bloqueo (ShedLock) del ciclo diario si hay varias réplicas |
+| Panel de plataforma | Métricas de actividad por empresa (uso, últimas conexiones); `EXPORT`, `AI_ASSISTANT` y `API` aún sin construir; pantalla de auditoría |
 | Cuentas | Recuperación y cambio de contraseña (incluido el cambio obligatorio tras un alta por teléfono) |
 | Correo | Proveedor real de correo (SMTP/SES/...) |
 | Infraestructura | Imágenes de producción, HTTPS, backups, monitoreo, recogida de logs, zona horaria, usuario de migraciones |
 | Datos | Auditoría de negocio por empresa; paginación de las pantallas que aún cargan listas completas; `ADJUSTMENT` como conteo físico |
 | Analytics | Respuesta 503 cuando MySQL falla; evaluación del error del modelo (backtesting) |
-| Calidad | Alinear versiones internas; corregir los 2 errores de lint de `AgentBubble.jsx` y activarlo en el CI; actualizar dependencias (sección 9) |
+| Calidad | Alinear versiones internas; corregir los 2 errores de lint de `AgentBubble.jsx` y activarlo en el CI; actualizar dependencias (sección 10) |
 | Asistente IA | Reactivar y definir qué datos se envían al proveedor |
 
 ---
