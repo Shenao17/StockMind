@@ -22,6 +22,8 @@ const ANY_USER = {
     products:  ['/api/products', [['GET', '/'], ['GET', '/low-stock'], ['GET', '/1']]],
     inventory: ['/api/inventory', [['GET', '/movements']]],
     sales:     ['/api/sales', [['GET', '/'], ['GET', '/1'], ['POST', '/']]],
+    dashboard: ['/api/dashboard', [['GET', '/summary']]],
+    categories: ['/api/categories', [['GET', '/']]],
 };
 
 const servers = {};

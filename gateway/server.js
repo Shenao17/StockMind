@@ -29,6 +29,8 @@ const userRoutes = require('./src/routes/users.routes');
 const reportRoutes = require('./src/routes/reports.routes');
 const predictionRoutes = require('./src/routes/predictions.routes');
 const agentRoutes      = require('./src/routes/agent.routes');
+const dashboardRoutes  = require('./src/routes/dashboard.routes');
+const categoryRoutes   = require('./src/routes/categories.routes');
 
 // Importar middlewares
 const errorHandler = require('./src/middleware/errorHandler.middleware');
@@ -136,6 +138,8 @@ app.use('/api/products', productRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/sales', salesRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/categories', categoryRoutes);
 app.use('/api/predictions', predictionRoutes);
 app.use('/api/agent',       agentRoutes);                           // Rutas del asistente IA (experimental)
 

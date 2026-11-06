@@ -12,7 +12,7 @@ const JAVA = config.javaApiUrl;
 
 router.get('/', authenticate, requireRole('ADMIN'), async (req, res, next) => {
     try {
-        const r = await axios.get(`${JAVA}/users`, { headers: authHeader(req) });
+        const r = await axios.get(`${JAVA}/users`, { headers: authHeader(req), params: req.query });
         res.status(r.status).json(r.data);
     } catch (e) { next(e); }
 });
