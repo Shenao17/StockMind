@@ -2,7 +2,6 @@ package com.stockmind.controller;
 
 import com.stockmind.dto.LoginRequest;
 import com.stockmind.dto.LoginResponse;
-import com.stockmind.model.User;
 import com.stockmind.repository.UserRepository;
 import com.stockmind.service.AuthService;
 import jakarta.validation.Valid;

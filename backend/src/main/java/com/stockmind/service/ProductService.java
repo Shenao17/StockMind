@@ -1,7 +1,6 @@
 package com.stockmind.service;
 
 import com.stockmind.exception.ResourceNotFoundException;
-import com.stockmind.model.Category;
 import com.stockmind.model.Product;
 import com.stockmind.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
