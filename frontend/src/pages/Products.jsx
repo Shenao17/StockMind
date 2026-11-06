@@ -2,43 +2,67 @@ import { useEffect, useState } from 'react';
 import { API, fmt } from '../api';
 import { useAuth } from '../context/AuthContext';
 import Modal from '../components/ui/Modal';
+import Pagination from '../components/ui/Pagination';
+import { useDebounce } from '../hooks/useDebounce';
 
 const UNITS = ['UNIT', 'KG', 'LT', 'BOX'];
 const UNIT_LABELS = { UNIT: 'Unidad', KG: 'Kilogramo', LT: 'Litro', BOX: 'Caja' };
+
+const PAGE_SIZE = 10;
 
 const emptyForm = { name: '', sku: '', price: '', stockCurrent: 0, stockMinimum: 5, unit: 'UNIT', categoryId: '', description: '' };
 
 export default function Products({ showToast }) {
   const { isAdmin } = useAuth();
-  const [products, setProducts] = useState([]);
-  const [filtered, setFiltered] = useState([]);
+  const [data, setData] = useState({ content: [], page: 0, totalElements: 0, totalPages: 0 });
+  const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
   const [modalOpen, setModalOpen] = useState(false);
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => { loadProducts(); }, []);
+  const debouncedSearch = useDebounce(search, 300);
+  const products = data.content;
 
+  // Categorías para el filtro y el formulario (el listado paginado ya no las trae todas)
   useEffect(() => {
-    const q = search.toLowerCase();
-    setFiltered(products.filter(p => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q)));
-  }, [search, products]);
+    API.categories.list()
+      .then(cats => setCategories(cats || []))
+      .catch(() => {});
+  }, []);
 
-  async function loadProducts() {
-    try {
-      const data = await API.products.list() || [];
-      setProducts(data);
-      setFiltered(data);
-      const cats = [...new Map(data.map(p => [p.category?.id, p.category])).values()].filter(Boolean);
-      setCategories(cats);
-    } catch (e) {
-      showToast?.('Error cargando productos: ' + e.message, 'error');
-    } finally {
-      setLoading(false);
-    }
-  }
+  // El servidor filtra y pagina: se vuelve a consultar al cambiar página, búsqueda o categoría
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await API.products.list({
+          page,
+          size: PAGE_SIZE,
+          search: debouncedSearch.trim(),
+          categoryId: categoryFilter,
+        });
+        if (cancelled) return;
+        if (res.content.length === 0 && page > 0) {
+          setPage(page - 1); // se vació la última página (p. ej. al eliminar)
+          return;
+        }
+        setData(res);
+      } catch (e) {
+        if (!cancelled) showToast?.('Error cargando productos: ' + e.message, 'error');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line
+  }, [page, debouncedSearch, categoryFilter, reloadKey]);
+
+  const reload = () => setReloadKey(k => k + 1);
 
   function openModal(product = null) {
     if (product) {
@@ -69,7 +93,7 @@ export default function Products({ showToast }) {
         showToast?.('Producto creado correctamente');
       }
       setModalOpen(false);
-      loadProducts();
+      reload();
     } catch (e) {
       showToast?.('Error: ' + e.message, 'error');
     }
@@ -80,7 +104,7 @@ export default function Products({ showToast }) {
     try {
       await API.products.remove(id);
       showToast?.('Producto desactivado');
-      loadProducts();
+      reload();
     } catch (e) {
       showToast?.('Error: ' + e.message, 'error');
     }
@@ -100,11 +124,20 @@ export default function Products({ showToast }) {
               type="text"
               placeholder="Buscar por nombre o SKU..."
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={e => { setSearch(e.target.value); setPage(0); }}
               style={{ width: 220 }}
             />
+            <select
+              value={categoryFilter}
+              onChange={e => { setCategoryFilter(e.target.value); setPage(0); }}
+              aria-label="Filtrar por categoría"
+              style={{ width: 170 }}
+            >
+              <option value="">Todas las categorías</option>
+              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
             <span style={{ fontSize: '.8rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
-              {filtered.length} productos
+              {data.totalElements} productos
             </span>
             {isAdmin() && (
               <button className="btn btn-primary btn-sm" onClick={() => openModal()}>
@@ -114,9 +147,9 @@ export default function Products({ showToast }) {
           </div>
         </div>
 
-        {filtered.length === 0 ? (
+        {products.length === 0 ? (
           <div className="loading-state">
-            {search ? `Sin resultados para "${search}"` : 'Sin productos registrados'}
+            {debouncedSearch || categoryFilter ? `Sin resultados para "${debouncedSearch || 'la categoría seleccionada'}"` : 'Sin productos registrados'}
           </div>
         ) : (
           <table>
@@ -127,7 +160,7 @@ export default function Products({ showToast }) {
               </tr>
             </thead>
             <tbody>
-              {filtered.map(p => (
+              {products.map(p => (
                 <tr key={p.id}>
                   <td><strong>{p.name}</strong></td>
                   <td className="mono">{p.sku}</td>
@@ -155,6 +188,12 @@ export default function Products({ showToast }) {
             </tbody>
           </table>
         )}
+        <Pagination
+          page={data.page}
+          totalPages={data.totalPages}
+          totalElements={data.totalElements}
+          onPage={setPage}
+        />
       </div>
 
       <Modal

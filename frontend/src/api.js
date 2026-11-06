@@ -72,6 +72,16 @@ async function apiRequest(method, endpoint, body = null) {
   }
 }
 
+// Construye ?a=1&b=2 omitiendo valores vacíos
+const qs = (params = {}) => {
+  const q = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== '') q.append(k, v);
+  });
+  const s = q.toString();
+  return s ? `?${s}` : '';
+};
+
 // ── API pública ───────────────────────────────────────────
 export const API = {
   auth: {
@@ -81,14 +91,16 @@ export const API = {
   },
 
   users: {
-    list:   ()         => apiRequest('GET',    '/users'),
+    // params: { page, size, search, role, active, sort, dir } → con page/size devuelve { content, page, size, totalElements, totalPages }
+    list:   (params)   => apiRequest('GET',    `/users${qs(params)}`),
     create: (data)     => apiRequest('POST',   '/users', data),
     update: (id, data) => apiRequest('PUT',    `/users/${id}`, data),
     remove: (id)       => apiRequest('DELETE', `/users/${id}`),
   },
 
   products: {
-    list:     ()         => apiRequest('GET',    '/products'),
+    // params: { page, size, search, categoryId, lowStock, sort, dir } → con page/size devuelve el sobre paginado; sin params, el arreglo completo
+    list:     (params)   => apiRequest('GET',    `/products${qs(params)}`),
     get:      (id)       => apiRequest('GET',    `/products/${id}`),
     lowStock: ()         => apiRequest('GET',    '/products/low-stock'),
     create:   (data)     => apiRequest('POST',   '/products', data),
@@ -97,22 +109,39 @@ export const API = {
   },
 
   inventory: {
-    movements: (productId) =>
+    // movements(productId) o movements({ page, size, productId, type, from, to })
+    movements: (arg) =>
       apiRequest(
         'GET',
-        `/inventory/movements${productId ? `?productId=${productId}` : ''}`
+        `/inventory/movements${
+          arg && typeof arg === 'object' ? qs(arg) : qs({ productId: arg })
+        }`
       ),
     register: (data) =>
       apiRequest('POST', '/inventory/movements', data),
   },
 
   sales: {
-    list:   (from, to) =>
-      apiRequest('GET', `/sales${from ? `?from=${from}&to=${to}` : ''}`),
+    // list(from, to) o list({ page, size, from, to, status, userId, sort, dir })
+    list:   (arg, to) =>
+      apiRequest(
+        'GET',
+        `/sales${
+          arg && typeof arg === 'object' ? qs(arg) : qs({ from: arg, to })
+        }`
+      ),
     get:    (id) =>
       apiRequest('GET', `/sales/${id}`),
     create: (data) =>
       apiRequest('POST', '/sales', data),
+  },
+
+  categories: {
+    list: () => apiRequest('GET', '/categories'),
+  },
+
+  dashboard: {
+    summary: () => apiRequest('GET', '/dashboard/summary'),
   },
 
   reports: {

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { API } from '../api';
 import { useAuth } from '../context/AuthContext';
 import Modal from '../components/ui/Modal';
+import Pagination from '../components/ui/Pagination';
 
 const TYPE_LABELS = {
   ENTRY:      { label: 'Entrada',     cls: 'badge-success' },
@@ -11,28 +12,43 @@ const TYPE_LABELS = {
   RETURN:     { label: 'Devolución',  cls: 'badge-muted'   },
 };
 
+const PAGE_SIZE = 15;
+
 const emptyForm = { productId: '', type: 'ENTRY', quantity: '', reason: '' };
 
 export default function Inventory({ showToast }) {
   const { isAdmin } = useAuth();
-  const [movements, setMovements] = useState([]);
+  const [data, setData] = useState({ content: [], page: 0, totalElements: 0, totalPages: 0 });
+  const [page, setPage] = useState(0);
+  const [typeFilter, setTypeFilter] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
 
-  useEffect(() => { loadMovements(); }, []);
+  const movements = data.content;
 
-  async function loadMovements() {
-    try {
-      const data = await API.inventory.movements() || [];
-      setMovements(data);
-    } catch (e) {
-      showToast?.('Error cargando movimientos: ' + e.message, 'error');
-    } finally {
-      setLoading(false);
-    }
-  }
+  // El servidor pagina y filtra el historial
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await API.inventory.movements({ page, size: PAGE_SIZE, type: typeFilter });
+        if (cancelled) return;
+        if (res.content.length === 0 && page > 0) { setPage(page - 1); return; }
+        setData(res);
+      } catch (e) {
+        if (!cancelled) showToast?.('Error cargando movimientos: ' + e.message, 'error');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line
+  }, [page, typeFilter, reloadKey]);
+
+  const reload = () => setReloadKey(k => k + 1);
 
   async function openModal() {
     const prods = await API.products.list() || [];
@@ -49,7 +65,7 @@ export default function Inventory({ showToast }) {
       await API.inventory.register({ productId: parseInt(form.productId), type: form.type, quantity: parseInt(form.quantity), reason: form.reason });
       showToast?.('Movimiento registrado correctamente');
       setModalOpen(false);
-      loadMovements();
+      reload();
     } catch (e) {
       showToast?.('Error: ' + e.message, 'error');
     }
@@ -62,9 +78,23 @@ export default function Inventory({ showToast }) {
       <div className="table-container">
         <div className="table-header">
           <h2>Historial de Movimientos</h2>
-          <button className="btn btn-primary btn-sm" onClick={openModal}>
-            + Registrar movimiento
-          </button>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <select
+              value={typeFilter}
+              onChange={e => { setTypeFilter(e.target.value); setPage(0); }}
+              aria-label="Filtrar por tipo"
+              style={{ width: 170 }}
+            >
+              <option value="">Todos los tipos</option>
+              {Object.entries(TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+            </select>
+            <span style={{ fontSize: '.8rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
+              {data.totalElements} movimientos
+            </span>
+            <button className="btn btn-primary btn-sm" onClick={openModal}>
+              + Registrar movimiento
+            </button>
+          </div>
         </div>
         {loading ? (
           <div className="loading-state"><div className="spinner" /> Cargando...</div>
@@ -100,6 +130,12 @@ export default function Inventory({ showToast }) {
             </tbody>
           </table>
         )}
+        <Pagination
+          page={data.page}
+          totalPages={data.totalPages}
+          totalElements={data.totalElements}
+          onPage={setPage}
+        />
       </div>
 
       <Modal

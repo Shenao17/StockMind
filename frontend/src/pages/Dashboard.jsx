@@ -8,9 +8,6 @@ export default function Dashboard({ showToast }) {
   const [recentSales, setRecentSales] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const today = new Date().toISOString().split('T')[0];
-  const month = today.substring(0, 7);
-
   useEffect(() => {
     loadDashboard();
     // eslint-disable-next-line
@@ -18,26 +15,18 @@ export default function Dashboard({ showToast }) {
 
   async function loadDashboard() {
     try {
-      const [products, lowStock, sales] = await Promise.all([
-        API.products.list(),
-        API.products.lowStock(),
-        API.sales.list(),
-      ]);
-
-      const todaySales = (sales || []).filter(s => s.createdAt?.startsWith(today) && s.status === 'COMPLETED');
-      const todayTotal = todaySales.reduce((sum, s) => sum + (s.total || 0), 0);
-      const monthSales = (sales || []).filter(s => s.createdAt?.startsWith(month) && s.status === 'COMPLETED');
-      const monthTotal = monthSales.reduce((sum, s) => sum + (s.total || 0), 0);
+      // Los totales los calcula el servidor: ya no se descargan todas las ventas y productos
+      const summary = await API.dashboard.summary();
 
       setStats({
-        products: products?.length || 0,
-        lowStock: lowStock?.length || 0,
-        salesToday: todayTotal,
-        salesTodayCount: todaySales.length,
-        salesMonth: monthTotal,
+        products: summary.activeProducts || 0,
+        lowStock: summary.lowStockCount || 0,
+        salesToday: summary.salesToday?.total || 0,
+        salesTodayCount: summary.salesToday?.count || 0,
+        salesMonth: summary.salesMonth?.total || 0,
       });
-      setLowStockItems(lowStock || []);
-      setRecentSales((sales || []).slice(0, 8));
+      setLowStockItems(summary.lowStockItems || []);
+      setRecentSales(summary.recentSales || []);
     } catch (err) {
       showToast?.('Error cargando el dashboard: ' + err.message, 'error');
     } finally {

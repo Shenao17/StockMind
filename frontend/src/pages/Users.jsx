@@ -3,6 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { API, fmtDate } from '../api';
 import { useAuth } from '../context/AuthContext';
 import Modal from '../components/ui/Modal';
+import Pagination from '../components/ui/Pagination';
+import { useDebounce } from '../hooks/useDebounce';
+
+const PAGE_SIZE = 10;
 
 const emptyForm = {
   username: '',
@@ -15,7 +19,12 @@ export default function Users({ showToast }) {
   const { user: currentUser, isAdmin } = useAuth();
   const navigate = useNavigate();
 
-  const [users, setUsers] = useState([]);
+  const [data, setData] = useState({ content: [], page: 0, totalElements: 0, totalPages: 0 });
+  const [page, setPage] = useState(0);
+  const [search, setSearch] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
+  const debouncedSearch = useDebounce(search, 300);
+  const users = data.content;
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editId, setEditId] = useState(null);
@@ -24,22 +33,31 @@ export default function Users({ showToast }) {
   useEffect(() => {
     if (!isAdmin()) {
       navigate('/dashboard', { replace: true });
-      return;
     }
-
-    loadUsers();
+    // eslint-disable-next-line
   }, []);
 
-  async function loadUsers() {
-    try {
-      const data = await API.users.list() || [];
-      setUsers(data);
-    } catch (e) {
-      showToast?.('Error cargando usuarios: ' + e.message, 'error');
-    } finally {
-      setLoading(false);
-    }
-  }
+  // El servidor filtra y pagina los usuarios
+  useEffect(() => {
+    if (!isAdmin()) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await API.users.list({ page, size: PAGE_SIZE, search: debouncedSearch.trim() });
+        if (cancelled) return;
+        if (res.content.length === 0 && page > 0) { setPage(page - 1); return; }
+        setData(res);
+      } catch (e) {
+        if (!cancelled) showToast?.('Error cargando usuarios: ' + e.message, 'error');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line
+  }, [page, debouncedSearch, reloadKey]);
+
+  const reload = () => setReloadKey(k => k + 1);
 
   function openModal(user = null) {
     if (user) {
@@ -89,7 +107,7 @@ export default function Users({ showToast }) {
       }
 
       setModalOpen(false);
-      loadUsers();
+      reload();
     } catch (e) {
       showToast?.('Error: ' + e.message, 'error');
     }
@@ -117,7 +135,7 @@ export default function Users({ showToast }) {
         }`
       );
 
-      loadUsers();
+      reload();
     } catch (e) {
       showToast?.('Error: ' + e.message, 'error');
     }
@@ -146,18 +164,32 @@ export default function Users({ showToast }) {
         <div className="table-header">
           <h2>Usuarios del Sistema</h2>
 
-          <button
-            className="btn btn-primary"
-            onClick={() => openModal()}
-          >
-            + Nuevo usuario
-          </button>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <input
+              type="text"
+              placeholder="Buscar por usuario o correo..."
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(0); }}
+              style={{ width: 240 }}
+            />
+
+            <span style={{ fontSize: '.8rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
+              {data.totalElements} usuarios
+            </span>
+
+            <button
+              className="btn btn-primary"
+              onClick={() => openModal()}
+            >
+              + Nuevo usuario
+            </button>
+          </div>
         </div>
 
         {/* Tabla */}
         {users.length === 0 ? (
           <div className="loading-state">
-            Sin usuarios registrados
+            {debouncedSearch ? `Sin resultados para "${debouncedSearch}"` : 'Sin usuarios registrados'}
           </div>
         ) : (
           <table>

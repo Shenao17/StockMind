@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { API, fmt, fmtDate } from '../api';
+import Pagination from '../components/ui/Pagination';
 
 export default function Sales({ showToast }) {
   const [view, setView] = useState('nueva');
@@ -8,7 +9,8 @@ export default function Sales({ showToast }) {
   const [cart, setCart] = useState([]);
   const [notes, setNotes] = useState('');
   const [productSearch, setProductSearch] = useState('');
-  const [salesHistory, setSalesHistory] = useState([]);
+  const [histData, setHistData] = useState({ content: [], page: 0, totalElements: 0, totalPages: 0 });
+  const salesHistory = histData.content;
   const [histLoading, setHistLoading] = useState(false);
   const [registering, setRegistering] = useState(false);
 
@@ -162,13 +164,12 @@ export default function Sales({ showToast }) {
     }
   }
 
-  async function showHistorial() {
-    setView('historial');
+  async function loadHistory(pageNum = 0) {
     setHistLoading(true);
 
     try {
-      const data = await API.sales.list() || [];
-      setSalesHistory(data);
+      const res = await API.sales.list({ page: pageNum, size: 15 });
+      setHistData(res);
     } catch (e) {
       showToast?.(
         'Error cargando historial: ' + e.message,
@@ -177,6 +178,11 @@ export default function Sales({ showToast }) {
     } finally {
       setHistLoading(false);
     }
+  }
+
+  function showHistorial() {
+    setView('historial');
+    loadHistory(0);
   }
 
   return (
@@ -656,7 +662,7 @@ export default function Sales({ showToast }) {
               </div>
 
               <span className="history-count">
-                {salesHistory.length} registros
+                {histData.totalElements} registros
               </span>
 
             </div>
@@ -740,6 +746,13 @@ export default function Sales({ showToast }) {
               </table>
 
             )}
+
+            <Pagination
+              page={histData.page}
+              totalPages={histData.totalPages}
+              totalElements={histData.totalElements}
+              onPage={loadHistory}
+            />
 
           </div>
 

@@ -12,16 +12,29 @@ const mockProducts = [
   { id: 3, name: 'Silla Ergonómica',  sku: 'MOB-001',  price: 320000, stockCurrent: 8, stockMinimum: 2, unit: 'UNIT', category: { id: 2, name: 'Mobiliario' } },
 ];
 
-function renderProducts({ isAdmin = false } = {}) {
-  vi.spyOn(apiModule.API.products, 'list').mockResolvedValue(mockProducts);
-  return render(
+const envelope = (content, extra = {}) => ({
+  content, page: 0, size: 10, totalElements: content.length, totalPages: 1, ...extra,
+});
+
+function renderProducts({ isAdmin = false, list } = {}) {
+  const listSpy = vi.spyOn(apiModule.API.products, 'list')
+    .mockImplementation(list || (async () => envelope(mockProducts)));
+  vi.spyOn(apiModule.API.categories, 'list').mockResolvedValue([
+    { id: 1, name: 'Electrónica' }, { id: 2, name: 'Mobiliario' },
+  ]);
+  const utils = render(
     <MemoryRouter>
       <AuthContext.Provider value={{ isAdmin: () => isAdmin, user: { username: 'test', role: isAdmin ? 'ADMIN' : 'SELLER' } }}>
         <Products showToast={vi.fn()} />
       </AuthContext.Provider>
     </MemoryRouter>
   );
+  return { ...utils, listSpy };
 }
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('Products — renderizado', () => {
   it('muestra el título del catálogo', async () => {
@@ -39,58 +52,106 @@ describe('Products — renderizado', () => {
   it('muestra badge CRÍTICO en productos con stock bajo el mínimo', async () => {
     renderProducts();
     await screen.findByText('Teclado Mecánico');
-    const badges = screen.getAllByText('CRÍTICO');
-    expect(badges.length).toBeGreaterThan(0);
+    expect(screen.getAllByText('CRÍTICO').length).toBeGreaterThan(0);
   });
 
   it('muestra badge OK en productos con stock suficiente', async () => {
     renderProducts();
     await screen.findByText('Mouse Inalámbrico');
-    const badges = screen.getAllByText('OK');
-    expect(badges.length).toBeGreaterThan(0);
+    expect(screen.getAllByText('OK').length).toBeGreaterThan(0);
+  });
+
+  it('pide al servidor la primera página con tamaño fijo', async () => {
+    const { listSpy } = renderProducts();
+    await screen.findByText('Mouse Inalámbrico');
+    expect(listSpy).toHaveBeenCalledWith(expect.objectContaining({ page: 0, size: 10 }));
+  });
+
+  it('muestra el total de productos que informa el servidor', async () => {
+    renderProducts({ list: async () => envelope(mockProducts, { totalElements: 57, totalPages: 6 }) });
+    expect(await screen.findByText('57 productos')).toBeInTheDocument();
   });
 });
 
-describe('Products — buscador', () => {
-  it('filtra productos por nombre', async () => {
-    renderProducts();
+describe('Products — buscador (en el servidor)', () => {
+  it('envía el texto al servidor tras una breve pausa, y vuelve a la página 0', async () => {
+    const { listSpy } = renderProducts();
     await screen.findByText('Mouse Inalámbrico');
+
     fireEvent.change(screen.getByPlaceholderText(/buscar por nombre o sku/i), {
       target: { value: 'mouse' },
     });
-    expect(screen.getByText('Mouse Inalámbrico')).toBeInTheDocument();
-    expect(screen.queryByText('Teclado Mecánico')).not.toBeInTheDocument();
-    expect(screen.queryByText('Silla Ergonómica')).not.toBeInTheDocument();
+
+    await waitFor(() =>
+      expect(listSpy).toHaveBeenLastCalledWith(expect.objectContaining({ search: 'mouse', page: 0 }))
+    );
   });
 
-  it('filtra productos por SKU', async () => {
-    renderProducts();
+  it('no consulta en cada tecla (debounce)', async () => {
+    const { listSpy } = renderProducts();
     await screen.findByText('Mouse Inalámbrico');
-    fireEvent.change(screen.getByPlaceholderText(/buscar por nombre o sku/i), {
-      target: { value: 'MOB-001' },
+    const callsBefore = listSpy.mock.calls.length;
+
+    const input = screen.getByPlaceholderText(/buscar por nombre o sku/i);
+    fireEvent.change(input, { target: { value: 'm' } });
+    fireEvent.change(input, { target: { value: 'mo' } });
+    fireEvent.change(input, { target: { value: 'mou' } });
+
+    await waitFor(() => expect(listSpy.mock.calls.length).toBeGreaterThan(callsBefore));
+    expect(listSpy.mock.calls.length - callsBefore).toBe(1);
+  });
+
+  it('muestra mensaje cuando el servidor no devuelve resultados', async () => {
+    renderProducts({
+      list: async (params) => (params.search ? envelope([]) : envelope(mockProducts)),
     });
-    expect(screen.getByText('Silla Ergonómica')).toBeInTheDocument();
-    expect(screen.queryByText('Mouse Inalámbrico')).not.toBeInTheDocument();
-  });
-
-  it('muestra mensaje cuando no hay resultados', async () => {
-    renderProducts();
     await screen.findByText('Mouse Inalámbrico');
+
     fireEvent.change(screen.getByPlaceholderText(/buscar por nombre o sku/i), {
       target: { value: 'zzzznotexiste' },
     });
-    expect(screen.getByText(/sin resultados para/i)).toBeInTheDocument();
+
+    expect(await screen.findByText(/sin resultados para/i)).toBeInTheDocument();
   });
 
-  it('restaura todos los productos al borrar la búsqueda', async () => {
+  it('filtra por categoría en el servidor', async () => {
+    const { listSpy } = renderProducts();
+    await screen.findByText('Mouse Inalámbrico');
+
+    fireEvent.change(screen.getByLabelText(/filtrar por categoría/i), { target: { value: '2' } });
+
+    await waitFor(() =>
+      expect(listSpy).toHaveBeenLastCalledWith(expect.objectContaining({ categoryId: '2', page: 0 }))
+    );
+  });
+});
+
+describe('Products — paginación', () => {
+  const pages = (page) => envelope(mockProducts, { page, totalElements: 30, totalPages: 3 });
+
+  it('muestra los controles cuando hay más de una página', async () => {
+    renderProducts({ list: async (p) => pages(p.page) });
+    expect(await screen.findByText(/página 1 de 3/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /anterior/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /siguiente/i })).toBeEnabled();
+  });
+
+  it('no muestra controles si todo cabe en una página', async () => {
     renderProducts();
     await screen.findByText('Mouse Inalámbrico');
-    const input = screen.getByPlaceholderText(/buscar por nombre o sku/i);
-    fireEvent.change(input, { target: { value: 'mouse' } });
-    fireEvent.change(input, { target: { value: '' } });
-    expect(screen.getByText('Mouse Inalámbrico')).toBeInTheDocument();
-    expect(screen.getByText('Teclado Mecánico')).toBeInTheDocument();
-    expect(screen.getByText('Silla Ergonómica')).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: /paginación/i })).not.toBeInTheDocument();
+  });
+
+  it('pide la página siguiente al hacer clic en Siguiente', async () => {
+    const { listSpy } = renderProducts({ list: async (p) => pages(p.page) });
+    await screen.findByText(/página 1 de 3/i);
+
+    fireEvent.click(screen.getByRole('button', { name: /siguiente/i }));
+
+    await waitFor(() =>
+      expect(listSpy).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1 }))
+    );
+    expect(await screen.findByText(/página 2 de 3/i)).toBeInTheDocument();
   });
 });
 
