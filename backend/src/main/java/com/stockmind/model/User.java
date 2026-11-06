@@ -47,6 +47,10 @@ public class User {
     @Builder.Default
     private Boolean active = true;
 
+    /** Cuándo confirmó su correo; null = pendiente de verificar. */
+    @Column(name = "email_verified_at")
+    private LocalDateTime emailVerifiedAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();

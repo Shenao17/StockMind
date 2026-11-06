@@ -53,6 +53,10 @@ public class SecurityConfig {
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/auth/login").permitAll()
+                // Registro y verificación de correo: sin sesión (el gateway pone CAPTCHA y límites)
+                .requestMatchers("/public/**").permitAll()
+                // Operaciones del dueño de la plataforma
+                .requestMatchers("/platform/**").hasRole("PLATFORM_ADMIN")
                 // Solo ADMIN (misma política que el gateway: defensa en profundidad)
                 .requestMatchers("/users/**").hasRole("ADMIN")
                 .requestMatchers("/reports/**").hasRole("ADMIN")

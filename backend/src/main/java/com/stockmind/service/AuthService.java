@@ -43,20 +43,29 @@ public class AuthService {
         User user = userRepository.findByEmail(email)
             .orElseThrow(() -> new BadCredentialsException("Credenciales inválidas"));
 
-        if (!user.getActive()) {
-            throw new BadCredentialsException("Usuario inactivo. Contacte al administrador.");
-        }
-
+        // Primero la contraseña: los avisos específicos (inactivo, pendiente de verificar, suspendida)
+        // solo se muestran a quien demuestra conocer la clave; si no, se permitiría averiguar qué
+        // correos existen y en qué estado están.
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             throw new BadCredentialsException("Credenciales inválidas");
+        }
+
+        if (!user.getActive()) {
+            throw new BadCredentialsException("Usuario inactivo. Contacte al administrador.");
         }
 
         // La empresa debe estar activa (pendiente de verificar, suspendida o cancelada no entran)
         if (user.getOrganizationId() != null) {
             Organization org = organizationRepository.findById(user.getOrganizationId()).orElse(null);
-            if (org == null || org.getStatus() != Organization.Status.ACTIVE) {
+            if (org == null) {
+                throw new BadCredentialsException("La cuenta de la empresa no está activa. Contacte a soporte.");
+            }
+            if (org.getStatus() == Organization.Status.PENDING) {
                 throw new BadCredentialsException(
-                    "La cuenta de la empresa no está activa. Contacte a soporte.");
+                    "Falta verificar tu correo electrónico. Revisa el enlace que te enviamos para activar la cuenta.");
+            }
+            if (org.getStatus() != Organization.Status.ACTIVE) {
+                throw new BadCredentialsException("La cuenta de la empresa no está activa. Contacte a soporte.");
             }
         }
 

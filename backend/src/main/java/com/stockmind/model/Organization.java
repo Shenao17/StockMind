@@ -50,6 +50,16 @@ public class Organization {
     @Column(nullable = false, length = 20)
     private Origin origin;
 
+    /** Fin de la prueba gratis; se fija al verificar el correo en el autoregistro. */
+    @Column(name = "trial_ends_at")
+    private LocalDateTime trialEndsAt;
+
+    @Column(name = "terms_accepted_at")
+    private LocalDateTime termsAcceptedAt;
+
+    @Column(name = "terms_version", length = 20)
+    private String termsVersion;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();

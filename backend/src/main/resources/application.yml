@@ -15,3 +15,15 @@ spring:
     baseline-version: "1"
     # Nunca permitir borrar la base desde Flyway
     clean-disabled: true
+
+# ── Registro de empresas ──
+stockmind:
+  trial-days: 14            # prueba gratis al verificar el correo (autoregistro)
+  verification-hours: 24    # vigencia del enlace de verificación
+  terms-version: "2026-11"  # versión de los términos que se registra al aceptar
+  platform-admin:
+    email: ${PLATFORM_ADMIN_EMAIL:}
+    password: ${PLATFORM_ADMIN_PASSWORD:}
+
+app:
+  public-url: ${APP_PUBLIC_URL:http://localhost:5173}   # base de los enlaces que van en los correos

@@ -14,8 +14,8 @@ public class UserDTO {
 
     // Mínimo 8 caracteres con al menos una letra y un número.
     // Máximo 72: BCrypt ignora (o rechaza) lo que exceda 72 bytes.
-    private static final String PASSWORD_REGEX = "^(?=.*[A-Za-z])(?=.*\\d).{8,72}$";
-    private static final String PASSWORD_MSG =
+    public static final String PASSWORD_REGEX = "^(?=.*[A-Za-z])(?=.*\\d).{8,72}$";
+    public static final String PASSWORD_MSG =
         "La contraseña debe tener entre 8 y 72 caracteres, con al menos una letra y un número";
 
     @Data
