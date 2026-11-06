@@ -93,13 +93,16 @@ function Enroll({ challenge, onDone, onCancel }) {
     if (challenge.mustChangePassword) {
       if (password !== password2) { setError('Las contraseñas no coinciden'); return; }
     }
-    if (!/^\d{6,10}$/.test(pin)) { setError('El PIN debe tener entre 6 y 10 dígitos'); return; }
-    if (pin !== pin2) { setError('Los PIN no coinciden'); return; }
+    if (challenge.pinRequired) {
+      if (!/^\d{6,10}$/.test(pin)) { setError('El PIN debe tener entre 6 y 10 dígitos'); return; }
+      if (pin !== pin2) { setError('Los PIN no coinciden'); return; }
+    }
     if (!/^\d{6}$/.test(code)) { setError('Escribe el código de 6 dígitos de la app'); return; }
     setBusy(true); setError('');
     try {
       const res = await API.auth.enrollFinish({
-        challengeToken: challenge.token, code, pin,
+        challengeToken: challenge.token, code,
+        ...(challenge.pinRequired ? { pin } : {}),
         ...(challenge.mustChangePassword ? { newPassword: password } : {}),
       });
       setDone({ user: res.user, backupCodes: res.backupCodes || [] });
@@ -131,9 +134,11 @@ function Enroll({ challenge, onDone, onCancel }) {
   return (
     <div className="login-card">
       <div className="login-card-header">
-        <span className="login-eyebrow">Primer acceso</span>
+        <span className="login-eyebrow">{challenge.pinRequired ? 'Primer acceso' : 'Seguridad de la empresa'}</span>
         <h2>Protege tu cuenta</h2>
-        <p>Configura tu app autenticadora y un PIN. Lo haces una sola vez.</p>
+        <p>{challenge.pinRequired
+          ? 'Configura tu app autenticadora y un PIN. Lo haces una sola vez.'
+          : 'Tu empresa exige la verificación en dos pasos. Configura tu app autenticadora; lo haces una sola vez.'}</p>
       </div>
       {error && <div className="login-error visible"><span className="login-error-icon">!</span><span>{error}</span></div>}
 
@@ -166,16 +171,20 @@ function Enroll({ challenge, onDone, onCancel }) {
         <div className="login-input-wrapper"><input id="enroll-code" inputMode="numeric" maxLength={6} autoComplete="one-time-code"
           value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} /></div>
       </div>
-      <div className="form-group login-field">
-        <label htmlFor="enroll-pin">PIN de confirmación (6 a 10 dígitos)</label>
-        <div className="login-input-wrapper"><input id="enroll-pin" type="password" inputMode="numeric" maxLength={10} autoComplete="off"
-          value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))} /></div>
-      </div>
-      <div className="form-group login-field">
-        <label htmlFor="enroll-pin2">Repite el PIN</label>
-        <div className="login-input-wrapper"><input id="enroll-pin2" type="password" inputMode="numeric" maxLength={10} autoComplete="off"
-          value={pin2} onChange={(e) => setPin2(e.target.value.replace(/\D/g, ''))} /></div>
-      </div>
+      {challenge.pinRequired && (
+        <>
+          <div className="form-group login-field">
+            <label htmlFor="enroll-pin">PIN de confirmación (6 a 10 dígitos)</label>
+            <div className="login-input-wrapper"><input id="enroll-pin" type="password" inputMode="numeric" maxLength={10} autoComplete="off"
+              value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))} /></div>
+          </div>
+          <div className="form-group login-field">
+            <label htmlFor="enroll-pin2">Repite el PIN</label>
+            <div className="login-input-wrapper"><input id="enroll-pin2" type="password" inputMode="numeric" maxLength={10} autoComplete="off"
+              value={pin2} onChange={(e) => setPin2(e.target.value.replace(/\D/g, ''))} /></div>
+          </div>
+        </>
+      )}
 
       <button className="login-submit" onClick={submit} disabled={busy || !setup}>
         {busy ? 'Guardando...' : <><span>Terminar configuración</span><span className="login-submit-arrow">→</span></>}

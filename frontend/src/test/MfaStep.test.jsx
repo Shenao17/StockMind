@@ -41,7 +41,7 @@ describe('MfaStep — verificar', () => {
 });
 
 describe('MfaStep — primer acceso', () => {
-  const challenge = { token: 'desafio', mfaRequired: false, enrollmentRequired: true, mustChangePassword: true };
+  const challenge = { token: 'desafio', mfaRequired: false, enrollmentRequired: true, mustChangePassword: true, pinRequired: true };
 
   function setup() {
     vi.spyOn(apiModule.API.auth, 'enrollStart').mockResolvedValue({ secret: 'ABCDEFGH23456789', otpauthUri: 'otpauth://totp/x' });
@@ -89,5 +89,24 @@ describe('MfaStep — primer acceso', () => {
     expect(onDone).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: /ya los guardé/i }));
     expect(onDone).toHaveBeenCalledWith({ id: 1, role: 'PLATFORM_SUPPORT' });
+  });
+});
+
+describe('MfaStep — usuario de empresa (sin PIN)', () => {
+  it('no pide PIN ni contraseña nueva y envía solo el código', async () => {
+    vi.spyOn(apiModule.API.auth, 'enrollStart').mockResolvedValue({ secret: 'ABCDEFGH23456789', otpauthUri: 'otpauth://totp/x' });
+    const finish = vi.spyOn(apiModule.API.auth, 'enrollFinish')
+      .mockResolvedValue({ user: { id: 1, role: 'SELLER' }, backupCodes: ['AAAAA11111'] });
+    const onDone = vi.fn();
+    render(<MfaStep challenge={{ token: 't', enrollmentRequired: true, mustChangePassword: false, pinRequired: false }}
+      onDone={onDone} onCancel={vi.fn()} />);
+    await screen.findByTestId('mfa-secret');
+    expect(screen.getByText(/tu empresa exige/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/pin de confirmación/i)).toBeNull();
+    expect(screen.queryByLabelText('Contraseña nueva')).toBeNull();
+    fireEvent.change(screen.getByLabelText('Código de la app'), { target: { value: '123456' } });
+    fireEvent.click(screen.getByRole('button', { name: /terminar configuración/i }));
+    await waitFor(() => expect(finish).toHaveBeenCalledWith({ challengeToken: 't', code: '123456' }));
+    expect(await screen.findByText('AAAAA11111')).toBeInTheDocument();
   });
 });

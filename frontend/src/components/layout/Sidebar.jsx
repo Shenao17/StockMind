@@ -11,10 +11,17 @@ const navItems = [
   { to: '/reports', icon: 'reports', label: 'Reportes', feature: 'REPORTS' },
   { to: '/users', icon: 'users', label: 'Usuarios', section: 'Administración', adminOnly: true },
   { to: '/billing', icon: 'billing', label: 'Plan y pagos', section: 'Cuenta' },
+  { to: '/security', icon: 'security', label: 'Seguridad' },
 ];
 
 function NavIcon({ type }) {
   const paths = {
+    security: (
+      <>
+        <path d="M12 3 5 6v5c0 4.5 2.9 8.2 7 10 4.1-1.8 7-5.5 7-10V6l-7-3Z" />
+        <path d="m9 12 2 2 4-4" />
+      </>
+    ),
     dashboard: (
       <>
         <rect x="3" y="3" width="7" height="7" rx="1" />

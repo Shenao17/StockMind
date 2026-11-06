@@ -96,12 +96,24 @@ export const API = {
     enrollFinish: (data) => apiRequest('POST', '/auth/mfa/enroll/finish', data),
   },
 
+  // 2FA del usuario de empresa, desde su perfil (activar y desactivar piden la contraseña actual)
+  mfa: {
+    status:      ()                 => apiRequest('GET',  '/auth/mfa/self/status'),
+    setupStart:  (password)         => apiRequest('POST', '/auth/mfa/self/setup/start', { password }),
+    setupFinish: (code)             => apiRequest('POST', '/auth/mfa/self/setup/finish', { code }),
+    disable:     (password, code)   => apiRequest('POST', '/auth/mfa/self/disable', { password, code }),
+  },
+
   users: {
     // params: { page, size, search, role, active, sort, dir } → con page/size devuelve { content, page, size, totalElements, totalPages }
     list:   (params)   => apiRequest('GET',    `/users${qs(params)}`),
     create: (data)     => apiRequest('POST',   '/users', data),
     update: (id, data) => apiRequest('PUT',    `/users/${id}`, data),
     remove: (id)       => apiRequest('DELETE', `/users/${id}`),
+    // Política de la empresa: exigir 2FA a todos; el admin reinicia a quien perdió su celular
+    mfaPolicy:    ()         => apiRequest('GET',  '/users/mfa-policy'),
+    setMfaPolicy: (required) => apiRequest('PUT',  '/users/mfa-policy', { required }),
+    resetMfa:     (id)       => apiRequest('POST', `/users/${id}/reset-mfa`),
   },
 
   products: {
@@ -164,6 +176,8 @@ export const API = {
     create:        (data)           => apiRequest('POST', '/platform/organizations', data),
     // action: suspend | reactivate | cancel | extend-trial | plan | payment-links | manual-payment
     action:        (id, action, body) => apiRequest('POST', `/platform/organizations/${id}/${action}`, body || {}),
+    // Reinicia el 2FA de un usuario de una empresa (solo el dueño, con su PIN)
+    resetUserMfa: (orgId, userId, pin) => apiRequest('POST', `/platform/organizations/${orgId}/users/${userId}/reset-mfa`, { pin }),
     // Gestión del equipo (solo el dueño; cada cambio exige su PIN)
     team: {
       list:        ()         => apiRequest('GET',   '/platform/team'),

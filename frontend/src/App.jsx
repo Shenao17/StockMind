@@ -9,6 +9,7 @@ import VerifyEmail from './pages/VerifyEmail';
 import Pay from './pages/Pay';
 import Billing from './pages/Billing';
 import Platform from './pages/Platform';
+import Security from './pages/Security';
 import { isPlatformRole, PLATFORM_ROLE_LABELS } from './platformRoles';
 import { SubscriptionProvider } from './context/SubscriptionContext';
 import { useSubscription } from './context/subscriptionState';
@@ -32,6 +33,7 @@ const PAGE_TITLES = {
   '/predictions': 'Predicción de Demanda',
   '/users':       'Gestión de Usuarios',
   '/billing':     'Plan y facturación',
+  '/security':    'Seguridad',
   '/platform':    'Panel de plataforma',
 };
 
@@ -44,6 +46,7 @@ const PAGE_SUBTITLES = {
   '/predictions': 'Anticipa la demanda de tus productos',
   '/users':       'Administra los usuarios del sistema',
   '/billing':     'Tu plan, tu uso y tus cobros',
+  '/security':    'Protege tu cuenta con la verificación en dos pasos',
   '/platform':    'Empresas, planes y cobros de StockMind',
 };
 
@@ -118,6 +121,7 @@ function CompanyLayout({ showToast }) {
         <PlanBanner />
         <Routes>
           <Route path="/billing"     element={<Billing     showToast={showToast} />} />
+          <Route path="/security"    element={<Security    showToast={showToast} />} />
           {blocked && <Route path="*" element={<Navigate to="/billing" replace />} />}
           <Route path="/dashboard"   element={<Dashboard   showToast={showToast} />} />
           <Route path="/products"    element={<Products    showToast={showToast} />} />

@@ -141,6 +141,19 @@ export default function Users({ showToast }) {
     }
   }
 
+  async function resetMfa(u) {
+    if (!confirm(`¿Reiniciar la verificación en dos pasos de ${u.username}? Podrá entrar solo con su contraseña y deberá configurarla de nuevo.`)) {
+      return;
+    }
+    try {
+      await API.users.resetMfa(u.id);
+      showToast?.('Verificación en dos pasos reiniciada');
+      reload();
+    } catch (e) {
+      showToast?.('Error: ' + e.message, 'error');
+    }
+  }
+
   const f = (k) => (e) =>
     setForm((prev) => ({
       ...prev,
@@ -199,6 +212,7 @@ export default function Users({ showToast }) {
                 <th>Email</th>
                 <th>Rol</th>
                 <th>Estado</th>
+                <th>2FA</th>
                 <th>Creado</th>
                 <th>Acciones</th>
               </tr>
@@ -251,6 +265,12 @@ export default function Users({ showToast }) {
                     </span>
                   </td>
 
+                  <td>
+                    <span className={`badge ${u.mfaEnabledAt ? 'badge-success' : 'badge-muted'}`}>
+                      {u.mfaEnabledAt ? 'Activa' : 'No'}
+                    </span>
+                  </td>
+
                   <td className="mono">
                     {new Date(
                       u.createdAt
@@ -269,6 +289,15 @@ export default function Users({ showToast }) {
                     >
                       Editar
                     </button>
+
+                    {u.id !== currentUser?.id && u.mfaEnabledAt && (
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => resetMfa(u)}
+                      >
+                        Reiniciar 2FA
+                      </button>
+                    )}
 
                     {u.id !== currentUser?.id && (
                       <button
