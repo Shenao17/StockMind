@@ -12,6 +12,9 @@
  * GET  /api/platform/organizations/:id/detail         → ficha: datos, plan y uso, usuarios, cobros, línea de tiempo
  * PATCH /api/platform/organizations/:id/contact        { name, legalName, phone, contactEmail, country }
  * PATCH /api/platform/organizations/:id/tax-id         { taxId, pin }   (solo el dueño)
+ * GET  /api/platform/summary                           → métricas (ingresos solo con permiso de cobros)
+ * GET  /api/platform/payments                          → cobros de todas las empresas (filtros y paginación)
+ * GET  /api/platform/audit                             → auditoría (filtros y paginación)
  * GET  /api/platform/team                              → miembros (solo el dueño)
  * POST /api/platform/team                              { fullName, email, role, pin }
  * PATCH /api/platform/team/:id                         { role, active, fullName, pin }
@@ -45,6 +48,28 @@ const ACTIONS = {
     'payment-links': ['planCode', 'billingCycle'],
     'manual-payment': ['planCode', 'billingCycle']
 };
+
+// Solo pasan los filtros conocidos; el resto de la query se descarta
+const QUERY = {
+    payments: ['status', 'organizationId', 'search', 'from', 'to', 'page', 'size', 'sort', 'dir'],
+    audit: ['action', 'actor', 'organizationId', 'from', 'to', 'page', 'size', 'sort', 'dir']
+};
+
+router.get('/summary', ...guard, async (req, res, next) => {
+    try {
+        const r = await axios.get(`${JAVA}/platform/summary`, { headers: authHeader(req) });
+        res.status(r.status).json(r.data);
+    } catch (e) { next(e); }
+});
+
+for (const name of ['payments', 'audit']) {
+    router.get(`/${name}`, ...guard, async (req, res, next) => {
+        try {
+            const r = await axios.get(`${JAVA}/platform/${name}`, { headers: authHeader(req), params: pick(req.query, QUERY[name]) });
+            res.status(r.status).json(r.data);
+        } catch (e) { next(e); }
+    });
+}
 
 router.get('/organizations', ...guard, async (req, res, next) => {
     try {

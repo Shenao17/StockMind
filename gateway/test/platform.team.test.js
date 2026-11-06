@@ -115,3 +115,33 @@ describe('ficha de empresa', () => {
         assert.equal((await req('PATCH', '/organizations/12/tax-id', tokenFor('SELLER'), {})).status, 403);
     });
 });
+
+describe('resumen, cobros y auditoría', () => {
+    const owner = () => tokenFor('PLATFORM_OWNER');
+
+    test('llegan a Java; cobros y auditoría solo con los filtros conocidos', async () => {
+        javaCalls.length = 0;
+        assert.equal((await req('GET', '/summary', owner())).status, 200);
+        assert.equal(javaCalls[0].url, '/platform/summary');
+
+        javaCalls.length = 0;
+        await req('GET', '/payments?status=PAID&search=alfa&page=1&size=10&from=2026-11-01&hack=1&sort=amountTotal', owner());
+        const u = new URL(javaCalls[0].url, 'http://x');
+        assert.equal(u.pathname, '/platform/payments');
+        assert.deepEqual(Object.fromEntries(u.searchParams),
+            { status: 'PAID', search: 'alfa', page: '1', size: '10', from: '2026-11-01', sort: 'amountTotal' });
+
+        javaCalls.length = 0;
+        await req('GET', '/audit?action=PLAN_CHANGED&actor=ana&organizationId=3&x=y', owner());
+        const a = new URL(javaCalls[0].url, 'http://x');
+        assert.equal(a.pathname, '/platform/audit');
+        assert.deepEqual(Object.fromEntries(a.searchParams), { action: 'PLAN_CHANGED', actor: 'ana', organizationId: '3' });
+    });
+
+    test('exigen rol de plataforma', async () => {
+        for (const p of ['/summary', '/payments', '/audit']) {
+            assert.equal((await req('GET', p)).status, 401, p);
+            assert.equal((await req('GET', p, tokenFor('ADMIN'))).status, 403, p);
+        }
+    });
+});
