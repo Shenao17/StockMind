@@ -195,7 +195,7 @@ class RegistrationIntegrationTest extends IntegrationTestBase {
     @Test
     @DisplayName("Alta por plataforma: prueba desde hoy, pago ya recibido o cortesía")
     void platformCreationModes() throws Exception {
-        String owner = bearer(createUser("dueno", User.Role.PLATFORM_ADMIN));
+        String owner = bearer(createUser("dueno", User.Role.PLATFORM_OWNER));
         String[][] cases = {{"TRIAL", "901111111-1", "t@c.com"}, {"PAID", "902222222-2", "p@c.com"}, {"COMPLIMENTARY", "903333333-3", "c@c.com"}};
         for (String[] c : cases) {
             Map<String, Object> body = company(c[1], c[2]);
@@ -315,7 +315,7 @@ class RegistrationIntegrationTest extends IntegrationTestBase {
     // ───────────────────────────── Panel de plataforma ─────────────────────────────
 
     @Test
-    @DisplayName("Plataforma: solo PLATFORM_ADMIN puede crear y listar empresas")
+    @DisplayName("Plataforma: solo el equipo de plataforma puede crear y listar empresas")
     void platformEndpointsAreRestricted() throws Exception {
         String admin = bearer(createUser("adminA", User.Role.ADMIN));
         String seller = bearer(createUser("vendedorA", User.Role.SELLER));
@@ -330,7 +330,7 @@ class RegistrationIntegrationTest extends IntegrationTestBase {
     @Test
     @DisplayName("Plataforma: crea la empresa ACTIVE con su administrador ya verificado, que puede entrar de inmediato")
     void platformCreatesActiveOrganization() throws Exception {
-        String owner = bearer(createUser("dueno", User.Role.PLATFORM_ADMIN));
+        String owner = bearer(createUser("dueno", User.Role.PLATFORM_OWNER));
         Map<String, Object> body = company("901.222.333-4", "dueno@cliente.com");
         body.put("phone", "+57 300 123 4567");
         body.put("legalName", "Cliente S.A.S.");
@@ -354,7 +354,7 @@ class RegistrationIntegrationTest extends IntegrationTestBase {
     @Test
     @DisplayName("Plataforma: los conflictos sí indican qué chocó")
     void platformConflictsAreSpecific() throws Exception {
-        String owner = bearer(createUser("dueno", User.Role.PLATFORM_ADMIN));
+        String owner = bearer(createUser("dueno", User.Role.PLATFORM_OWNER));
         createUser("existente", User.Role.ADMIN);
 
         mvc.perform(MockMvcRequestBuilders.post("/platform/organizations")
@@ -374,7 +374,7 @@ class RegistrationIntegrationTest extends IntegrationTestBase {
     @Test
     @DisplayName("Plataforma: listado paginado con búsqueda y filtro por estado")
     void platformListsOrganizations() throws Exception {
-        String owner = bearer(createUser("dueno", User.Role.PLATFORM_ADMIN));
+        String owner = bearer(createUser("dueno", User.Role.PLATFORM_OWNER));
         post("/public/registrations", signup("900111111-1", "p@pendiente.com")).andExpect(status().isAccepted());
 
         mvc.perform(get("/platform/organizations?page=0&size=10").header("Authorization", owner)).andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(2)); // A + pendiente
@@ -390,7 +390,7 @@ class RegistrationIntegrationTest extends IntegrationTestBase {
     @Test
     @DisplayName("Dos empresas registradas no ven los datos de la otra")
     void newOrganizationsStartIsolatedAndEmpty() throws Exception {
-        String owner = bearer(createUser("dueno", User.Role.PLATFORM_ADMIN));
+        String owner = bearer(createUser("dueno", User.Role.PLATFORM_OWNER));
         mvc.perform(MockMvcRequestBuilders.post("/platform/organizations")
                 .header("Authorization", owner).contentType(MediaType.APPLICATION_JSON)
                 .content(json.writeValueAsString(company("900123456-7", "nuevo@cliente.com")))).andExpect(status().isCreated());

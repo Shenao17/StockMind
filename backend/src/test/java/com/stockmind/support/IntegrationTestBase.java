@@ -81,7 +81,7 @@ public abstract class IntegrationTestBase {
         TenantContext.clear();
         emails.clear();
         // SQL directo (sin filtro de empresa) para vaciar TODAS las empresas, hijos primero
-        for (String table : new String[]{"email_verification_tokens", "inventory_movements", "sale_details", "sales", "demand_predictions",
+        for (String table : new String[]{"platform_backup_codes", "email_verification_tokens", "inventory_movements", "sale_details", "sales", "demand_predictions",
                 "products", "categories", "payments", "subscriptions", "audit_log", "users", "organizations"}) {
             try {
                 jdbc.update("DELETE FROM " + table);
@@ -147,7 +147,7 @@ public abstract class IntegrationTestBase {
 
     protected User createUser(Organization organization, String username, User.Role role) {
         return userRepository.save(User.builder()
-            .organizationId(role == User.Role.PLATFORM_ADMIN ? null : organization.getId())
+            .organizationId(role == User.Role.PLATFORM_OWNER ? null : organization.getId())
             .username(username)
             .email((username + "@test.com").toLowerCase())
             .passwordHash("no-importa-en-estas-pruebas")

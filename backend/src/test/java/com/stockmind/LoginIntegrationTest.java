@@ -139,13 +139,12 @@ class LoginIntegrationTest extends IntegrationTestBase {
     }
 
     @Test
-    @DisplayName("El dueño de la plataforma inicia sesión sin empresa y su token no lleva org")
-    void platformAdminLogin() throws Exception {
-        createUserWithPassword(org, "dueno", User.Role.PLATFORM_ADMIN);
+    @DisplayName("El equipo de plataforma no recibe sesión solo con la contraseña: recibe un desafío (el token real se prueba en PlatformTeamIntegrationTest)")
+    void platformUserGetsChallengeNotSession() throws Exception {
+        createUserWithPassword(org, "dueno", User.Role.PLATFORM_OWNER);
         String body = login("dueno@test.com", PASSWORD).andExpect(status().isOk())
             .andReturn().getResponse().getContentAsString();
-        String token = json.readTree(body).get("token").asText();
-        assertNull(jwtConfig.extractOrganizationId(token));
-        assertEquals("PLATFORM_ADMIN", jwtConfig.extractRole(token));
+        assertFalse(json.readTree(body).hasNonNull("token"));
+        assertTrue(json.readTree(body).get("enrollmentRequired").asBoolean());
     }
 }

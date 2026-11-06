@@ -45,7 +45,7 @@ class BillingPaymentsIntegrationTest extends IntegrationTestBase {
     void setUp() {
         admin = bearer(createUser("admin", User.Role.ADMIN));
         seller = bearer(createUser("vendedor", User.Role.SELLER));
-        owner = bearer(createUser("dueno", User.Role.PLATFORM_ADMIN));
+        owner = bearer(createUser("dueno", User.Role.PLATFORM_OWNER));
         setSubscription(org.getId(), "STARTER", Subscription.Status.TRIAL);
     }
 
@@ -211,7 +211,7 @@ class BillingPaymentsIntegrationTest extends IntegrationTestBase {
     }
 
     @Test
-    @DisplayName("Plataforma: solo PLATFORM_ADMIN puede usar las acciones")
+    @DisplayName("Plataforma: solo el equipo de plataforma puede usar las acciones")
     void platformRolesOnly() throws Exception {
         for (String[] a : new String[][]{{"suspend"}, {"reactivate"}, {"cancel"}, {"extend-trial"}, {"plan"}, {"payment-links"}, {"manual-payment"}}) {
             as(admin, "POST", "/platform/organizations/" + org.getId() + "/" + a[0], Map.of("days", 5, "planCode", "PRO"))

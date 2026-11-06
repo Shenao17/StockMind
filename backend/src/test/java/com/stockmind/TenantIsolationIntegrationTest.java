@@ -213,13 +213,13 @@ class TenantIsolationIntegrationTest extends IntegrationTestBase {
     }
 
     @Test
-    @DisplayName("Un administrador de empresa no puede crear ni asignar PLATFORM_ADMIN")
+    @DisplayName("Un administrador de empresa no puede crear ni asignar un rol de plataforma")
     void cannotEscalateToPlatformAdmin() throws Exception {
         asA("POST", "/users",
-            "{\"username\":\"jefe\",\"email\":\"jefe@test.com\",\"password\":\"Abcdef12\",\"role\":\"PLATFORM_ADMIN\"}")
+            "{\"username\":\"jefe\",\"email\":\"jefe@test.com\",\"password\":\"Abcdef12\",\"role\":\"PLATFORM_OWNER\"}")
             .andExpect(status().isBadRequest());
         User seller = createUser("vendedorA", User.Role.SELLER);
-        asA("PUT", "/users/" + seller.getId(), "{\"role\":\"PLATFORM_ADMIN\"}").andExpect(status().isBadRequest());
+        asA("PUT", "/users/" + seller.getId(), "{\"role\":\"PLATFORM_OWNER\"}").andExpect(status().isBadRequest());
         assertEquals(User.Role.SELLER, userRepository.findById(seller.getId()).orElseThrow().getRole());
     }
 
@@ -255,9 +255,9 @@ class TenantIsolationIntegrationTest extends IntegrationTestBase {
     // ───────────────────────────── Tokens ─────────────────────────────
 
     @Test
-    @DisplayName("Un PLATFORM_ADMIN no accede a los datos de negocio de ninguna empresa")
+    @DisplayName("Un PLATFORM_OWNER no accede a los datos de negocio de ninguna empresa")
     void platformAdminHasNoBusinessAccess() throws Exception {
-        User owner = createUser("dueno", User.Role.PLATFORM_ADMIN);
+        User owner = createUser("dueno", User.Role.PLATFORM_OWNER);
         String auth = bearer(owner);
         mvc.perform(get("/products").header("Authorization", auth)).andExpect(status().isForbidden());
         mvc.perform(get("/users").header("Authorization", auth)).andExpect(status().isForbidden());

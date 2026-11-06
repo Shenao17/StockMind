@@ -16,11 +16,11 @@ class PlatformAdminBootstrapTest extends IntegrationTestBase {
     @Autowired PasswordEncoder encoder;
 
     private PlatformAdminBootstrap bootstrap(String email, String password) {
-        return new PlatformAdminBootstrap(userRepository, encoder, email, password);
+        return new PlatformAdminBootstrap(userRepository, encoder, email, password, "");
     }
 
     private long platformAdmins() {
-        return userRepository.findAll().stream().filter(u -> u.getRole() == User.Role.PLATFORM_ADMIN).count();
+        return userRepository.findAll().stream().filter(u -> u.getRole() == User.Role.PLATFORM_OWNER).count();
     }
 
     @Test
@@ -31,12 +31,12 @@ class PlatformAdminBootstrapTest extends IntegrationTestBase {
     }
 
     @Test
-    @DisplayName("Crea el PLATFORM_ADMIN sin empresa, verificado, con la contraseña cifrada")
+    @DisplayName("Crea el PLATFORM_OWNER sin empresa, verificado, con la contraseña cifrada")
     void createsPlatformAdmin() {
         bootstrap("Dueno@StockMind.com", "Clave1234").run(null);
 
         User u = userRepository.findByEmail("dueno@stockmind.com").orElseThrow();
-        assertEquals(User.Role.PLATFORM_ADMIN, u.getRole());
+        assertEquals(User.Role.PLATFORM_OWNER, u.getRole());
         assertNull(u.getOrganizationId());
         assertNotNull(u.getEmailVerifiedAt());
         assertTrue(u.getPasswordHash().startsWith("$2"));
@@ -44,7 +44,7 @@ class PlatformAdminBootstrapTest extends IntegrationTestBase {
     }
 
     @Test
-    @DisplayName("Es idempotente: si ya hay un PLATFORM_ADMIN, cambiar la variable no crea otro ni pisa el existente")
+    @DisplayName("Es idempotente: si ya hay un PLATFORM_OWNER, cambiar la variable no crea otro ni pisa el existente")
     void idempotent() {
         bootstrap("dueno@stockmind.com", "Clave1234").run(null);
         bootstrap("otro@stockmind.com", "OtraClave99").run(null);

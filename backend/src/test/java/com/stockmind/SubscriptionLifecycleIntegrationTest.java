@@ -86,7 +86,7 @@ class SubscriptionLifecycleIntegrationTest extends IntegrationTestBase {
     @Test
     @DisplayName("Al vencer la prueba: gracia de 7 días en solo lectura, con aviso")
     void trialExpiresIntoGrace() {
-        LocalDateTime ended = LocalDateTime.now().minusHours(2);
+        LocalDateTime ended = LocalDateTime.now().minusHours(2).withNano(0);
         edit(s -> s.setTrialEndsAt(ended));
 
         assertEquals(1, lifecycle.run(LocalDateTime.now()));
