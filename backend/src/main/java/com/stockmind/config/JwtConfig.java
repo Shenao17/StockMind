@@ -64,6 +64,13 @@ public class JwtConfig {
     }
 
     /**
+     * Extrae el rol (ADMIN, SELLER) del claim "role"; null si el token no lo trae.
+     */
+    public String extractRole(String token) {
+        return extractClaims(token).get("role", String.class);
+    }
+
+    /**
      * Verifica si el token es válido (firma correcta y no expirado).
      */
     public boolean isTokenValid(String token) {

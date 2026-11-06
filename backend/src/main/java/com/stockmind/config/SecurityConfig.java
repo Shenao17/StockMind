@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -31,7 +32,8 @@ import java.util.List;
  *
  * - Sin estado (stateless) con JWT
  * - Solo /auth/login es pública; el resto requiere token válido
- * - Los roles son manejados por el gateway; aquí se valida el token
+ * - El rol se lee del claim "role" del JWT y se aplica aquí también
+ *   (el gateway sigue validando; esto evita depender solo de él)
  */
 @Configuration
 @EnableWebSecurity
@@ -55,7 +57,15 @@ public class SecurityConfig {
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/auth/login").permitAll()
-                .anyRequest().authenticated()
+                // Solo ADMIN (misma política que el gateway: defensa en profundidad)
+                .requestMatchers("/users/**").hasRole("ADMIN")
+                .requestMatchers("/reports/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.POST, "/products/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.PUT, "/products/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.DELETE, "/products/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.POST, "/inventory/**").hasRole("ADMIN")
+                // Cualquier otro endpoint: ADMIN o SELLER (un token sin rol válido no pasa)
+                .anyRequest().hasAnyRole("ADMIN", "SELLER")
             )
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
@@ -103,15 +113,17 @@ class JwtAuthFilter extends OncePerRequestFilter {
                 SecurityContextHolder.getContext().getAuthentication() == null) {
 
             String username = jwtConfig.extractUsername(token);
+            String role = jwtConfig.extractRole(token);
 
-            // Autenticación mínima: solo username sin cargar el usuario de BD
-            // ya que los roles son gestionados por el gateway
+            // El rol sale del claim firmado del JWT. Sin rol válido no se
+            // concede ninguna autoridad (los endpoints protegidos dan 403).
+            List<SimpleGrantedAuthority> authorities =
+                ("ADMIN".equals(role) || "SELLER".equals(role))
+                    ? List.of(new SimpleGrantedAuthority("ROLE_" + role))
+                    : List.of();
+
             UsernamePasswordAuthenticationToken authToken =
-                new UsernamePasswordAuthenticationToken(
-                    username,
-                    null,
-                    List.of(new SimpleGrantedAuthority("ROLE_USER"))
-                );
+                new UsernamePasswordAuthenticationToken(username, null, authorities);
 
             SecurityContextHolder.getContext().setAuthentication(authToken);
         }
