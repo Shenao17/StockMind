@@ -1,6 +1,8 @@
 package com.stockmind;
 
+import com.stockmind.model.Organization;
 import com.stockmind.support.IntegrationTestBase;
+import com.stockmind.tenant.TenantContext;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -33,15 +35,36 @@ class FlywayMigrationMysqlTest extends IntegrationTestBase {
     }
 
     @Test
+    @DisplayName("Flyway aplicó V2 (multiempresa) y la tabla de versiones registra ambas migraciones")
+    void multitenancyMigrationApplied() {
+        Integer applied = jdbc.queryForObject(
+            "SELECT COUNT(*) FROM flyway_schema_history WHERE success = 1 AND version IN ('1','2')", Integer.class);
+        assertEquals(2, applied);
+    }
+
+    @Test
     @DisplayName("Existen todas las tablas del esquema")
     void tablesExist() {
         for (String table : new String[]{"users", "categories", "products", "sales",
-                "sale_details", "inventory_movements", "demand_predictions"}) {
+                "sale_details", "inventory_movements", "demand_predictions", "organizations"}) {
             Integer n = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM information_schema.tables "
                     + "WHERE table_schema = DATABASE() AND table_name = ?", Integer.class, table);
             assertEquals(1, n, "falta la tabla " + table);
         }
+    }
+
+    @Test
+    @DisplayName("El SKU es único POR EMPRESA: se repite entre empresas pero no dentro de una")
+    void skuUniquePerOrganization() {
+        var category = createCategory();
+        var product = createProduct(category, 5, "10.00");
+
+        Organization other = createOrganization("Otra empresa");
+        TenantContext.runAs(other.getId(), () -> {
+            var otherCategory = createCategory();
+            assertDoesNotThrow(() -> createProduct(otherCategory, product.getSku(), 1, "1.00"));
+        });
     }
 
     @Test
@@ -54,7 +77,7 @@ class FlywayMigrationMysqlTest extends IntegrationTestBase {
             jdbc.update("UPDATE products SET stock_current = -1 WHERE id = ?", product.getId()));
 
         assertThrows(DataAccessException.class, () ->
-            jdbc.update("INSERT INTO products (category_id, name, sku, price) VALUES (?, 'dup', ?, 1)",
-                category.getId(), product.getSku()));
+            jdbc.update("INSERT INTO products (organization_id, category_id, name, sku, price) VALUES (?, ?, 'dup', ?, 1)",
+                org.getId(), category.getId(), product.getSku()));
     }
 }

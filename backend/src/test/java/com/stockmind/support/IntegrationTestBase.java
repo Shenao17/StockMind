@@ -2,17 +2,23 @@ package com.stockmind.support;
 
 import com.stockmind.config.JwtConfig;
 import com.stockmind.model.Category;
+import com.stockmind.model.Organization;
 import com.stockmind.model.Product;
 import com.stockmind.model.User;
 import com.stockmind.repository.CategoryRepository;
 import com.stockmind.repository.InventoryMovementRepository;
+import com.stockmind.repository.OrganizationRepository;
 import com.stockmind.repository.ProductRepository;
 import com.stockmind.repository.SaleRepository;
 import com.stockmind.repository.UserRepository;
+import com.stockmind.tenant.TenantContext;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataAccessException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
@@ -52,21 +58,53 @@ public abstract class IntegrationTestBase {
     @Autowired protected CategoryRepository categoryRepository;
     @Autowired protected SaleRepository saleRepository;
     @Autowired protected InventoryMovementRepository movementRepository;
+    @Autowired protected OrganizationRepository organizationRepository;
     @Autowired protected JwtConfig jwtConfig;
+    @Autowired protected JdbcTemplate jdbc;
+
+    /** Empresa por defecto de cada prueba (la "A"); el contexto de empresa queda apuntando a ella. */
+    protected Organization org;
 
     @BeforeEach
-    void cleanDatabase() {
-        movementRepository.deleteAll();
-        saleRepository.deleteAll();
-        productRepository.deleteAll();
-        categoryRepository.deleteAll();
-        userRepository.deleteAll();
+    void cleanDatabaseAndStartTenant() {
+        TenantContext.clear();
+        // SQL directo (sin filtro de empresa) para vaciar TODAS las empresas, hijos primero
+        for (String table : new String[]{"inventory_movements", "sale_details", "sales", "demand_predictions",
+                "products", "categories", "users", "organizations"}) {
+            try {
+                jdbc.update("DELETE FROM " + table);
+            } catch (DataAccessException e) {
+                // demand_predictions no tiene entidad: en H2 (esquema generado) no existe; en MySQL sí (Flyway)
+                if (!table.equals("demand_predictions")) throw e;
+            }
+        }
+        org = createOrganization("Empresa A");
+        TenantContext.set(org.getId());
+    }
+
+    @AfterEach
+    void clearTenant() {
+        TenantContext.clear();
+    }
+
+    protected Organization createOrganization(String name) {
+        return organizationRepository.save(Organization.builder()
+            .name(name)
+            .contactEmail(name.toLowerCase().replace(' ', '.') + "@test.com")
+            .status(Organization.Status.ACTIVE)
+            .origin(Organization.Origin.PLATFORM_ADMIN)
+            .build());
     }
 
     protected User createUser(String username, User.Role role) {
+        return createUser(org, username, role);
+    }
+
+    protected User createUser(Organization organization, String username, User.Role role) {
         return userRepository.save(User.builder()
+            .organizationId(role == User.Role.PLATFORM_ADMIN ? null : organization.getId())
             .username(username)
-            .email(username + "@test.com")
+            .email((username + "@test.com").toLowerCase())
             .passwordHash("no-importa-en-estas-pruebas")
             .role(role)
             .active(true)
@@ -84,10 +122,14 @@ public abstract class IntegrationTestBase {
     }
 
     protected Product createProduct(Category category, int stock, String price) {
+        return createProduct(category, "SKU-" + UUID.randomUUID().toString().substring(0, 8), stock, price);
+    }
+
+    protected Product createProduct(Category category, String sku, int stock, String price) {
         return productRepository.save(Product.builder()
             .category(category)
             .name("Producto de prueba")
-            .sku("SKU-" + UUID.randomUUID().toString().substring(0, 8))
+            .sku(sku)
             .price(new BigDecimal(price))
             .stockCurrent(stock)
             .stockMinimum(2)

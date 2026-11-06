@@ -4,6 +4,7 @@ import com.stockmind.dto.SaleDTO;
 import com.stockmind.exception.ResourceNotFoundException;
 import com.stockmind.model.*;
 import com.stockmind.service.SaleService;
+import com.stockmind.tenant.TenantContext;
 import com.stockmind.support.IntegrationTestBase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -49,7 +50,7 @@ class SaleServiceIntegrationTest extends IntegrationTestBase {
     void priceComesFromDatabase() {
         Product p = createProduct(category, 10, "45000.00");
 
-        Sale sale = saleService.registerSale("vendedor", request(p.getId(), 2));
+        Sale sale = saleService.registerSale("vendedor@test.com", request(p.getId(), 2));
 
         assertEquals(0, new BigDecimal("90000.00").compareTo(sale.getTotal()));
         assertEquals(0, new BigDecimal("45000.00").compareTo(sale.getDetails().get(0).getUnitPrice()));
@@ -60,7 +61,7 @@ class SaleServiceIntegrationTest extends IntegrationTestBase {
     void discountsStockAndLinksMovement() {
         Product p = createProduct(category, 10, "100.00");
 
-        Sale sale = saleService.registerSale("vendedor", request(p.getId(), 3));
+        Sale sale = saleService.registerSale("vendedor@test.com", request(p.getId(), 3));
 
         assertEquals(7, productRepository.findById(p.getId()).orElseThrow().getStockCurrent());
         List<InventoryMovement> movs = movementRepository.findAll();
@@ -79,7 +80,7 @@ class SaleServiceIntegrationTest extends IntegrationTestBase {
         Product p = createProduct(category, 2, "100.00");
 
         IllegalStateException ex = assertThrows(IllegalStateException.class,
-            () -> saleService.registerSale("vendedor", request(p.getId(), 5)));
+            () -> saleService.registerSale("vendedor@test.com", request(p.getId(), 5)));
 
         assertTrue(ex.getMessage().contains("Stock insuficiente"));
         assertEquals(2, productRepository.findById(p.getId()).orElseThrow().getStockCurrent());
@@ -94,7 +95,7 @@ class SaleServiceIntegrationTest extends IntegrationTestBase {
         Product poor = createProduct(category, 1, "100.00");
 
         assertThrows(IllegalStateException.class,
-            () -> saleService.registerSale("vendedor", request(ok.getId(), 3, poor.getId(), 5)));
+            () -> saleService.registerSale("vendedor@test.com", request(ok.getId(), 3, poor.getId(), 5)));
 
         assertEquals(10, productRepository.findById(ok.getId()).orElseThrow().getStockCurrent());
         assertEquals(0, saleRepository.count());
@@ -109,9 +110,9 @@ class SaleServiceIntegrationTest extends IntegrationTestBase {
         productRepository.save(p);
 
         assertThrows(IllegalStateException.class,
-            () -> saleService.registerSale("vendedor", request(p.getId(), 1)));
+            () -> saleService.registerSale("vendedor@test.com", request(p.getId(), 1)));
         assertThrows(ResourceNotFoundException.class,
-            () -> saleService.registerSale("vendedor", request(999999L, 1)));
+            () -> saleService.registerSale("vendedor@test.com", request(999999L, 1)));
     }
 
     @Test
@@ -127,14 +128,18 @@ class SaleServiceIntegrationTest extends IntegrationTestBase {
         AtomicInteger rejected = new AtomicInteger();
         List<Future<?>> futures = new ArrayList<>();
 
+        Long orgId = org.getId();
         for (int i = 0; i < attempts; i++) {
             futures.add(pool.submit(() -> {
                 start.await();
+                TenantContext.set(orgId); // el contexto de empresa es por hilo
                 try {
-                    saleService.registerSale("vendedor", request(p.getId(), 1));
+                    saleService.registerSale("vendedor@test.com", request(p.getId(), 1));
                     ok.incrementAndGet();
                 } catch (IllegalStateException e) {
                     rejected.incrementAndGet();
+                } finally {
+                    TenantContext.clear();
                 }
                 return null;
             }));

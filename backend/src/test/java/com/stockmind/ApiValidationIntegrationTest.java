@@ -72,7 +72,7 @@ class ApiValidationIntegrationTest extends IntegrationTestBase {
             .andExpect(jsonPath("$.role").value("SELLER"))
             .andExpect(jsonPath("$.email").value("nuevo@test.com"))
             .andExpect(jsonPath("$.passwordHash").doesNotExist());
-        User saved = userRepository.findByUsername("nuevo").orElseThrow();
+        User saved = userRepository.findByEmail("nuevo@test.com").orElseThrow();
         assertNotEquals("Abcdef12", saved.getPasswordHash());
         assertTrue(saved.getPasswordHash().startsWith("$2"), "la contraseña debe guardarse con BCrypt");
     }

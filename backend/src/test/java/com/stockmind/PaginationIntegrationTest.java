@@ -55,7 +55,7 @@ class PaginationIntegrationTest extends IntegrationTestBase {
         item.setQuantity(qty);
         SaleDTO.Request r = new SaleDTO.Request();
         r.setItems(List.of(item));
-        saleService.registerSale("admin", r);
+        saleService.registerSale("admin@test.com", r);
     }
 
     // ───────────────────────────── Productos ─────────────────────────────
@@ -155,7 +155,6 @@ class PaginationIntegrationTest extends IntegrationTestBase {
     void salesPagination() throws Exception {
         createUser("vendedor", User.Role.SELLER);
         Product p = product(electronics, "Item", "I-1", 100, 1, "10.00");
-        userRepository.save(userRepository.findByUsername("admin").orElseThrow());
         for (int i = 0; i < 7; i++) sell(p, 1);
 
         String today = LocalDate.now().toString();
