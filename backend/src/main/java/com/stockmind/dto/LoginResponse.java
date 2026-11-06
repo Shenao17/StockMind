@@ -20,4 +20,12 @@ public class LoginResponse {
     private String email;
     private Long organizationId;
     private String role;
+    private String fullName;
+
+    // Equipo de plataforma: el inicio de sesión se completa en un segundo paso
+    private Boolean mfaRequired;          // ya tiene app autenticadora: pedir el código
+    private Boolean enrollmentRequired;   // primer acceso: configurar app, PIN (y contraseña si es temporal)
+    private Boolean mustChangePassword;
+    private String challengeToken;
+    private java.util.List<String> backupCodes;   // solo al terminar la configuración, una vez
 }

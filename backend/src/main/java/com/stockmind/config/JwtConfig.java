@@ -30,6 +30,10 @@ public class JwtConfig {
     @Value("${jwt.expiration}")
     private long expirationMs;
 
+    /** Duración de la sesión del equipo de plataforma (más corta que la de las empresas). */
+    @Value("${stockmind.platform.session-minutes:120}")
+    private long platformSessionMinutes;
+
     /**
      * Genera la clave de firma HMAC-SHA256 a partir del secreto configurado.
      */
@@ -54,9 +58,38 @@ public class JwtConfig {
                 .setClaims(claims)
                 .setSubject(user.getEmail())
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + expirationMs))
+                .setExpiration(new Date(System.currentTimeMillis()
+                    + (user.isPlatformUser() ? platformSessionMinutes * 60_000L : expirationMs)))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
+    }
+
+    /**
+     * Token de corta vida para completar la verificación en dos pasos (typ = MFA o ENROLL).
+     * No lleva rol: no sirve para llamar a ninguna API, solo a /auth/mfa/*.
+     */
+    public String generateChallenge(User user, String type, int minutes) {
+        return Jwts.builder()
+                .claim("typ", type)
+                .claim("id", user.getId())
+                .setSubject(user.getEmail())
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + minutes * 60_000L))
+                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    /** Tipo de un token de desafío (MFA/ENROLL); null en los tokens de sesión normales. */
+    public String extractType(String token) {
+        return extractClaims(token).get("typ", String.class);
+    }
+
+    public Date extractIssuedAt(String token) {
+        return extractClaims(token).getIssuedAt();
+    }
+
+    public long platformSessionSeconds() {
+        return platformSessionMinutes * 60;
     }
 
     /**
@@ -74,7 +107,7 @@ public class JwtConfig {
     }
 
     /**
-     * Extrae el id de la empresa del claim "org"; null si el token no lo trae (PLATFORM_ADMIN).
+     * Extrae el id de la empresa del claim "org"; null si el token no lo trae (equipo de plataforma).
      */
     public Long extractOrganizationId(String token) {
         Object org = extractClaims(token).get("org");

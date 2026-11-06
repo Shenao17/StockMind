@@ -14,10 +14,10 @@ import java.time.LocalDateTime;
 import java.util.Locale;
 
 /**
- * PlatformAdminBootstrap — Crea el PRIMER dueño de la plataforma (rol PLATFORM_ADMIN).
+ * PlatformAdminBootstrap — Crea el PRIMER dueño de la plataforma (rol PLATFORM_OWNER).
  *
  * Se configura con PLATFORM_ADMIN_EMAIL y PLATFORM_ADMIN_PASSWORD (en el .env). Si no están
- * definidas no hace nada. Solo actúa cuando NO existe ya un PLATFORM_ADMIN, así que cambiar
+ * definidas no hace nada. Solo actúa cuando NO existe ya un PLATFORM_OWNER, así que cambiar
  * después la variable no crea otro ni pisa el existente. La contraseña debe cumplir la política.
  * Nunca se escribe en el log.
  */
@@ -29,11 +29,14 @@ public class PlatformAdminBootstrap implements ApplicationRunner {
     private final PasswordEncoder passwordEncoder;
     private final String email;
     private final String password;
+    private final String fullName;
 
     public PlatformAdminBootstrap(UserRepository userRepository,
                                   PasswordEncoder passwordEncoder,
                                   @Value("${stockmind.platform-admin.email:}") String email,
-                                  @Value("${stockmind.platform-admin.password:}") String password) {
+                                  @Value("${stockmind.platform-admin.password:}") String password,
+                                  @Value("${stockmind.platform-admin.name:}") String fullName) {
+        this.fullName = fullName == null ? "" : fullName.trim();
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.email = email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
@@ -49,7 +52,7 @@ public class PlatformAdminBootstrap implements ApplicationRunner {
             throw new IllegalStateException(
                 "Define PLATFORM_ADMIN_EMAIL y PLATFORM_ADMIN_PASSWORD juntas (o ninguna)");
         }
-        if (userRepository.existsByRole(User.Role.PLATFORM_ADMIN)) {
+        if (userRepository.existsByRole(User.Role.PLATFORM_OWNER)) {
             return; // ya existe: la configuración no crea otro ni modifica el actual
         }
         if (!password.matches(UserDTO.PASSWORD_REGEX)) {
@@ -62,10 +65,11 @@ public class PlatformAdminBootstrap implements ApplicationRunner {
 
         userRepository.save(User.builder()
             .organizationId(null)
-            .username("platform-admin")
+            .username("platform-owner")
+            .fullName(fullName.isBlank() ? null : fullName)
             .email(email)
             .passwordHash(passwordEncoder.encode(password))
-            .role(User.Role.PLATFORM_ADMIN)
+            .role(User.Role.PLATFORM_OWNER)
             .active(true)
             .emailVerifiedAt(LocalDateTime.now())
             .build());

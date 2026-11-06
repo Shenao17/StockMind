@@ -36,7 +36,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * PlatformController — Operaciones del dueño de la plataforma (rol PLATFORM_ADMIN).
+ * PlatformController — Operaciones del equipo de plataforma (roles PLATFORM_*, por permiso).
  * Toda acción que cambia algo queda en la auditoría (quién, qué y sobre qué empresa).
  *
  * GET  /platform/organizations                        → lista paginada con su suscripción
@@ -141,6 +141,13 @@ public class PlatformController {
     public ResponseEntity<PlatformDTO.OrganizationView> extendTrial(
             @PathVariable Long id, @Valid @RequestBody PlatformDTO.ExtendTrial body, Authentication auth) {
         find(id);
+        // Más de 7 días solo el dueño; el resto del equipo extiende pruebas cortas
+        boolean owner = auth.getAuthorities().stream()
+            .anyMatch(a -> a.getAuthority().equals(com.stockmind.platform.PlatformPermission.SENSITIVE.authority()));
+        if (!owner && body.getDays() > com.stockmind.platform.PlatformPermission.MAX_TRIAL_EXTENSION_DAYS) {
+            throw new org.springframework.security.access.AccessDeniedException("Solo el dueño extiende más de "
+                + com.stockmind.platform.PlatformPermission.MAX_TRIAL_EXTENSION_DAYS + " días");
+        }
         subscriptionService.extendTrial(id, body.getDays());
         auditService.record(auth.getName(), "TRIAL_EXTENDED", id, "días=" + body.getDays());
         return ResponseEntity.ok(view(find(id)));

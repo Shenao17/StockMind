@@ -5,6 +5,7 @@ import com.stockmind.dto.LoginRequest;
 import com.stockmind.dto.LoginResponse;
 import com.stockmind.model.Organization;
 import com.stockmind.model.User;
+import com.stockmind.platform.PlatformSecurityService;
 import com.stockmind.repository.OrganizationRepository;
 import com.stockmind.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,7 @@ public class AuthService {
     private final OrganizationRepository organizationRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtConfig jwtConfig;
+    private final PlatformSecurityService platformSecurity;
 
     /**
      * Autentica un usuario con username y password.
@@ -69,15 +71,51 @@ public class AuthService {
             }
         }
 
-        String token = jwtConfig.generateToken(user);
+        // Equipo de plataforma: la contraseña no basta, falta el segundo factor. Aún no hay sesión.
+        if (user.isPlatformUser()) {
+            boolean enrolled = platformSecurity.mfaEnrolled(user);
+            return LoginResponse.builder()
+                .mfaRequired(enrolled)
+                .enrollmentRequired(!enrolled)
+                .mustChangePassword(Boolean.TRUE.equals(user.getMustChangePassword()))
+                .challengeToken(platformSecurity.challengeFor(user))
+                .fullName(user.getFullName())
+                .build();
+        }
 
+        return session(user);
+    }
+
+    /** Sesión completa (token de acceso) tras superar todos los pasos. */
+    public LoginResponse session(User user) {
         return LoginResponse.builder()
-            .token(token)
+            .token(jwtConfig.generateToken(user))
             .userId(user.getId())
             .username(user.getUsername())
             .email(user.getEmail())
             .organizationId(user.getOrganizationId())
             .role(user.getRole().name())
+            .fullName(user.getFullName())
             .build();
+    }
+
+    /** Segundo paso del inicio de sesión del equipo de plataforma. */
+    public LoginResponse verifyMfa(String challengeToken, String code) {
+        User user = platformSecurity.userFromChallenge(challengeToken, PlatformSecurityService.TYPE_MFA);
+        platformSecurity.verifySecondFactor(user, code);
+        return session(user);
+    }
+
+    public PlatformSecurityService.Enrollment startEnrollment(String challengeToken) {
+        return platformSecurity.startEnrollment(
+            platformSecurity.userFromChallenge(challengeToken, PlatformSecurityService.TYPE_ENROLL));
+    }
+
+    public LoginResponse finishEnrollment(String challengeToken, String code, String pin, String newPassword) {
+        User user = platformSecurity.userFromChallenge(challengeToken, PlatformSecurityService.TYPE_ENROLL);
+        java.util.List<String> backup = platformSecurity.finishEnrollment(user, code, pin, newPassword);
+        LoginResponse r = session(user);
+        r.setBackupCodes(backup);
+        return r;
     }
 }

@@ -24,6 +24,11 @@ stockmind:
   platform-admin:
     email: ${PLATFORM_ADMIN_EMAIL:}
     password: ${PLATFORM_ADMIN_PASSWORD:}
+    name: ${PLATFORM_ADMIN_NAME:}      # nombre del dueño (opcional)
+  platform:
+    session-minutes: 120      # sesión del equipo de plataforma (las empresas usan jwt.expiration)
+  mfa:
+    key: ${STOCKMIND_MFA_KEY:}  # llave que cifra los secretos TOTP; vacío = derivada de JWT_SECRET (solo desarrollo)
   billing:
     default-plan: PRO         # plan con el que prueba quien no elige uno
     iva-rate: 0.19            # IVA que se suma al precio de los planes

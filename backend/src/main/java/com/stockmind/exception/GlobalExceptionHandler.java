@@ -53,6 +53,16 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(ex.getStatus()).body(body);
     }
 
+    /** PIN de confirmación incorrecto o bloqueado → 403 con código estable (la sesión sigue vigente) */
+    @ExceptionHandler(PinException.class)
+    public ResponseEntity<Map<String, Object>> handlePin(PinException ex) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("error", ex.getMessage());
+        body.put("code", "PIN_INVALID");
+        body.put("timestamp", LocalDateTime.now().toString());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
+    }
+
     /** Datos ya registrados (NIT, correo) → 409 */
     @ExceptionHandler(ConflictException.class)
     public ResponseEntity<Map<String, Object>> handleConflict(ConflictException ex) {

@@ -153,9 +153,9 @@ public class UserController {
             .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
     }
 
-    /** Un administrador de empresa solo puede asignar ADMIN o SELLER, nunca PLATFORM_ADMIN. */
+    /** Un administrador de empresa solo puede asignar ADMIN o SELLER, nunca un rol de plataforma. */
     private void assertAssignableRole(User.Role role) {
-        if (role == User.Role.PLATFORM_ADMIN) {
+        if (role.isPlatform()) {
             throw new IllegalStateException("No se puede asignar ese rol");
         }
     }

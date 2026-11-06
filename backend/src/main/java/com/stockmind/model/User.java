@@ -22,7 +22,7 @@ public class User {
     private Long id;
 
     /**
-     * Empresa del usuario. NULL solo para PLATFORM_ADMIN (dueño de la plataforma).
+     * Empresa del usuario. NULL solo para el equipo de plataforma (PLATFORM_*).
      * Los usuarios NO usan @TenantId porque el login debe poder buscarlos por correo
      * antes de conocer la empresa; el aislamiento de usuarios se aplica en UserController.
      */
@@ -51,6 +51,47 @@ public class User {
     @Column(name = "email_verified_at")
     private LocalDateTime emailVerifiedAt;
 
+    /** Nombre real (equipo de plataforma). */
+    @Column(name = "full_name", length = 100)
+    private String fullName;
+
+    // ── Verificación en dos pasos (solo equipo de plataforma) ──
+    @JsonIgnore
+    @Column(name = "mfa_secret")
+    private String mfaSecret;                 // cifrado con AES-GCM
+
+    @Column(name = "mfa_enabled_at")
+    private LocalDateTime mfaEnabledAt;       // null = pendiente de configurar
+
+    @Column(name = "mfa_last_step")
+    private Long mfaLastStep;
+
+    @Column(name = "mfa_failed_attempts", nullable = false)
+    @Builder.Default
+    private Integer mfaFailedAttempts = 0;
+
+    @Column(name = "mfa_locked_until")
+    private LocalDateTime mfaLockedUntil;
+
+    @JsonIgnore
+    @Column(name = "pin_hash")
+    private String pinHash;
+
+    @Column(name = "pin_failed_attempts", nullable = false)
+    @Builder.Default
+    private Integer pinFailedAttempts = 0;
+
+    @Column(name = "pin_locked_until")
+    private LocalDateTime pinLockedUntil;
+
+    @Column(name = "must_change_password", nullable = false)
+    @Builder.Default
+    private Boolean mustChangePassword = false;
+
+    /** Las sesiones emitidas antes de esta fecha dejan de valer (cambio de rol, reinicio de acceso). */
+    @Column(name = "sessions_valid_from")
+    private LocalDateTime sessionsValidFrom;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
@@ -65,8 +106,20 @@ public class User {
     }
 
     public enum Role {
-        PLATFORM_ADMIN, // dueño de la plataforma: sin empresa
-        ADMIN,          // administrador de UNA empresa
-        SELLER          // vendedor de una empresa
+        PLATFORM_OWNER,   // dueño de la plataforma: todo
+        PLATFORM_BILLING, // cobranza: empresas, enlaces de pago
+        PLATFORM_SUPPORT, // soporte técnico: consulta y acciones no sensibles
+        PLATFORM_VIEWER,  // solo lectura
+        ADMIN,            // administrador de UNA empresa
+        SELLER;           // vendedor de una empresa
+
+        /** Roles del equipo de plataforma: no pertenecen a ninguna empresa. */
+        public boolean isPlatform() {
+            return name().startsWith("PLATFORM_");
+        }
+    }
+
+    public boolean isPlatformUser() {
+        return role != null && role.isPlatform();
     }
 }
