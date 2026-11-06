@@ -228,7 +228,28 @@ Haga clic en **Desactivar** para inhabilitar el acceso de un usuario sin elimina
 
 ---
 
-## 9. Agente IA *(experimental)*
+### Reiniciar la verificación en dos pasos de un compañero *(solo Administrador)*
+En la columna **2FA** ves quién la tiene activa. Si alguien perdió su celular y sus códigos de respaldo, pulsa **Reiniciar 2FA** en su fila: podrá entrar solo con su contraseña y deberá configurarla de nuevo (si la empresa la exige, se la pedirá al entrar). No puedes reiniciar la tuya; si eres el único administrador, pídelo a StockMind.
+
+## 9. Seguridad de la cuenta (verificación en dos pasos)
+
+Entra por **Seguridad** en el menú. Además de tu contraseña, te pediremos un código de 6 dígitos que genera una app autenticadora en tu celular (Google Authenticator, Microsoft Authenticator o Aegis). No necesita internet, correo ni SMS.
+
+### Activarla
+1. **Seguridad → Activar** y confirma tu contraseña.
+2. Escanea el QR con la app (o escribe la clave que aparece debajo).
+3. Escribe el código de 6 dígitos que muestra la app.
+4. **Guarda los 8 códigos de respaldo.** Cada uno sirve una sola vez si pierdes el celular y no se vuelven a mostrar.
+
+Desde ese momento, al iniciar sesión te pedirá el código después de tu contraseña.
+
+### Desactivarla
+**Seguridad → Desactivar**, con tu contraseña y un código de la app (o de respaldo). No se puede desactivar si tu empresa la exige.
+
+### Exigirla a toda la empresa *(solo Administrador)*
+En **Seguridad → Política de la empresa → Exigirla a todos**. Quien aún no la tenga la configurará en su próximo inicio de sesión (las sesiones ya abiertas siguen hasta que terminen). Puedes volver a hacerla opcional cuando quieras.
+
+## 10. Agente IA *(experimental)*
 
 A partir de la versión 1.2.0, StockMind incluye un asistente de inteligencia artificial conversacional accesible desde cualquier módulo del sistema.
 

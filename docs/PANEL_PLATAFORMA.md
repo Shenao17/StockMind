@@ -61,7 +61,14 @@ Protecciones:
 | (c) | Resumen con métricas (empresas por estado, pruebas por vencer, ingresos), pantalla de pagos y de auditoría | pendiente |
 | (d) | Solicitudes con aprobación del Dueño (cancelar, NIT, plan, pago manual, suspender) y editor de planes/precios | pendiente |
 
-## 5. Pendientes y límites conocidos
+## 5. 2FA para las empresas clientes
+
+Implementado junto al del equipo (ver `manual-usuario.md`, sección 9, y `manual-tecnico.md`, 5.7):
+- Opcional por usuario desde **Seguridad**; el administrador de la empresa puede **exigirla a todos**.
+- Sin PIN: solo app autenticadora + códigos de respaldo.
+- Si alguien pierde el celular: su administrador le reinicia el 2FA desde **Usuarios**; si es el único administrador, lo reinicia el **Dueño de plataforma con su PIN** (endpoint listo; el botón llegará con la ficha de empresa, fase b). Cuando exista la fase (d), soporte podrá solicitarlo y el Dueño aprobarlo.
+
+## 6. Pendientes y límites conocidos
 
 - Un miembro desactivado o con otro rol ve errores 403 en lugar de volver al login hasta que recarga la página.
 - No hay recuperación de acceso por correo: el Dueño reinicia el acceso de un miembro; si el **Dueño** pierde celular y códigos de respaldo hay que repararlo a mano en la base (borrar `mfa_*`/`pin_hash` de su fila).

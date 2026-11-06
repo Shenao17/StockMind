@@ -292,7 +292,7 @@ Un ADMIN de empresa no puede crear ni asignar un rol de plataforma, y no puede d
 | `plans`, `plan_features` | Planes (precios en COP sin IVA, límites) y sus funciones premium |
 | `subscriptions` | Una por empresa: plan, estado, ciclo, fechas de prueba/periodo/gracia, cortesía |
 | `payments` | Cobros: neto, IVA, total, proveedor, estado y referencia impredecible del enlace de pago |
-| `audit_log` | Acciones sensibles del panel de plataforma (quién, qué, sobre qué empresa) |
+| `audit_log` | Acciones sensibles del panel de plataforma y de seguridad de las empresas (quién, qué, sobre qué empresa) |
 | `flyway_schema_history` | Control de migraciones |
 
 **Estados de empresa:** `PENDING` (sin verificar el correo), `ACTIVE`, `SUSPENDED`, `CANCELLED`. Solo `ACTIVE` puede iniciar sesión. **Origen:** `SELF_SIGNUP` o `PLATFORM_ADMIN` (creada desde el panel).
@@ -309,6 +309,7 @@ El esquema lo gestiona **Flyway** desde el backend; Hibernate solo valida (`ddl-
 | `V2__organizations_multitenancy.sql` | `organizations`, `organization_id` en todas las tablas, unicidades por empresa, empresa inicial (id 1) con los datos existentes |
 | `V3__registration_and_verification.sql` | Verificación de correo, fin de prueba y términos |
 | `V4__plans_subscriptions_payments.sql` | Planes (borrador de precios), suscripciones, pagos y auditoría; las empresas existentes quedan con una suscripción de cortesía (Business) |
+| `V6__company_mfa.sql` | `organizations.require_mfa`: la empresa exige 2FA a todos sus usuarios |
 | `V5__platform_roles_mfa.sql` | Roles de plataforma (`PLATFORM_ADMIN` pasa a `PLATFORM_OWNER`), columnas de 2FA/PIN/sesiones en `users` y `platform_backup_codes` |
 
 - **Una migración aplicada no se edita** (Flyway detecta el cambio por checksum y no arranca): los cambios van en una versión nueva.
@@ -403,6 +404,19 @@ Detalle de producto en [`PANEL_PLATAFORMA.md`](PANEL_PLATAFORMA.md). Resumen té
 - **PIN:** 6–10 dígitos, BCrypt. Se exige en cada mutación de `/platform/team` (`PinException` → 403 `PIN_INVALID`, sin cerrar la sesión). Bloqueo de 15 min tras 5 fallos (código y PIN por separado).
 - **Equipo (`/platform/team`, permiso `TEAM_MANAGE`):** listar, alta (contraseña temporal, `must_change_password`), cambiar rol/estado/nombre, reiniciar acceso. No se tocan dueños ni la propia cuenta. Todo auditado.
 - **Perfil:** `GET /auth/me` devuelve también `fullName` y `permissions`; el frontend los usa solo para mostrar u ocultar controles.
+
+---
+
+### 5.7 2FA de usuarios de empresa
+
+Mismo mecanismo que el equipo de plataforma (5.6, `PlatformSecurityService`/`TotpService`), con estas diferencias:
+
+- **Opcional por usuario**; la empresa puede **exigirla** (`organizations.require_mfa`, `PUT /users/mfa-policy`, solo ADMIN). Sin PIN ni contraseña temporal.
+- **Login:** si el usuario la tiene → desafío `MFA`. Si no la tiene y la empresa la exige → desafío `ENROLL` (configura antes de entrar; sin sesión hasta terminar). La cuenta y la empresa se revalidan al completar el segundo paso (una empresa suspendida entre ambos no entra).
+- **Autoservicio** (`/auth/mfa/self/*`, solo ADMIN/SELLER): `status`, `setup/start` (pide la contraseña), `setup/finish` (primer código → 8 códigos de respaldo), `disable` (contraseña + código; no si la empresa la exige). Contraseña incorrecta → 400 (no 401, para no cerrar la sesión).
+- **Reinicio:** el ADMIN reinicia a un compañero (`POST /users/{id}/reset-mfa`, no a sí mismo ni a otra empresa); el dueño de plataforma reinicia a cualquiera con su PIN (`POST /platform/organizations/{id}/users/{userId}/reset-mfa`, permiso `SENSITIVE`, auditado). Aún no hay botón en el panel (llegará con la ficha de empresa).
+- Los usuarios devueltos por `/users` incluyen `mfaEnabledAt` pero ningún secreto, hash ni contador (`@JsonIgnore`; hay prueba que lo vigila).
+- Activar la política no cierra sesiones abiertas: se aplica en el siguiente inicio de sesión.
 
 ---
 
@@ -561,10 +575,10 @@ Reiniciar la base con los datos de ejemplo: `docker compose down -v` y volver a 
 
 | Servicio | Herramienta | Pruebas | Cómo ejecutar |
 |----------|-------------|--------:|---------------|
-| Backend | JUnit + MockMvc (H2 por defecto) | 151 | `mvn test` en `backend/` |
-| Backend contra **MySQL real** | idem, con `MYSQL_TEST_URL` | 151 | `MYSQL_TEST_URL=jdbc:mysql://host:3306/db MYSQL_TEST_USER=... MYSQL_TEST_PASSWORD=... mvn test` |
-| Gateway | `node:test` (sin dependencias) | 154 | `npm test` en `gateway/` |
-| Frontend | Vitest + Testing Library | 101 | `npx vitest run` en `frontend/` |
+| Backend | JUnit + MockMvc (H2 por defecto) | 162 | `mvn test` en `backend/` |
+| Backend contra **MySQL real** | idem, con `MYSQL_TEST_URL` | 162 | `MYSQL_TEST_URL=jdbc:mysql://host:3306/db MYSQL_TEST_USER=... MYSQL_TEST_PASSWORD=... mvn test` |
+| Gateway | `node:test` (sin dependencias) | 160 | `npm test` en `gateway/` |
+| Frontend | Vitest + Testing Library | 109 | `npx vitest run` en `frontend/` |
 | Analytics | pytest | 65 (+4 contra MySQL real) | `python -m pytest` en `analytics/` (con `ANALYTICS_MYSQL_HOST` corre también el aislamiento sobre MySQL) |
 
 Cobertura destacada: roles y tokens, validaciones, ventas con **concurrencia** (nunca se vende más del stock), **aislamiento entre empresas** (listados, por id, escrituras cruzadas, reportes, usuarios, analytics), login, registro y verificación, planes (solo lectura, bloqueo, funciones y límites), pagos idempotentes, ciclo diario, panel de plataforma, paginación y orden permitido, cabeceras de seguridad, CORS, límites y logs sin datos sensibles.
