@@ -37,13 +37,14 @@ async function apiRequest(method, endpoint, body = null) {
     // aquí causaría un bucle infinito: redirige a '/' -> remonta AuthProvider
     // -> vuelve a llamar /me -> vuelve a dar 401 -> vuelve a redirigir...
     //
-    // Tampoco redirigimos en /auth/login: un 401 ahí significa que las
+    // Tampoco redirigimos en /auth/login ni en /auth/mfa/*: un 401 ahí significa que las
     // credenciales son incorrectas y el componente Login debe poder recibir
     // el mensaje y mostrarlo al usuario.
     if (
       response.status === 401 &&
       endpoint !== '/auth/me' &&
-      endpoint !== '/auth/login'
+      endpoint !== '/auth/login' &&
+      !endpoint.startsWith('/auth/mfa/')   // un código incorrecto no es una sesión vencida
     ) {
       Auth.clearUser();
       window.location.href = '/';
@@ -89,6 +90,10 @@ export const API = {
     login:  (data) => apiRequest('POST', '/auth/login', data),
     logout: ()     => apiRequest('POST', '/auth/logout'),
     me:     ()     => apiRequest('GET',  '/auth/me'),
+    // Equipo de plataforma: segundo paso del inicio de sesión (el token de desafío viaja en el cuerpo)
+    mfaVerify:   (data) => apiRequest('POST', '/auth/mfa/verify', data),
+    enrollStart: (data) => apiRequest('POST', '/auth/mfa/enroll/start', data),
+    enrollFinish: (data) => apiRequest('POST', '/auth/mfa/enroll/finish', data),
   },
 
   users: {
@@ -153,12 +158,19 @@ export const API = {
     checkout:     (data) => apiRequest('POST', '/billing/checkout', data),
   },
 
-  // Panel del dueño de la plataforma (solo PLATFORM_ADMIN)
+  // Panel del equipo de plataforma (roles PLATFORM_*; el backend aplica el permiso de cada acción)
   platform: {
     organizations: (params)         => apiRequest('GET',  `/platform/organizations${qs(params)}`),
     create:        (data)           => apiRequest('POST', '/platform/organizations', data),
     // action: suspend | reactivate | cancel | extend-trial | plan | payment-links | manual-payment
     action:        (id, action, body) => apiRequest('POST', `/platform/organizations/${id}/${action}`, body || {}),
+    // Gestión del equipo (solo el dueño; cada cambio exige su PIN)
+    team: {
+      list:        ()         => apiRequest('GET',   '/platform/team'),
+      create:      (data)     => apiRequest('POST',  '/platform/team', data),
+      update:      (id, data) => apiRequest('PATCH', `/platform/team/${id}`, data),
+      resetAccess: (id, pin)  => apiRequest('POST',  `/platform/team/${id}/reset-access`, { pin }),
+    },
   },
 
   categories: {

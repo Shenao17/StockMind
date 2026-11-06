@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { vi } from 'vitest';
 import Platform from '../pages/Platform';
+import { AuthContext } from '../context/AuthContext';
 import * as apiModule from '../api';
 
 const org = (over = {}) => ({
@@ -13,11 +14,15 @@ const plans = [
   { code: 'STARTER', name: 'Starter', totalMonthly: 71281 }, { code: 'PRO', name: 'Pro', totalMonthly: 142681 },
 ];
 
-function setup(list = envelope([org()])) {
+const OWNER_PERMS = ['ORG_VIEW', 'ORG_CREATE', 'ORG_REACTIVATE', 'TRIAL_EXTEND', 'PAYMENT_LINK', 'SENSITIVE', 'TEAM_MANAGE'];
+const SUPPORT_PERMS = ['ORG_VIEW', 'ORG_REACTIVATE', 'TRIAL_EXTEND'];
+
+function setup(list = envelope([org()]), permissions = OWNER_PERMS) {
   const orgsSpy = vi.spyOn(apiModule.API.platform, 'organizations').mockImplementation(async () => list);
   vi.spyOn(apiModule.API.public, 'plans').mockResolvedValue(plans);
   const toast = vi.fn();
-  render(<Platform showToast={toast} />);
+  const user = { id: 1, email: 'd@x.com', role: 'PLATFORM_OWNER', permissions };
+  render(<AuthContext.Provider value={{ user }}><Platform showToast={toast} /></AuthContext.Provider>);
   return { orgsSpy, toast };
 }
 
@@ -107,5 +112,29 @@ describe('Platform', () => {
   it('sin empresas muestra un mensaje', async () => {
     setup(envelope([]));
     expect(await screen.findByText(/aún no hay empresas/i)).toBeInTheDocument();
+  });
+
+  it('un rol de soporte no ve crear empresa, ni acciones sensibles, ni la pestaña Equipo', async () => {
+    setup(envelope([org()]), SUPPORT_PERMS);
+    await screen.findByText('Ferretería El Tornillo');
+    expect(screen.queryByRole('button', { name: /nueva empresa/i })).toBeNull();
+    expect(screen.queryByRole('tab', { name: /equipo/i })).toBeNull();
+    const options = within(screen.getByLabelText(/acción para ferretería/i)).getAllByRole('option').map((o) => o.textContent);
+    expect(options).toEqual(['Acciones…', 'Extender prueba', 'Reactivar']);
+  });
+
+  it('un rol de solo consulta ve las empresas pero ninguna acción', async () => {
+    setup(envelope([org()]), ['ORG_VIEW']);
+    await screen.findByText('Ferretería El Tornillo');
+    expect(screen.getByText('Solo consulta')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/acción para/i)).toBeNull();
+  });
+
+  it('el dueño ve la pestaña Equipo y la abre', async () => {
+    vi.spyOn(apiModule.API.platform.team, 'list').mockResolvedValue([]);
+    setup();
+    await screen.findByText('Ferretería El Tornillo');
+    fireEvent.click(screen.getByRole('tab', { name: /equipo/i }));
+    expect(await screen.findByText(/equipo de la plataforma/i)).toBeInTheDocument();
   });
 });

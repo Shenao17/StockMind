@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API } from '../api';
 import { useAuth } from '../context/AuthContext';
+import { isPlatformRole } from '../platformRoles';
+import MfaStep from '../components/MfaStep';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -11,12 +13,23 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [challenge, setChallenge] = useState(null);   // equipo de plataforma: segundo paso pendiente
 
-  const homeFor = (u) => (u?.role === 'PLATFORM_ADMIN' ? '/platform' : '/dashboard');
+  const homeFor = (u) => (isPlatformRole(u?.role) ? '/platform' : '/dashboard');
 
   if (isLoggedIn()) {
     navigate(homeFor(user), { replace: true });
     return null;
+  }
+
+  // Sesión abierta: el equipo de plataforma necesita además sus permisos (/auth/me) para dibujar el panel
+  async function finish(u) {
+    let full = u;
+    if (isPlatformRole(u.role)) {
+      try { full = { ...u, ...(await API.auth.me()) }; } catch { /* sin permisos extra el panel solo muestra lo básico */ }
+    }
+    login(full);
+    navigate(homeFor(full), { replace: true });
   }
 
   async function handleLogin() {
@@ -36,9 +49,11 @@ export default function Login() {
 
       // El token ya no viaja en el body: el gateway lo puso en una cookie
       // httpOnly. Aquí solo llega { user: { id, username, email, organizationId, role } }.
-      if (response?.user) {
-        login(response.user);
-        navigate(homeFor(response.user), { replace: true });
+      if (response?.challenge) {
+        setPassword('');
+        setChallenge(response.challenge);
+      } else if (response?.user) {
+        finish(response.user);
       } else {
         setError('Respuesta inesperada del servidor');
       }
@@ -74,7 +89,13 @@ export default function Login() {
           <p>Gestión inteligente de inventario</p>
         </div>
 
+        {challenge && (
+          <MfaStep challenge={challenge} onDone={finish}
+            onCancel={() => setChallenge(null)} />
+        )}
+
         {/* Tarjeta */}
+        {!challenge && (
         <div className="login-card">
 
           <div className="login-card-header">
@@ -157,6 +178,7 @@ export default function Login() {
           </div>
 
         </div>
+        )}
 
         <p className="login-copyright">
           Sistema de gestión de inventario

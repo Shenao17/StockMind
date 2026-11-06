@@ -4220,3 +4220,34 @@ select option {
 .pay-total td { border-top: 1px solid rgba(255, 255, 255, 0.15); font-weight: 600; padding-top: 10px; }
 
 .platform-layout { grid-template-columns: 1fr; }
+
+/* ── Verificación en dos pasos (equipo de plataforma) ───────────────────── */
+.backup-codes {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  padding: 0;
+  margin: 0 0 14px;
+}
+.backup-codes li {
+  padding: 8px 10px;
+  text-align: center;
+  letter-spacing: .08em;
+  border: 1px solid var(--border, rgba(255,255,255,.12));
+  border-radius: 8px;
+}
+.mfa-setup { margin-bottom: 14px; }
+.mfa-setup img { display: block; margin: 8px auto 12px; background: #fff; padding: 6px; border-radius: 8px; }
+.mfa-secret { font-size: .78rem; color: var(--text-muted); word-break: break-all; }
+.team-temp-password {
+  padding: 10px 12px;
+  border: 1px dashed var(--border, rgba(255,255,255,.2));
+  border-radius: 8px;
+  text-align: center;
+  font-size: 1.05rem;
+  letter-spacing: .06em;
+  user-select: all;
+}
+.platform-tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+.platform-tabs button[aria-selected="true"] { border-color: var(--accent, #6c8cff); }

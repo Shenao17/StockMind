@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { API } from '../api';
 import { useAuth } from './AuthContext';
 import { SubscriptionContext } from './subscriptionState';
+import { isPlatformRole } from '../platformRoles';
 
 /**
  * SubscriptionProvider — Plan y estado de la empresa del usuario (GET /api/billing/subscription).
@@ -12,7 +13,7 @@ export function SubscriptionProvider({ children }) {
   const { user } = useAuth();
   const [subscription, setSubscription] = useState(null);
   const [loaded, setLoaded] = useState(false);
-  const isCompanyUser = !!user && user.role !== 'PLATFORM_ADMIN';
+  const isCompanyUser = !!user && !isPlatformRole(user.role);
 
   const reload = useCallback(async () => {
     try {

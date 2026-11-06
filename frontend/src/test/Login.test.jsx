@@ -118,3 +118,36 @@ describe('Login — interacción con la API', () => {
     expect(await screen.findByText(/no se puede conectar/i)).toBeInTheDocument();
   });
 });
+
+describe('Login — equipo de plataforma', () => {
+  it('con un desafío muestra el segundo paso en vez de abrir sesión', async () => {
+    vi.spyOn(apiModule.API.auth, 'login').mockResolvedValue({
+      challenge: { token: 't', mfaRequired: true, enrollmentRequired: false, mustChangePassword: false, fullName: 'Sebas' },
+    });
+    mockLogin.mockClear();
+    renderLogin();
+    fireEvent.change(screen.getByPlaceholderText(/tucorreo@empresa.com/i), { target: { value: 'd@x.com' } });
+    fireEvent.change(screen.getByPlaceholderText(/ingrese su contraseña/i), { target: { value: 'Clave1234' } });
+    fireEvent.click(screen.getByRole('button', { name: /iniciar sesión/i }));
+    expect(await screen.findByText(/verificación en dos pasos/i)).toBeInTheDocument();
+    expect(mockLogin).not.toHaveBeenCalled();
+    expect(screen.queryByPlaceholderText(/ingrese su contraseña/i)).toBeNull();
+  });
+
+  it('al terminar el segundo paso carga los permisos del perfil y abre sesión', async () => {
+    vi.spyOn(apiModule.API.auth, 'login').mockResolvedValue({
+      challenge: { token: 't', mfaRequired: true, enrollmentRequired: false, fullName: null },
+    });
+    vi.spyOn(apiModule.API.auth, 'mfaVerify').mockResolvedValue({ user: { id: 1, email: 'd@x.com', role: 'PLATFORM_OWNER' } });
+    vi.spyOn(apiModule.API.auth, 'me').mockResolvedValue({ id: 1, role: 'PLATFORM_OWNER', fullName: 'Sebas', permissions: ['ORG_VIEW'] });
+    mockLogin.mockClear();
+    renderLogin();
+    fireEvent.change(screen.getByPlaceholderText(/tucorreo@empresa.com/i), { target: { value: 'd@x.com' } });
+    fireEvent.change(screen.getByPlaceholderText(/ingrese su contraseña/i), { target: { value: 'Clave1234' } });
+    fireEvent.click(screen.getByRole('button', { name: /iniciar sesión/i }));
+    fireEvent.change(await screen.findByLabelText('Código'), { target: { value: '123456' } });
+    fireEvent.click(screen.getByRole('button', { name: /verificar/i }));
+    await waitFor(() => expect(mockLogin).toHaveBeenCalledWith(
+      expect.objectContaining({ role: 'PLATFORM_OWNER', fullName: 'Sebas', permissions: ['ORG_VIEW'] })));
+  });
+});

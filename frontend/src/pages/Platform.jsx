@@ -3,20 +3,23 @@ import { API, fmt, fmtDate } from '../api';
 import Modal from '../components/ui/Modal';
 import Pagination from '../components/ui/Pagination';
 import { useDebounce } from '../hooks/useDebounce';
+import { useAuth } from '../context/AuthContext';
+import PlatformTeam from './PlatformTeam';
 
 const PAGE_SIZE = 10;
 
 const STATUS_LABELS = { PENDING: 'Sin verificar', ACTIVE: 'Activa', SUSPENDED: 'Suspendida', CANCELLED: 'Cancelada' };
 const SUB_LABELS = { TRIAL: 'Prueba', ACTIVE: 'Activo', GRACE: 'Gracia', SUSPENDED: 'Suspendido', CANCELLED: 'Cancelado' };
 
+// perm = permiso que concede el rol (el backend lo vuelve a exigir; aquí solo se oculta lo que no aplica)
 const ACTIONS = [
-  { value: 'extend-trial', label: 'Extender prueba' },
-  { value: 'plan', label: 'Cambiar plan' },
-  { value: 'payment-links', label: 'Generar enlace de pago' },
-  { value: 'manual-payment', label: 'Registrar pago recibido' },
-  { value: 'suspend', label: 'Suspender' },
-  { value: 'reactivate', label: 'Reactivar' },
-  { value: 'cancel', label: 'Cancelar' },
+  { value: 'extend-trial', label: 'Extender prueba', perm: 'TRIAL_EXTEND' },
+  { value: 'plan', label: 'Cambiar plan', perm: 'SENSITIVE' },
+  { value: 'payment-links', label: 'Generar enlace de pago', perm: 'PAYMENT_LINK' },
+  { value: 'manual-payment', label: 'Registrar pago recibido', perm: 'SENSITIVE' },
+  { value: 'suspend', label: 'Suspender', perm: 'SENSITIVE' },
+  { value: 'reactivate', label: 'Reactivar', perm: 'ORG_REACTIVATE' },
+  { value: 'cancel', label: 'Cancelar', perm: 'SENSITIVE' },
 ];
 
 const emptyCompany = {
@@ -24,8 +27,13 @@ const emptyCompany = {
   planCode: 'PRO', mode: 'TRIAL', billingCycle: 'MONTHLY',
 };
 
-/** Platform — Panel del dueño de la plataforma: empresas, planes y cobros. */
+/** Platform — Panel del equipo de plataforma: empresas, planes y cobros (y el equipo, para el dueño). */
 export default function Platform({ showToast }) {
+  const { user } = useAuth() || {};
+  const perms = user?.permissions || [];
+  const can = (p) => perms.includes(p);
+  const allowedActions = ACTIONS.filter((a) => can(a.perm));
+  const [tab, setTab] = useState('companies');
   const [data, setData] = useState({ content: [], page: 0, totalElements: 0, totalPages: 0 });
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
@@ -118,6 +126,13 @@ export default function Platform({ showToast }) {
 
   return (
     <>
+      {can('TEAM_MANAGE') && (
+        <div className="platform-tabs" role="tablist">
+          <button role="tab" aria-selected={tab === 'companies'} className="btn btn-ghost btn-sm" onClick={() => setTab('companies')}>Empresas</button>
+          <button role="tab" aria-selected={tab === 'team'} className="btn btn-ghost btn-sm" onClick={() => setTab('team')}>Equipo</button>
+        </div>
+      )}
+      {tab === 'team' && can('TEAM_MANAGE') ? <PlatformTeam showToast={showToast} /> : (<>
       <div className="table-container">
         <div className="table-header">
           <h2>Empresas</h2>
@@ -130,7 +145,7 @@ export default function Platform({ showToast }) {
               {Object.entries(STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
             <span style={{ fontSize: '.8rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{data.totalElements} empresas</span>
-            <button className="btn btn-primary btn-sm" onClick={() => setCreating(true)}>+ Nueva empresa</button>
+            {can('ORG_CREATE') && <button className="btn btn-primary btn-sm" onClick={() => setCreating(true)}>+ Nueva empresa</button>}
           </div>
         </div>
 
@@ -150,10 +165,14 @@ export default function Platform({ showToast }) {
                   <td className="mono">{expiry(o.subscription)}</td>
                   <td>{o.origin === 'SELF_SIGNUP' ? 'Autoregistro' : 'Plataforma'}</td>
                   <td>
-                    <select aria-label={`Acción para ${o.name}`} value="" onChange={(e) => startAction(o, e.target.value)} style={{ width: 170 }}>
-                      <option value="">Acciones…</option>
-                      {ACTIONS.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
-                    </select>
+                    {allowedActions.length === 0 ? (
+                      <span style={{ color: 'var(--text-muted)', fontSize: '.8rem' }}>Solo consulta</span>
+                    ) : (
+                      <select aria-label={`Acción para ${o.name}`} value="" onChange={(e) => startAction(o, e.target.value)} style={{ width: 170 }}>
+                        <option value="">Acciones…</option>
+                        {allowedActions.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
+                      </select>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -192,7 +211,7 @@ export default function Platform({ showToast }) {
       <Modal open={!!action} onClose={() => setAction(null)} title={action ? `${ACTIONS.find((a) => a.value === action.type)?.label} — ${action.org.name}` : ''}
         footer={<><button className="btn btn-ghost" onClick={() => setAction(null)}>Cancelar</button><button className="btn btn-primary" onClick={submitAction}>Aceptar</button></>}>
         {action?.type === 'extend-trial' ? (
-          <div className="form-group"><label>Días a sumar (1–90)</label><input type="number" min="1" max="90" value={actionForm.days} onChange={f(setActionForm)('days')} /></div>
+          <div className="form-group"><label>Días a sumar (1–{can('SENSITIVE') ? 90 : 7})</label><input type="number" min="1" max={can('SENSITIVE') ? 90 : 7} value={actionForm.days} onChange={f(setActionForm)('days')} /></div>
         ) : (
           <>
             <div className="form-group"><label>Plan</label>
@@ -215,6 +234,7 @@ export default function Platform({ showToast }) {
         <button className="btn btn-ghost btn-sm" style={{ marginTop: 8 }}
           onClick={() => { navigator.clipboard?.writeText(link); showToast?.('Enlace copiado'); }}>Copiar</button>
       </Modal>
+      </>)}
     </>
   );
 }

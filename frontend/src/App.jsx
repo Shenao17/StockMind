@@ -9,6 +9,7 @@ import VerifyEmail from './pages/VerifyEmail';
 import Pay from './pages/Pay';
 import Billing from './pages/Billing';
 import Platform from './pages/Platform';
+import { isPlatformRole, PLATFORM_ROLE_LABELS } from './platformRoles';
 import { SubscriptionProvider } from './context/SubscriptionContext';
 import { useSubscription } from './context/subscriptionState';
 import PlanBanner from './components/ui/PlanBanner';
@@ -52,7 +53,7 @@ function ProtectedLayout({ showToast }) {
   if (!isLoggedIn()) return <Navigate to="/" replace />;
 
   // El dueño de la plataforma no tiene empresa: solo ve su panel
-  if (user.role === 'PLATFORM_ADMIN') {
+  if (isPlatformRole(user.role)) {
     return (
       <div className="app-layout platform-layout">
         <header className="topbar">
@@ -61,7 +62,7 @@ function ProtectedLayout({ showToast }) {
             <span className="topbar-subtitle">{PAGE_SUBTITLES['/platform']}</span>
           </div>
           <div className="topbar-actions">
-            <span className="mono" style={{ fontSize: '.8rem' }}>{user.email}</span>
+            <span className="mono" style={{ fontSize: '.8rem' }}>{user.fullName || user.email} · {PLATFORM_ROLE_LABELS[user.role]}</span>
             <button className="btn btn-ghost btn-sm" onClick={logout}>Cerrar sesión</button>
           </div>
         </header>
