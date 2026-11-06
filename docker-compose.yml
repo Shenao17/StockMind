@@ -71,6 +71,7 @@ services:
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:?Falta INTERNAL_API_KEY en .env}
       NODE_ENV: ${NODE_ENV:-development}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      LANDING_URL: ${LANDING_URL:-}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       AGENT_ENABLED: ${AGENT_ENABLED:-false}
       TRUST_PROXY: ${TRUST_PROXY:-}

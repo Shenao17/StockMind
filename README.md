@@ -2,9 +2,36 @@
 
 > Plataforma web para la gestión de inventario y ventas con analítica predictiva integrada.
 
+> **Documentación vigente:** la arquitectura, la configuración, la seguridad y las pruebas están descritas en [`docs/manual-tecnico.md`](docs/manual-tecnico.md) (v1.4.0). Algunas secciones históricas de este README (changelog antiguo, diagramas) describen versiones anteriores.
+
 ---
 
 ## Changelog
+
+### [1.4.0] - Multiempresa y endurecimiento
+> Noviembre 2026
+
+**Plataforma multiempresa (SaaS)**
+- Tabla `organizations` y aislamiento automático de los datos por empresa (`organization_id` + `@TenantId` de Hibernate). El SKU, la categoría y el nombre de usuario son únicos por empresa.
+- Inicio de sesión por **correo electrónico**; el token lleva la empresa.
+- Nuevo rol `PLATFORM_ADMIN` (dueño de la plataforma) y operaciones `/api/platform/*`.
+- Registro de empresas: **autoregistro** con verificación de correo, CAPTCHA, honeypot y **14 días de prueba gratis**, y **alta desde el panel de plataforma**.
+- Servicio de analítica aislado por empresa y autenticado con clave interna gateway ↔ analytics.
+
+**Seguridad e integridad**
+- Secretos fuera del repositorio (`.env`), puertos internos cerrados y usuario de aplicación de MySQL sin permisos de administrador.
+- Roles aplicados también en el backend; ventas con precio fijado por el servidor y bloqueo de stock; validación de entradas con DTOs; errores sin detalles internos.
+- Gateway con Helmet, límites de cuerpo, timeouts y logging estructurado (JSON).
+
+**Calidad e infraestructura**
+- Migraciones con **Flyway**; Hibernate solo valida el esquema.
+- Paginación y filtros del lado del servidor; dashboard con resumen calculado en la base de datos.
+- Pruebas automáticas en los cuatro servicios y CI en GitHub Actions.
+- Entorno de desarrollo con recarga automática (`docker compose up --build --watch`).
+
+**Eliminado**
+- **MongoDB** y el logging a Mongo: los logs pasan a la salida estándar en formato JSON.
+- El asistente IA queda temporalmente apagado (`AGENT_ENABLED=false`) mientras se reconstruye.
 
 ### [1.3.6] - Capa de Logging con MongoDB (Experimental / Reto técnico)
 > Septiembre 2026
@@ -654,115 +681,63 @@ Gateway (en paralelo, sin bloquear la respuesta):
 
 ### Prerrequisitos
 
-- Node.js 20 LTS
-- Java 17 JDK
-- Python 3.11+
-- MySQL 8.x
-- MongoDB 7.x (o vía Docker)
-- Maven 3.x
-- API Key de Groq (gratuita en [console.groq.com](https://console.groq.com)) — requerida para el agente IA
-
-### Inicio rápido (Windows)
-
-Ejecutar `start.bat` en la raíz del proyecto. El script levanta todos los servicios en orden y abre el navegador automáticamente en `http://localhost:5173`.
-
-> Requiere MySQL Community Server 8.x activo y la base de datos inicializada previamente.
+- **Docker** con Docker Compose v2 (recomendado: levanta todo el sistema)
+- Opcional, para correr los servicios fuera de Docker: Node.js 20 LTS, Java 17 JDK, Maven 3.x, Python 3.11+ y MySQL 8.x
 
 ### Inicio rápido (Docker)
 
-```bash
-docker compose up --build
-```
-
-Levanta MySQL, MongoDB, backend, analytics, gateway y frontend en un solo comando, con las redes y variables de entorno ya configuradas entre servicios.
-
-### 1. Base de datos (MySQL)
+1. Crea tu archivo de variables de entorno a partir de la plantilla y reemplaza **todos** los valores:
 
 ```bash
-mysql -u root -p < database/schema.sql
-mysql -u root -p stockmind_db < database/seed.sql
+cp .env.example .env
+# Genera valores aleatorios fuertes con:  openssl rand -hex 32
 ```
 
-### 2. MongoDB (logs)
+   Variables obligatorias: `MYSQL_ROOT_PASSWORD`, `MYSQL_USER`, `MYSQL_PASSWORD`, `JWT_SECRET` e `INTERNAL_API_KEY`. El resto (dueño de la plataforma, CAPTCHA, asistente IA...) está descrito en `.env.example` y en el manual técnico. El `.env` no se sube al repositorio.
+
+2. Levanta el sistema con recarga automática en desarrollo:
 
 ```bash
-docker run -d --name stockmind_mongo -p 27017:27017 \
-  -e MONGO_INITDB_ROOT_USERNAME=root \
-  -e MONGO_INITDB_ROOT_PASSWORD=root \
-  mongo:7
-# Disponible en localhost:27017
+docker compose up --build --watch
 ```
 
-> Si ya levantaste todo con `docker compose up`, este paso queda cubierto automáticamente.
+   - Frontend: <http://localhost:5173> · Gateway: <http://localhost:3000>
+   - Solo el gateway y el frontend se publican al host; MySQL, backend y analytics solo son accesibles dentro de la red de Docker (MySQL también en `127.0.0.1:3306` en desarrollo).
+   - En desarrollo se cargan **datos de ejemplo**: inicia sesión con `admin@stockmind.com` (administrador) o `vendedor1@stockmind.com` (vendedor). La contraseña de ejemplo está en el comentario de `backend/src/main/resources/db/dev/seed.sql`. **Solo desarrollo.**
+   - Los enlaces de verificación de correo del registro aparecen en el log del backend (`docker compose logs backend`) mientras no haya un proveedor de correo.
 
-### 3. Backend Java
+3. Para reiniciar la base con los datos de ejemplo (borra los datos de desarrollo):
 
 ```bash
-cd backend
-mvn clean install
-mvn spring-boot:run
-# Disponible en http://localhost:8080
+docker compose down -v
 ```
 
-### 4. Microservicio Python
+### Pruebas
 
 ```bash
-cd analytics
-python -m venv venv
-venv\Scripts\activate
-pip install -r requirements.txt
-python app.py
-# Disponible en http://localhost:8000
+cd backend   && mvn test              # 85 pruebas (H2); con MYSQL_TEST_URL corre contra MySQL real
+cd gateway   && npm test              # 122 pruebas
+cd frontend  && npx vitest run        # 55 pruebas
+cd analytics && python -m pytest      # 65 pruebas (+4 contra MySQL real con ANALYTICS_MYSQL_HOST)
 ```
 
-### 5. Gateway Node.js
+El CI (`.github/workflows/ci.yml`) las ejecuta en cada push y pull request.
+
+### Ejecutar los servicios fuera de Docker (opcional)
+
+El esquema de la base lo crea **Flyway** al arrancar el backend (migraciones en `backend/src/main/resources/db/migration/`); solo hace falta una base vacía `stockmind_db` y un usuario con permisos sobre ella. Cada servicio lee sus variables de entorno (ver `.env.example`):
 
 ```bash
-cd gateway
-npm install
-npm start
-# Disponible en http://localhost:3000
+cd backend   && mvn spring-boot:run        # http://localhost:8080 (perfil dev: SPRING_PROFILES_ACTIVE=dev)
+cd analytics && pip install -r requirements.txt && python app.py   # http://localhost:8000
+cd gateway   && npm install && npm start   # http://localhost:3000 (exige JWT_SECRET e INTERNAL_API_KEY)
+cd frontend  && npm install && npm run dev # http://localhost:5173
 ```
 
-> El gateway espera la conexión a MongoDB antes de levantar — si Mongo no está corriendo, el proceso no arranca.
+### Asistente IA (apagado por ahora)
 
-### 6. Frontend React
-
-```bash
-cd frontend
-npm install
-npm run dev
-# Disponible en http://localhost:5173
-```
-
-### Variables de entorno (gateway/.env)
-
-```env
-PORT=3000
-JAVA_API_URL=http://localhost:8080
-PYTHON_API_URL=http://localhost:8000
-JWT_SECRET=stockmind_super_secret_key_2024
-MONGO_URI=mongodb://root:root@localhost:27017/stockmind_logs?authSource=admin
-```
-
-> Al correr vía `docker compose`, `MONGO_URI` usa el nombre del servicio interno (`mongo`) en vez de `localhost` — ya viene configurado así en `docker-compose.yml`.
-
-### Configuración del agente IA (opcional)
-
-El agente IA requiere una API key de Groq. Configúrala como variable de entorno de Vite para no exponerla en el código fuente:
-
-```env
-# frontend/.env
-VITE_GROQ_API_KEY=tu_api_key_aqui
-```
-
-```jsx
-// App.jsx
-<AgentBubble geminiApiKey={import.meta.env.VITE_GROQ_API_KEY} />
-```
-
-> Si no se configura la API key, el agente mostrará el indicador de estado "sin conexión" y no afectará el funcionamiento del resto del sistema.
+El asistente consulta Groq **desde el gateway** (la clave nunca llega al navegador). Está desactivado por defecto; para reactivarlo define `AGENT_ENABLED=true` y `GROQ_API_KEY` en el `.env` y recrea el gateway.
 
 ---
 
-*Desarrollado como proyecto académico — StockMind v1.3.6 (experimental)*
+*StockMind v1.4.0 — BlackLabs Dev*

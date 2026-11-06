@@ -1,152 +1,142 @@
 # StockMind — Manual Técnico
 
-**Versión:** 1.3.6
-**Clasificación:** Documentación técnica interna
+**Versión:** 1.4.0 (multiempresa)
+**Clasificación:** Documentación técnica interna — BlackLabs Dev
 **Audiencia:** Desarrolladores, administradores de sistemas
 
 ---
 
-## 0. Resumen de cambios desde v1.2.0
+## 0. Resumen de cambios desde v1.3.6
 
-Este manual no se actualizaba desde la v1.2.0. Entre esa versión y la actual (v1.3.6) se incorporaron, en orden:
+La v1.4.0 convierte StockMind de una aplicación de un solo negocio en una plataforma **multiempresa** (SaaS), y endurece su seguridad e infraestructura. En orden:
 
-- **v1.3.0** — Rediseño visual (Dark Glass / Glassmorphism) y correcciones en gestión de usuarios.
-- **v1.3.1** — Rate limiting realmente activado en el gateway (antes importado pero sin aplicar).
-- **v1.3.2** — Cambio de fondo en autenticación: el JWT deja de viajar en el body y de guardarse en `localStorage`; pasa a cookie `httpOnly`. **Esto invalida la sección 4 de la versión anterior del manual** — ver la sección 4 reescrita más abajo.
-- **v1.3.5** — Efecto visual **StockMindGlass** (`GlassElement`), aplicado por ahora al botón del agente IA.
-- **v1.3.6** — Capa de logging con MongoDB, desacoplada de MySQL (experimental / reto técnico — ver nota de producción en la sección 6).
+**Seguridad y estabilidad**
+- Secretos fuera del repositorio (`.env`), puertos internos cerrados, usuario de aplicación de MySQL sin privilegios de administrador.
+- Roles aplicados también en el backend Java (antes solo en el gateway).
+- Ventas: el precio lo fija el servidor, bloqueo pesimista de stock, trazabilidad de movimientos.
+- Validación de entradas con DTOs en todos los módulos, errores sin detalles internos, política de contraseñas.
 
-El resto de este documento ya refleja el sistema tal como queda en v1.3.6, no como estaba en v1.2.0.
+**Calidad**
+- Pruebas automáticas en los cuatro servicios y CI (GitHub Actions).
+- Migraciones de base de datos con **Flyway**; Hibernate solo valida.
+- Paginación y filtros del lado del servidor; resumen de dashboard calculado en la base de datos.
+- Gateway endurecido: Helmet, límites de cuerpo, timeouts, logging estructurado (JSON).
+
+**Multiempresa**
+- Tabla `organizations` y aislamiento automático por empresa (`@TenantId`).
+- Login por **correo**; el token lleva la empresa.
+- Servicio de analítica aislado por empresa y autenticado con clave interna.
+- Registro de empresas: autoregistro con verificación de correo y prueba gratis, y alta desde el panel de plataforma.
+
+**Eliminado**
+- **MongoDB** (solo guardaba logs que nadie leía). Los logs pasan a la salida estándar en JSON.
+- `morgan` (reemplazado por `pino-http`).
+
+> Los números de versión internos de cada servicio (gateway 1.0.0, analytics 1.2.0, frontend 0.0.0) no se han alineado con la versión del producto. Es un pendiente menor.
 
 ---
 
 ## 1. Visión general de la arquitectura
 
-StockMind es un sistema distribuido compuesto por componentes independientes que se comunican mediante HTTP/REST. Ningún componente accede directamente a la base de datos de otro; MySQL es el único almacén de datos **de negocio**, accedido por Java (lógica de negocio) y Python (analítica de solo lectura + escritura de predicciones). Desde la v1.3.6, MongoDB se suma como un almacén adicional, pero exclusivamente para logs — no para datos de negocio.
-
-A partir de la v1.2.0, el frontend incorpora un componente de agente IA (`AgentBubble`) que realiza llamadas directas a la API de Groq desde el navegador. Este componente sigue siendo el único que opera fuera del gateway Node.js.
+StockMind es un sistema distribuido de servicios independientes que se comunican por HTTP/REST. **MySQL es el único almacén de datos**, accedido por el backend Java (lógica de negocio y esquema) y por el servicio Python (lectura de ventas y escritura de predicciones).
 
 ```
-Frontend React → Gateway Node.js :3000
-                     ├── → Java Spring Boot :8080 (lógica de negocio)
-                     ├── → Python Flask :8000 (analítica)
-                     │              ↓
-                     │         MySQL :3306
-                     └── → MongoDB :27017 (logs, no bloqueante)
-
-Frontend React → Groq API (externo, solo AgentBubble)
+Navegador (React :5173)
+     │  cookie httpOnly
+     ▼
+Gateway Node.js :3000 ──► Backend Java Spring Boot :8080 ──► MySQL :3306
+     │  (X-Internal-Key + X-Organization-Id)                    ▲
+     ├────────────────► Analytics Python Flask :8000 ───────────┘
+     └────────────────► Groq API (externo, asistente IA — apagado por ahora)
 ```
 
-### Principio de diseño fundamental
+**Solo el gateway (3000) y el frontend (5173) se publican al host.** MySQL, el backend y analytics solo son alcanzables dentro de la red de Docker (en desarrollo, MySQL se publica además en `127.0.0.1:3306` para usar un cliente SQL).
 
-El frontend **nunca** contacta directamente al backend Java ni al microservicio Python. El gateway Node.js es el único punto de entrada del sistema. Esta decisión permite:
+### Principios de diseño
 
-- Autenticación centralizada (un solo punto de verificación de JWT)
-- Cambiar la implementación interna de cualquier servicio sin afectar el frontend
-- Aplicar rate limiting, logging y CORS en un solo lugar
-- Evolución independiente de cada servicio
-
-El agente IA sigue siendo la única excepción deliberada a este principio: al ser un componente experimental que consume un servicio externo de terceros (Groq), se integra directamente en el cliente sin pasar por el gateway.
-
-MongoDB **no** es una excepción a este principio en el mismo sentido: sigue centralizada en el gateway (es el único servicio que le escribe), pero es una rama paralela sin efecto en el flujo de negocio — si Mongo no respondiera durante una petición ya en curso, esa petición no se ve afectada (ver sección 2.2).
+- **El gateway es el único punto de entrada.** Centraliza la autenticación, CORS, límites de frecuencia, tamaño de cuerpo, timeouts y logging.
+- **Defensa en profundidad.** El gateway valida sesión y rol, pero el backend Java también valida el JWT y aplica roles; analytics exige una clave interna. Ningún servicio confía ciegamente en que otro ya validó.
+- **Aislamiento por empresa en la capa de datos**, no en el código de cada pantalla (sección 3).
+- **El frontend nunca habla con Java ni con Python**, y no maneja el JWT: vive solo en una cookie `httpOnly`.
 
 ---
 
 ## 2. Descripción de cada servicio
 
-### 2.1 Frontend (React 18 + Vite)
+### 2.1 Frontend (React + Vite)
 
-**Tipo:** Single Page Application
-**Tecnología:** React 18, Vite, React Router DOM 6
+**Tecnología:** React 19, Vite 8, React Router 7, Vitest
 **Puerto de desarrollo:** 5173
-**Comunicación:** Solo HTTP hacia `http://localhost:3000/api` (gateway), con cookies incluidas (`credentials: 'include'`), excepto `AgentBubble` que llama directamente a Groq
+**Comunicación:** solo HTTP hacia el gateway (`VITE_GATEWAY_URL`, por defecto `http://localhost:3000/api`) con `credentials: 'include'`.
 
-El frontend utiliza el módulo `api.js` como cliente HTTP centralizado. Todas las rutas pasan por `API.{modulo}.{operacion}()`.
-
-> **Cambio importante (v1.3.2):** el frontend ya **no** maneja el JWT directamente. No se lee ni se guarda en `localStorage`, y no se inyecta ningún header `Authorization` manualmente — el navegador envía la cookie `httpOnly` automáticamente en cada request al gateway. `AuthContext` restaura la sesión llamando a `GET /api/auth/me` al montar la aplicación, y solo mantiene en memoria el objeto `{ user }` (no el token).
-
-**Páginas y componentes principales:**
+`src/api.js` es el cliente HTTP central: `API.{módulo}.{operación}()`. Los listados aceptan un objeto de parámetros (`page`, `size`, `search`, ...) y construyen la query string omitiendo valores vacíos.
 
 | Archivo | Módulo |
 |---------|--------|
-| `pages/Login.jsx` | Autenticación |
-| `pages/Dashboard.jsx` | Resumen general |
-| `pages/Products.jsx` | CRUD de productos |
-| `pages/Inventory.jsx` | Movimientos de inventario |
-| `pages/Sales.jsx` | Registro y consulta de ventas |
-| `pages/Reports.jsx` | Reportes de ventas |
-| `pages/Predictions.jsx` | Predicciones y recomendaciones |
-| `pages/Users.jsx` | Gestión de usuarios (solo Admin) |
-| `components/layout/Sidebar.jsx` | Navegación lateral con NavLink |
-| `components/ui/GlassElement.jsx` | Base visual **StockMindGlass** (refracción/blur vía `backdrop-filter` + mapas de desplazamiento SVG) — v1.3.5 |
-| `components/ui/AgentBubble.jsx` | Agente IA conversacional (experimental); usa `GlassElement` en su botón flotante desde v1.3.5 |
-| `context/AuthContext.jsx` | Estado global de sesión (`{ user }`), restaurado vía `/api/auth/me` |
-| `hooks/useToast.js` | Sistema de notificaciones |
+| `pages/Login.jsx` | Inicio de sesión por **correo electrónico** |
+| `pages/VerifyEmail.jsx` | Destino del enlace de verificación de correo (`/verify-email?token=...`) |
+| `pages/Dashboard.jsx` | Resumen general (datos de `/api/dashboard/summary`) |
+| `pages/Products.jsx` | Catálogo: búsqueda y filtro por categoría en el servidor, paginado |
+| `pages/Inventory.jsx` | Movimientos: filtro por tipo, paginado |
+| `pages/Sales.jsx` | Punto de venta e historial paginado |
+| `pages/Reports.jsx`, `pages/Predictions.jsx` | Reportes y predicciones |
+| `pages/Users.jsx` | Usuarios de la empresa (solo ADMIN): búsqueda y paginación |
+| `components/ui/Pagination.jsx` | Controles de paginación reutilizables |
+| `hooks/useDebounce.js` | Retraso de 300 ms en búsquedas (evita una petición por tecla) |
+| `components/ui/AgentBubble.jsx` | Asistente IA (apagado por ahora, ver 2.5) |
+| `GlassUi/` | Efecto visual StockMindGlass |
+| `context/AuthContext.jsx` | Sesión `{ user }` en memoria, restaurada con `GET /api/auth/me` |
 
-**Protección de rutas:**
-`ProtectedLayout` verifica el estado de sesión resuelto por `AuthContext` (a partir de `/api/auth/me`) en cada render. Si no hay sesión válida, redirige a `/` (login). Las rutas específicas por rol se controlan en cada página individualmente.
+**Sesión:** no se lee ni guarda el token. Si el gateway responde 401 en cualquier llamada (salvo `/auth/me` y `/auth/login`), el cliente limpia la sesión y vuelve al login. Los tokens emitidos antes de la multiempresa (sin empresa) reciben 401 y obligan a iniciar sesión de nuevo.
 
----
+**Pantallas que aún cargan listas completas** (sin paginar): el catálogo del punto de venta, el selector de producto de Inventario, Predicciones y Reportes. Con catálogos grandes necesitan una solución propia (búsqueda mientras se escribe, por ejemplo).
 
 ### 2.2 API Gateway (Node.js + Express)
 
-**Puerto:** 3000
-**Responsabilidades:**
-- Verificación de sesión vía cookie `httpOnly` antes de cada petición protegida
-- Enrutamiento transparente hacia Java o Python según el módulo
-- CORS (con `credentials: true` y origin explícito, requerido para cookies cross-port), rate limiting, logging a consola (Morgan) y a MongoDB
-- Manejo unificado de errores (incluyendo servicios no disponibles)
+**Puerto:** 3000. El código se divide en `app.js` (construye la aplicación sin escuchar, para poder probarla) y `server.js` (la arranca).
 
-**Lógica de enrutamiento:**
-- `/api/auth/**` → Java :8080
-- `/api/users/**` → Java :8080
-- `/api/products/**` → Java :8080
-- `/api/inventory/**` → Java :8080
-- `/api/sales/**` → Java :8080
-- `/api/reports/**` → Java :8080
-- `/api/predictions/**` → **Python :8000** ← único módulo que va a Python
+**Responsabilidades**
+- Verificar la sesión (JWT en cookie `httpOnly`) y el rol antes de cada ruta protegida.
+- Proxy hacia Java y Python; el JWT se reenvía a Java como `Authorization: Bearer` (`utils/authHeader.js`).
+- Seguridad: **Helmet**, CORS por ruta, límite de cuerpo (100 KB), timeouts (15 s a Java/Python, 20 s a Groq), rate limiting.
+- Registro estructurado (`pino`/`pino-http`) y manejo unificado de errores.
 
-El gateway actúa como proxy sin estado; no persiste datos de negocio propios. Desde v1.3.6, sí persiste **metadatos de logging** (no datos de negocio) en MongoDB.
+**Rutas**
 
-**Rate limiting (activado en v1.3.1):**
+| Prefijo | Destino | Acceso |
+|---------|---------|--------|
+| `/api/auth/*` | Java | login público; `/me` con sesión |
+| `/api/users` | Java | ADMIN |
+| `/api/products`, `/api/categories` | Java | lectura: ADMIN/SELLER · escritura de productos: ADMIN |
+| `/api/inventory` | Java | lectura: ambos · alta de movimientos: ADMIN |
+| `/api/sales` | Java | ADMIN/SELLER |
+| `/api/dashboard/summary` | Java | ADMIN/SELLER |
+| `/api/reports` | Java | ADMIN |
+| `/api/predictions/*` | **Python** | ADMIN/SELLER (requiere empresa) |
+| `/api/agent/*` | Groq | sesión; apagado salvo `AGENT_ENABLED=true` |
+| `/api/public/*` | Java | **sin sesión**: registro y verificación (ver 5.4) |
+| `/api/platform/*` | Java | solo `PLATFORM_ADMIN` |
+| `/health` | — | público, sin datos internos |
+
+**CORS:** el origen del frontend (`FRONTEND_URL`) con `credentials: true`. La landing (otro dominio, `LANDING_URL`) solo puede llamar a `/api/public/*` y **sin cookies**.
+
+**Rate limiting** (en memoria del proceso; con varias réplicas hará falta un almacén compartido, p. ej. Redis):
 
 | Limitador | Alcance | Límite |
 |-----------|---------|--------|
-| `authLimiter` | `POST /api/auth/login` | 10 intentos / 15 min por IP (mitiga fuerza bruta) |
-| `apiLimiter` | Resto de `/api` | 600 peticiones / 5 min en producción · 5000 / 5 min en desarrollo |
+| `authLimiter` | `POST /api/auth/login` | 10 / 15 min por IP |
+| `apiLimiter` | resto de `/api` | 600 / 5 min por IP (5000 en desarrollo) |
+| Registro | `POST /api/public/registrations` | 5 / hora por IP |
+| Reenvío de verificación | `POST /api/public/resend-verification` | 5 / hora por IP |
+| Verificación | `POST /api/public/verify-email` | 30 / hora por IP |
 
-`apiLimiter` identifica por `req.user.id` cuando hay sesión, con fallback a IP. Nota interna: como la verificación de sesión ocurre dentro de cada archivo de rutas y no antes de este middleware, en la práctica `req.user` aún no existe al pasar por el limitador general — hoy limita por IP de forma efectiva; reordenar esto es un pendiente conocido.
+Detrás de un proxy inverso hay que definir `TRUST_PROXY` (número de proxies) para que se use la IP real.
 
-**Autenticación de cookie (v1.3.2):**
-`cookie-parser` lee la cookie `httpOnly` en cada request. El middleware de auth valida el JWT contenido en la cookie y reconstruye el header `Authorization: Bearer <token>` que Java espera, mediante el helper centralizado `utils/authHeader.js` — así esa reconstrucción vive en un solo lugar en vez de repetirse en cada archivo de rutas.
-
-**Logging a MongoDB (v1.3.6):**
-El middleware `mongoLogger` (`src/middleware/mongoLogger.middleware.js`) registra cada request en la colección `logs` de MongoDB (método, ruta, status code, IP, tiempo de respuesta), usando el cliente centralizado en `db/mongo.js`. La escritura ocurre en `res.on('finish')`, **después** de que la respuesta ya fue enviada al cliente — nunca la retrasa. Si la escritura falla, se captura y se registra por consola; no interrumpe la petición.
-
-El servidor (`server.js`) espera la conexión a MongoDB **antes** de aceptar tráfico: si Mongo no responde al arrancar, el proceso no levanta (`process.exit(1)`). Esto es deliberado — se prefiere fallar rápido y visible en el arranque, a levantar "a medias" sin logging y descubrirlo horas después.
-
-**Variables de entorno requeridas (gateway/.env):**
-```env
-PORT=3000
-JAVA_API_URL=http://localhost:8080
-PYTHON_API_URL=http://localhost:8000
-JWT_SECRET=<igual_al_configurado_en_java>
-NODE_ENV=development
-MONGO_URI=mongodb://root:root@localhost:27017/stockmind_logs?authSource=admin
-```
-> Al correr vía `docker compose`, `MONGO_URI` apunta al nombre del servicio interno (`mongo`), no a `localhost`.
-
----
+**Logging:** una línea JSON por petición a la salida estándar con `X-Request-Id` (reutiliza el del proxy si es válido), método, ruta **sin query string**, estado, duración y `userId`. Nunca registra cookies ni cabeceras de autorización. `/health` no se registra. Los logs no se guardan en ninguna base: queda para la fase de infraestructura decidir dónde recogerlos.
 
 ### 2.3 Backend Java (Spring Boot)
 
-**Puerto:** 8080
-**Framework:** Spring Boot 3.x con Spring Security, Spring Data JPA
-**Base de datos:** MySQL 8 vía JDBC/Hibernate
-
-Sin cambios funcionales desde v1.2.0. Sigue recibiendo el header `Authorization: Bearer <token>` en cada request protegida — lo único que cambió es *quién* arma ese header (antes el frontend directamente, ahora el gateway a partir de la cookie; ver 2.2).
-
-**Capas de la aplicación:**
+**Puerto:** 8080 (solo red interna). **Framework:** Spring Boot 3.2, Spring Security, Spring Data JPA, **Hibernate 6.4** (fijado en el `pom.xml`: Boot 3.2.0 trae 6.3.1, que no permite el identificador de empresa como `Long`), Flyway.
 
 ```
 Controller → Service → Repository → MySQL
@@ -154,430 +144,396 @@ Controller → Service → Repository → MySQL
 
 | Capa | Responsabilidad |
 |------|-----------------|
-| Controller | Recibir HTTP, validar body, delegar al Service, retornar ResponseEntity |
-| Service | Lógica de negocio, transacciones (@Transactional), validaciones de estado |
-| Repository | Consultas JPA, queries JPQL personalizadas |
-| Model | Entidades JPA anotadas |
-| DTO | Objetos de transferencia para entrada/salida de datos |
-| Exception | GlobalExceptionHandler para respuestas de error consistentes |
-| Config | SecurityConfig (Spring Security + filtro JWT), JwtConfig |
+| Controller | HTTP, validación del cuerpo con `@Valid`, delegar al servicio |
+| Service | Lógica de negocio y transacciones |
+| Repository | JPA, JPQL y *Specifications* para filtros combinables |
+| Model | Entidades JPA |
+| DTO | Entrada/salida validadas (`ProductDTO`, `SaleDTO`, `UserDTO`, `InventoryDTO`, `RegistrationDTO`, `PageResponse`) |
+| Exception | `GlobalExceptionHandler`: errores consistentes y sin detalles internos |
+| Tenant | `TenantContext` y resolución de la empresa para Hibernate |
 
-**Transacción crítica: `SaleService.registerSale()`**
+**Transacciones críticas**
+- `SaleService.registerSale`: precio **siempre desde `Product.price`**, producto leído con `SELECT ... FOR UPDATE` (en orden de id, contra deadlocks), validación de stock, movimiento de inventario con el id de la venta; todo en una transacción.
+- `InventoryService.registerMovement`: mismo bloqueo; solo `ENTRY`, `EXIT` y `ADJUSTMENT` se registran a mano (`ENTRY` suma; `EXIT` y `ADJUSTMENT` restan; la semántica de `ADJUSTMENT` como "conteo físico" está por definir).
+- `RegistrationService`: empresa y primer administrador en una sola transacción; el correo se envía solo si se confirma.
 
-Esta es la operación más sensible del sistema. Ocurre dentro de `@Transactional`:
-1. Obtiene el usuario del nombre extraído del JWT
-2. Para cada ítem en la lista:
-   a. Carga el producto con validación de existencia y activación
-   b. Verifica que `stockCurrent >= quantity`
-   c. Crea el `SaleDetail` con subtotal calculado
-   d. Descuenta el stock: `product.setStockCurrent(stockBefore - quantity)`
-   e. Persiste el `InventoryMovement` de tipo `SALE`
-3. Persiste la cabecera `Sale` con el total sumado
+**Paginación (contrato común de los listados)**
 
-Si cualquier paso lanza una excepción, el rollback es automático (ACID MySQL).
+`page` (base 0), `size` (1–100, por defecto 20), `sort` (solo campos permitidos por recurso) y `dir` (`asc`|`desc`). Con `page` o `size` la respuesta es `{ content, page, size, totalElements, totalPages }`; sin ellos, el arreglo completo (compatibilidad). Un campo de orden no permitido, `size` fuera de rango o `page` negativa devuelven 400.
 
-**Seguridad:**
-- `SecurityConfig` configura Spring Security para modo stateless (sin sesión)
-- El `JwtAuthFilter` extrae y valida el token en cada request
-- `/auth/login` es el único endpoint público
-- La autorización por rol (ADMIN vs SELLER) se delega al gateway para no duplicar lógica
+| Recurso | Filtros |
+|---------|---------|
+| `/products` | `search` (nombre o SKU, sin distinguir mayúsculas; `%` y `_` se tratan como texto), `categoryId`, `lowStock` |
+| `/sales` | `from`, `to` (yyyy-MM-dd), `status`, `userId` |
+| `/inventory/movements` | `productId`, `type`, `from`, `to` |
+| `/users` | `search`, `role`, `active` |
+| `/platform/organizations` | `search`, `status` (siempre paginado) |
 
-**Configuración requerida (backend/src/main/resources/application.properties):**
-Copiar `application.properties.example` como `application.properties` y completar credenciales locales. Este archivo está excluido del repositorio.
+**Endpoints**
 
----
+| Método y ruta | Rol |
+|---------------|-----|
+| `POST /auth/login` | público |
+| `GET /auth/me` | ADMIN, SELLER |
+| `GET /products`, `/products/low-stock`, `/products/{id}`, `GET /categories`, `GET /sales`, `GET /sales/{id}`, `POST /sales`, `GET /inventory/movements`, `GET /dashboard/summary` | ADMIN, SELLER |
+| `POST/PUT/DELETE /products`, `POST /inventory/movements`, `/users/**`, `/reports/**` | ADMIN |
+| `POST /public/registrations`, `/public/verify-email`, `/public/resend-verification` | público |
+| `/platform/**` | PLATFORM_ADMIN |
+
+Cualquier otra ruta exige ADMIN o SELLER. Un token sin rol válido, o de ADMIN/SELLER sin empresa, no concede nada.
+
+**Dashboard:** `GET /dashboard/summary` devuelve contadores, totales de hoy y del mes, stock crítico y ventas recientes calculados en la base de datos. "Hoy" y "mes" usan el reloj de la JVM (UTC en Docker): una venta a las 7 pm en Bogotá cuenta para el día siguiente. Pendiente de la fase de infraestructura (definir zona horaria).
 
 ### 2.4 Microservicio Python (Flask)
 
-**Puerto:** 8000
-**Framework:** Flask 3.x
-**Dependencias clave:** pandas, numpy, scikit-learn, mysql-connector-python
+**Puerto:** 8000 (solo red interna). **Dependencias:** Flask, pandas, numpy, scikit-learn, mysql-connector-python.
 
-Sin cambios desde v1.2.0.
+**Autenticación entre servicios.** Analytics no verifica el JWT: confía en el gateway, que envía
+- `X-Internal-Key`: clave compartida (`INTERNAL_API_KEY`, ≥ 32 caracteres), comparada en tiempo constante;
+- `X-Organization-Id`: empresa tomada del **token ya verificado** (nunca de lo que mande el cliente).
 
-**Justificación de Python como microservicio real:**
-Python no está en el sistema para cumplir un requisito de "usar 4 tecnologías". Está porque las bibliotecas científicas del ecosistema Python (pandas para series temporales, scikit-learn para regresión, numpy para álgebra lineal) no tienen equivalente de madurez ni facilidad de uso en Java ni Node.js para análisis estadístico. Su rol es el único componente del sistema con capacidad predictiva real.
-
-**Módulos internos:**
+Sin clave válida responde 401; sin empresa válida, 400. Sin `INTERNAL_API_KEY` configurada, el servicio no arranca. **Todas las consultas se limitan a esa empresa**, y una predicción solo se guarda si el producto pertenece a ella. Un producto de otra empresa responde 404. `/health` es público.
 
 | Módulo | Rol |
 |--------|-----|
-| `app.py` | Punto de entrada Flask, registro de blueprints |
-| `config.py` | Variables de entorno y parámetros del modelo |
-| `src/routes/predictions.py` | Endpoints REST `/predict/<id>` y `/recommend` |
+| `app.py` | Punto de entrada; exige `INTERNAL_API_KEY` |
+| `src/routes/predictions.py` | `/predict/<id>` y `/recommend`; valida clave y empresa (`before_request`) |
 | `src/services/prediction_service.py` | Orquestación: datos → modelo → persistencia |
-| `src/services/database_service.py` | Consultas MySQL con mysql-connector |
-| `src/models/demand_model.py` | Implementación de WMA y regresión lineal |
+| `src/services/database_service.py` | Consultas MySQL parametrizadas, siempre con `organization_id` |
+| `src/models/demand_model.py` | Media móvil ponderada y regresión lineal |
 
-**Configuración requerida (analytics/config.py):**
-Copiar `config.py.example` como `config.py` y completar credenciales locales. Este archivo está excluido del repositorio.
+**Selección de modelo:** con 4 o más semanas de historial se ajusta una regresión lineal y se usa solo si R² > 0,3; si no, media móvil ponderada (también con menos de 4 semanas). Recomendación: `mensual + mensual × 20 % − stock actual + stock mínimo`, con mínimo 0.
 
-**Lógica de selección de modelo en `demand_model.py`:**
+**Limitación conocida:** si MySQL no responde, `/predict/<id>` contesta 404 ("producto no encontrado") y `/recommend` una lista vacía, en vez de un 503.
 
-```python
-if n_weeks >= 4:
-    lr_forecast, lr_r2 = linear_regression_forecast(weekly_qty)
-    if lr_r2 > 0.3:
-        model = "linear_regression"    # Buena tendencia lineal
-    else:
-        model = "weighted_moving_avg"  # Tendencia baja, usar WMA
-else:
-    model = "weighted_moving_avg"      # Pocos datos, usar WMA
-```
+### 2.5 Asistente IA (experimental, apagado)
 
-El umbral R² = 0.3 significa: "usa regresión lineal solo si explica al menos el 30% de la varianza de la serie". Por debajo de ese umbral, la media móvil ponderada es más confiable.
+El asistente consulta Groq (`llama-3.3-70b-versatile`) **desde el gateway** (`/api/agent/*`): la clave de Groq nunca llega al navegador. Usa la sesión del usuario para consultar datos reales de su empresa a través del backend.
 
-**Fórmula de recomendación de reabastecimiento:**
-```
-safety_stock = monthly_forecast × SAFETY_STOCK_PCT (default 20%)
-recommendation = monthly_forecast + safety_stock - stock_current + stock_minimum
-recommendation = max(0, round(recommendation))
-```
+Está **apagado por defecto** (`AGENT_ENABLED=false`): el chat muestra un aviso de mejora. Para reactivarlo: `AGENT_ENABLED=true` y `GROQ_API_KEY` en el `.env`, y recrear el gateway. Antes de reactivarlo en producción conviene definir qué datos de la empresa pueden enviarse al proveedor externo.
 
 ---
 
-### 2.5 Agente IA — AgentBubble (experimental)
+## 3. Multiempresa (tenancy)
 
-**Tipo:** Componente React del frontend
-**Motor:** Groq API — modelo `llama-3.3-70b-versatile`
-**Comunicación:** Llamadas directas desde el navegador a `https://api.groq.com/openai/v1/chat/completions`
+Cada empresa cliente es una fila de `organizations`. Todos los datos de negocio (categorías, productos, ventas, movimientos, predicciones) pertenecen a **una** empresa mediante `organization_id`. El modelo es de **base de datos compartida con columna discriminadora**.
 
-El agente es un componente flotante (FAB) integrado en `ProtectedLayout` del frontend. Opera de forma completamente independiente al gateway y a los servicios internos; no requiere sesión ni accede a MySQL o MongoDB.
+### 3.1 Cómo se aplica el aislamiento
 
-**Características:**
-- Contexto dinámico por módulo: el system prompt incluye el módulo activo del usuario
-- Chips de sugerencias específicos por ruta (`/dashboard`, `/products`, `/sales`, etc.)
-- Detección de estado online/offline mediante ping al iniciar el panel
-- Historial de conversación limitado a los últimos 10 mensajes por sesión (no persiste)
-- Mensajes de error diferenciados: cuota agotada, API key inválida, error de red
-- **Desde v1.3.5:** el botón flotante usa el efecto visual **StockMindGlass** (`GlassElement`) — refracción y desenfoque sutil sobre el fondo oscuro, con ligera ampliación y elevación al pasar el cursor. `GlassElement` queda preparado como base reutilizable para aplicar el mismo efecto en otros componentes de la interfaz.
+1. **Token:** el JWT lleva el claim `org`. El filtro de seguridad (`JwtAuthFilter`) lo coloca en `TenantContext` (un `ThreadLocal`) y lo restaura al terminar la petición.
+2. **Hibernate:** las entidades con empresa (`Category`, `Product`, `Sale`, `InventoryMovement`) llevan `@TenantId`. Hibernate añade `organization_id = ?` a cada consulta y rellena la columna al insertar, tomando la empresa de `TenantIdentifierResolver`.
+3. **Sin empresa, falla cerrado:** si no hay empresa en el contexto, Hibernate usa `-1`, que no existe: no se lee nada y la clave foránea rechaza cualquier escritura.
+4. **Usuarios (`User`)** no usan `@TenantId`: el login debe buscarlos por correo antes de saber la empresa. Se aíslan a mano en `UserController` (`organizationId` en cada filtro; un usuario de otra empresa responde 404).
+5. **Tokens sin empresa:** ADMIN y SELLER sin `org` no reciben ninguna autoridad (backend) ni pasan `authenticate` (gateway).
 
-**Configuración:**
-```env
-# frontend/.env
-VITE_GROQ_API_KEY=tu_api_key_aqui
-```
+### 3.2 Trampas conocidas (y cómo están cubiertas)
 
-```jsx
-// App.jsx — dentro de ProtectedLayout
-<AgentBubble geminiApiKey={import.meta.env.VITE_GROQ_API_KEY} />
-```
+| Trampa | Cobertura |
+|--------|-----------|
+| `EntityManager.find()` (y por tanto el `findById` heredado) **no aplica** el filtro de empresa → lectura por id de datos ajenos | Cada repositorio con empresa **redeclara `findById` con JPQL**. `TenantArchitectureTest` falla si alguien lo quita |
+| Los JOIN implícitos de JPQL no heredan el filtro (reportes) | Las consultas agregadas reciben `organizationId` explícito (`sumTotalByPeriod`, `findTopProductsByPeriod`) |
+| El contexto es un `ThreadLocal`: los hilos nuevos no lo heredan | Usar `TenantContext.runAs(orgId, ...)` en ejecutores o tareas asíncronas |
+| SQL nativo y `JdbcTemplate` no se filtran | Evitarlos en código de negocio; si hace falta, filtrar a mano y probar el aislamiento |
+| Analytics (Python) no usa Hibernate | Clave interna + cabecera de empresa + `organization_id` explícito en cada consulta |
 
-> La API key de Groq se obtiene gratuitamente en [console.groq.com](https://console.groq.com). Si no se configura, el agente muestra estado "sin conexión" sin afectar el resto del sistema.
+### 3.3 Reglas de unicidad
 
-**Limitaciones conocidas:**
-- Sin acceso a datos en tiempo real del backend
-- Sin persistencia de historial entre sesiones
-- La API key queda expuesta en el bundle del cliente si no se maneja con un proxy backend (pendiente)
+El SKU de producto, el nombre de categoría y el `username` son únicos **por empresa**. El **correo es único en toda la plataforma** (es el identificador de login).
 
----
+### 3.4 Añadir una entidad nueva con datos de empresa (lista de verificación)
 
-## 3. Base de datos
+1. Columna `organization_id BIGINT NOT NULL` con clave foránea a `organizations` en una **migración nueva**.
+2. En la entidad: campo `@TenantId @JsonIgnore @Column(name = "organization_id", nullable = false, updatable = false) Long organizationId`.
+3. Redeclarar `findById` con `@Query` en su repositorio y añadirlo a `TenantArchitectureTest`.
+4. Cualquier JPQL con JOIN o agregado: pasar `organizationId` explícito.
+5. Escribir pruebas de aislamiento en `TenantIsolationIntegrationTest` (listado, por id, escritura cruzada, reportes).
 
-### 3.1 MySQL — datos de negocio
+### 3.5 Roles
 
-**Motor:** MySQL 8.x
-**Encoding:** utf8mb4 (soporte completo Unicode)
-**Base de datos:** `stockmind_db`
+| Rol | Alcance |
+|-----|---------|
+| `PLATFORM_ADMIN` | Dueño de la plataforma. **Sin empresa.** Solo accede a `/platform/**`; no ve datos de negocio de ninguna empresa |
+| `ADMIN` | Administrador de **una** empresa: gestiona sus usuarios, productos, inventario y reportes |
+| `SELLER` | Vendedor de una empresa: consulta y registra ventas |
 
-**Tablas y relaciones:**
-
-| Tabla | Descripción | Relaciones |
-|-------|-------------|------------|
-| `users` | Usuarios del sistema | → sales, inventory_movements |
-| `categories` | Clasificación de productos | → products |
-| `products` | Catálogo de productos | → sale_details, inventory_movements, demand_predictions |
-| `sales` | Cabecera de ventas | → sale_details |
-| `sale_details` | Líneas de cada venta | ← sales, products |
-| `inventory_movements` | Ledger de movimientos | ← products, users |
-| `demand_predictions` | Historial de predicciones | ← products |
-
-**Integridad referencial:**
-Todas las foreign keys usan `ON DELETE RESTRICT` (excepto `sale_details` que usa `CASCADE`) para preservar la integridad histórica. No se eliminan registros de productos si tienen ventas o movimientos asociados.
-
-**Índices:**
-Definidos en `schema.sql` sobre columnas de alta frecuencia de consulta:
-- `products.sku` — búsquedas por código
-- `products(stock_current, stock_minimum)` — alertas de stock bajo
-- `sales.created_at` — filtros por fecha en reportes
-- `inventory_movements.product_id` — historial por producto
-
-### 3.2 MongoDB — logs (v1.3.6, experimental)
-
-**Motor:** MongoDB 7.x
-**Base de datos:** `stockmind_logs`
-**Colección:** `logs`
-
-MongoDB se introdujo como capa de logging **separada** del modelo relacional, siguiendo un patrón de persistencia políglota: MySQL sigue siendo la única fuente de verdad para datos de negocio; Mongo solo guarda trazabilidad operativa del gateway (requests, status codes, errores). Ningún módulo funcional lee de esta colección — es de solo escritura desde el punto de vista de la aplicación.
-
-**Esquema del documento:**
-```js
-{
-  timestamp: ISODate,
-  service: "gateway",
-  level: "info" | "warn" | "error",   // derivado de statusCode
-  method: "GET",
-  route: "/api/products/123",
-  statusCode: 404,
-  userId: ObjectId | null,
-  ip: "192.168.1.10",
-  responseTimeMs: 42
-}
-```
-
-**Estado actual — pendientes conocidos:**
-- No tiene índices propios todavía. Se recomienda, antes de cualquier uso más allá de pruebas, agregar: un índice TTL sobre `timestamp` (para expirar logs viejos automáticamente) y un índice compuesto sobre `{route: 1, statusCode: 1}` para consultas de errores por ruta.
-- No hay rotación ni límite de tamaño configurado en el contenedor.
-- Solo el gateway escribe en Mongo; Java y Python no tienen cliente propio — sus errores llegan a Mongo indirectamente, solo si terminan reflejados en la respuesta HTTP que pasa por el gateway.
+Un ADMIN de empresa no puede crear ni asignar `PLATFORM_ADMIN`, y no puede desactivarse, eliminarse ni cambiarse el rol a sí mismo.
 
 ---
 
-## 4. Autenticación y autorización (reescrito — v1.3.2)
+## 4. Base de datos
 
-> Esta sección reemplaza por completo el flujo de la v1.2.0, que se basaba en JWT en `localStorage` + header `Authorization` manejado por el frontend. Ese flujo ya no aplica.
+### 4.1 MySQL
 
-### Flujo de autenticación
+**Motor:** MySQL 8.0 · **Encoding:** utf8mb4 · **Base:** `stockmind_db`
 
-```
-1. Frontend → POST /api/auth/login {username, password}  (credentials: 'include')
-2. Gateway → POST :8080/auth/login (Java — ruta pública, sin validar sesión)
-3. Java: BCrypt.matches(password, passwordHash) → true
-4. Java: JwtConfig.generateToken(user) → "eyJhbGci..." → Java → Gateway
-5. Gateway: setea el JWT como cookie httpOnly (no lo incluye en el body)
-6. Gateway → Frontend: { user: { id, username, role } }
-7. Frontend: AuthContext guarda { user } en memoria — nada en localStorage
-```
+| Tabla | Descripción |
+|-------|-------------|
+| `organizations` | Empresas cliente: nombre, NIT (único), contacto, país, estado, origen, fin de prueba, aceptación de términos |
+| `users` | Usuarios; `organization_id` es NULL solo para `PLATFORM_ADMIN`; `email_verified_at` |
+| `categories`, `products` | Catálogo de cada empresa |
+| `sales`, `sale_details` | Ventas y sus líneas |
+| `inventory_movements` | Libro de movimientos de inventario |
+| `demand_predictions` | Predicciones (las escribe analytics) |
+| `email_verification_tokens` | Hash SHA-256 de los tokens de verificación (nunca el token real) |
+| `flyway_schema_history` | Control de migraciones |
 
-### Restauración de sesión
+**Estados de empresa:** `PENDING` (sin verificar el correo), `ACTIVE`, `SUSPENDED`, `CANCELLED`. Solo `ACTIVE` puede iniciar sesión. **Origen:** `SELF_SIGNUP` o `PLATFORM_ADMIN`.
 
-```
-Frontend (al montar la app) → GET /api/auth/me  (la cookie va automática)
-Gateway: valida la cookie → responde { user } si es válida, 401 si no hay sesión
-AuthContext: distingue este 401 "esperado" (sin sesión aún) de un 401 de sesión
-             caída en medio del uso, para no generar un loop de recarga
-```
+**Integridad:** claves foráneas con `ON DELETE RESTRICT` (salvo detalles de venta y tokens, que usan `CASCADE`); restricciones `CHECK` de stock no negativo y precios; índices por empresa en las consultas frecuentes.
 
-### Flujo de request protegida
+### 4.2 Migraciones (Flyway)
 
-```
-1. Navegador envía la cookie httpOnly automáticamente (no hay código del
-   frontend involucrado en esto)
-2. Gateway (cookie-parser + auth.middleware.js):
-   a. Lee el JWT desde req.cookies
-   b. jwt.verify(token, JWT_SECRET) → payload { id, username, role }
-   c. Adjunta req.user = payload
-   d. utils/authHeader.js reconstruye "Authorization: Bearer <token>"
-3. Gateway verifica rol si aplica (requireRole('ADMIN'))
-4. Gateway reenvía a Java con ese header Authorization reconstruido
-5. Java JwtAuthFilter repite la validación (doble verificación, sin cambios)
-```
+El esquema lo gestiona **Flyway** desde el backend; Hibernate solo valida (`ddl-auto: validate`) y el arranque falla si una entidad no coincide con la base. MySQL solo crea la base vacía.
 
-### Cierre de sesión
+| Migración | Contenido |
+|-----------|-----------|
+| `V1__baseline_schema.sql` | Esquema inicial |
+| `V2__organizations_multitenancy.sql` | `organizations`, `organization_id` en todas las tablas, unicidades por empresa, empresa inicial (id 1) con los datos existentes |
+| `V3__registration_and_verification.sql` | Verificación de correo, fin de prueba y términos |
 
-```
-Frontend → POST /api/auth/logout
-Gateway: limpia la cookie del lado del servidor (Set-Cookie con expiración pasada)
-```
+- **Una migración aplicada no se edita** (Flyway detecta el cambio por checksum y no arranca): los cambios van en una versión nueva.
+- Una base anterior a Flyway se "baselinea" en V1 sin tocar datos (`baseline-on-migrate`), y después aplica V2 y V3. `clean` está deshabilitado.
+- **Datos de ejemplo (solo desarrollo):** `DevDataSeeder` carga `db/dev/seed.sql` únicamente con el perfil `dev` y si no hay usuarios. En producción nunca se ejecuta.
+- Flyway usa el mismo usuario que la aplicación; para producción conviene separar un usuario de migraciones con más permisos.
 
-### CORS (necesario para que las cookies viajen)
+### 4.3 Logs
 
-Con cookies `httpOnly`, el `origin` de CORS ya **no puede ser `'*'`** — debe ser el dominio exacto del frontend, y `credentials: true` es obligatorio en ambos lados (servidor y cliente) para que el navegador envíe y acepte la cookie entre `localhost:5173` (frontend) y `localhost:3000` (gateway).
-
-### Clave JWT compartida
-
-El secreto JWT debe seguir siendo **idéntico** en el gateway Node.js (`JWT_SECRET` en `gateway/.env`) y en el backend Java (`jwt.secret` en `application.properties`). Esto no cambió con el paso a cookies — lo único que cambió es dónde vive el token en tránsito, no cómo se firma ni se valida.
+Ya no hay base de datos de logs. Los registros del gateway van a la salida estándar en JSON (sección 2.2) y los del backend a su salida estándar. Dónde recogerlos y por cuánto tiempo (p. ej. Loki, CloudWatch) se decidirá en la fase de infraestructura. La **auditoría de negocio** (quién cambió qué) se hará en una tabla de MySQL con `organization_id`.
 
 ---
 
-## 5. Manejo de errores
+## 5. Autenticación y autorización
 
-Sin cambios desde v1.2.0.
+### 5.1 Inicio de sesión
 
-### Códigos de respuesta estándar
+```
+1. Frontend → POST /api/auth/login { email, password }   (credentials: 'include')
+2. Gateway  → POST :8080/auth/login
+3. Java: busca el usuario por correo (normalizado a minúsculas) y valida la contraseña (BCrypt)
+4. Java: solo DESPUÉS de validar la contraseña revisa: usuario activo y empresa ACTIVE
+5. Java → Gateway: { token, userId, username, email, organizationId, role }
+6. Gateway: pone el JWT en cookie httpOnly (Secure y SameSite=Strict en producción) y responde
+            { user: { id, username, email, organizationId, role } } — sin el token
+```
+
+**Mensajes:** credenciales incorrectas → genérico ("Correo o contraseña incorrectos"), idéntico para un correo que existe y uno que no. Los avisos de cuenta (usuario inactivo, correo sin verificar, empresa suspendida) solo se muestran a quien conoce la contraseña, para que no se pueda averiguar qué correos existen.
+
+### 5.2 JWT
+
+Firmado con HS256 y el secreto `JWT_SECRET` (idéntico en gateway y backend, ≥ 32 caracteres, sin valor por defecto: ninguno de los dos arranca sin él). Duración 24 h.
+
+| Claim | Contenido |
+|-------|-----------|
+| `sub` | Correo del usuario (único en la plataforma) |
+| `id` | Id del usuario |
+| `role` | `PLATFORM_ADMIN`, `ADMIN` o `SELLER` |
+| `org` | Id de la empresa (ausente solo en `PLATFORM_ADMIN`) |
+
+No hay revocación ni *refresh*: un usuario desactivado o una empresa suspendida conservan acceso hasta que expire el token. El control del estado de la suscripción en cada petición (con una caché corta) está previsto para la fase de planes.
+
+### 5.3 Petición protegida
+
+```
+1. El navegador envía la cookie automáticamente
+2. Gateway: jwt.verify → req.user; exige 'org' salvo PLATFORM_ADMIN; aplica requireRole
+3. Gateway reenvía a Java con Authorization: Bearer <token> (utils/authHeader.js)
+4. Java: JwtAuthFilter valida de nuevo, fija el rol y la empresa (TenantContext) y aplica las reglas por ruta
+5. Hacia analytics: el gateway envía X-Internal-Key y X-Organization-Id (del token verificado)
+```
+
+### 5.4 Registro de empresas
+
+Un único servicio (`RegistrationService`) con dos entradas:
+
+| | Autoregistro (landing) | Panel de plataforma |
+|---|---|---|
+| Endpoint | `POST /api/public/registrations` | `POST /api/platform/organizations` |
+| Quién | cualquiera (con CAPTCHA) | `PLATFORM_ADMIN` |
+| Estado inicial | `PENDING` | `ACTIVE` |
+| Correo del administrador | sin verificar → recibe enlace | verificado |
+| Prueba gratis | 14 días al verificar el correo | no aplica (se define en la fase de planes) |
+| Conflicto (NIT/correo) | mensaje genérico (409) | indica qué chocó |
+
+**Verificación:** el enlace (`APP_PUBLIC_URL/verify-email?token=...`) lleva un token aleatorio de 32 bytes; en la base solo se guarda su hash. Es de un solo uso, vale 24 h, y un token inexistente, usado o vencido recibe el mismo error. `POST /api/public/resend-verification` responde siempre igual exista o no el correo y respeta un enfriamiento de 60 s.
+
+**Protección anti-bots** (gateway, rutas `/api/public/*`):
+- **CAPTCHA** (`CAPTCHA_PROVIDER`): `turnstile` (Cloudflare Turnstile, requiere `TURNSTILE_SECRET`) o `none`, **solo fuera de producción**. En producción sin CAPTCHA el registro se desactiva (503): falla cerrado.
+- **Honeypot:** un campo `website` oculto; un bot que lo rellena recibe un "éxito" falso sin que se cree nada.
+- **Límite por IP** y **lista blanca de campos**: a Java solo viajan los campos esperados (un bot no puede enviar `role` ni `organizationId`).
+
+**Correo:** la interfaz `EmailSender` tiene hoy dos implementaciones sin proveedor real: `DevEmailSender` (perfil `dev`: escribe el enlace en el log) y `NoopEmailSender` (resto: registra un error para que la falta de proveedor no pase desapercibida y **no** registra el enlace). Para producción se agrega una implementación con un proveedor (SMTP, SES, Resend, ...) sin tocar el resto.
+
+**Dueño de la plataforma:** `PlatformAdminBootstrap` crea el primer `PLATFORM_ADMIN` al arrancar si hay `PLATFORM_ADMIN_EMAIL` y `PLATFORM_ADMIN_PASSWORD` y todavía no existe uno. Falla si la configuración está incompleta, la contraseña no cumple la política o el correo ya pertenece a un usuario de empresa. Nunca registra la contraseña.
+
+### 5.5 Contraseñas y datos de entrada
+
+Contraseña: 8–72 caracteres con al menos una letra y un número (BCrypt). Todos los cuerpos de entrada se validan con DTOs; los errores devuelven mensajes por campo.
+
+---
+
+## 6. Manejo de errores
+
+Formato JSON uniforme: `{ "error": "mensaje", "timestamp": "...", "details": { campo: mensaje } }` (`details` solo en validaciones; el gateway añade `code` en algunos casos).
 
 | Código | Situación |
 |--------|-----------|
-| 200 | OK — operación exitosa |
-| 201 | Creado — recurso persistido |
-| 400 | Error de validación o negocio (stock insuficiente, SKU duplicado, etc.) |
-| 401 | Sesión ausente, inválida o expirada |
-| 403 | Rol insuficiente |
-| 404 | Recurso no encontrado |
-| 503 | Servicio upstream (Java o Python) no disponible |
-| 504 | Timeout del servicio upstream |
+| 200 / 201 / 202 | OK / creado / aceptado (registro y reenvío) |
+| 400 | Validación, JSON mal formado, regla de negocio (stock insuficiente, SKU duplicado, rol no permitido) |
+| 401 | Sin sesión, token inválido o desactualizado, credenciales incorrectas |
+| 403 | Rol insuficiente o sin empresa |
+| 404 | Recurso inexistente **o de otra empresa** |
+| 409 | Datos ya registrados (NIT, correo) |
+| 413 | Cuerpo demasiado grande |
+| 429 | Límite de frecuencia |
+| 500 | Error interno: mensaje genérico; el detalle va solo al log del servidor |
+| 503 / 504 | Servicio upstream no disponible / timeout; registro público desactivado sin CAPTCHA |
 
-### Formato de error JSON
-
-Todos los errores retornan:
-```json
-{
-  "error": "Descripción del error",
-  "timestamp": "2024-03-15T10:22:00",
-  "code": "OPCIONAL_CODE"
-}
-```
-
-> Todo error que pase por el gateway queda además reflejado como documento en la colección `logs` de MongoDB (sección 3.2), vía `mongoLogger`.
+Un error inesperado **nunca** devuelve su mensaje interno al cliente.
 
 ---
 
-## 6. Configuración de entornos
+## 7. Configuración de entornos
 
-### Archivos de configuración excluidos del repositorio
+### 7.1 Variables de entorno (`.env` en la raíz)
 
-| Archivo | Ubicación | Plantilla disponible |
-|---------|-----------|----------------------|
-| `application.properties` | `backend/src/main/resources/` | `application.properties.example` |
-| `config.py` | `analytics/` | `config.py.example` |
-| `.env` | `gateway/` | Documentado en sección 2.2 (incluye `MONGO_URI` desde v1.3.6) |
-| `.env` | `frontend/` | Documentado en sección 2.5 |
+El `.env` no se versiona; `.env.example` es la plantilla. Docker Compose lo lee y falla con un mensaje claro si falta un valor obligatorio. Para generar valores: `openssl rand -hex 32`.
 
-Copiar cada plantilla `.example`, renombrarla sin la extensión `.example` y completar los valores locales antes de ejecutar el sistema.
+| Variable | Obligatoria | Uso |
+|----------|:---:|-----|
+| `MYSQL_ROOT_PASSWORD`, `MYSQL_USER`, `MYSQL_PASSWORD` | sí | MySQL; la aplicación entra con `MYSQL_USER`, no como `root` |
+| `JWT_SECRET` | sí | Firma del JWT (≥ 32 caracteres; igual en gateway y backend) |
+| `JWT_EXPIRATION` | no | Milisegundos (por defecto 86 400 000) |
+| `INTERNAL_API_KEY` | sí | Clave gateway ↔ analytics (≥ 32 caracteres) |
+| `NODE_ENV` | no | `development` o `production` (cookie `Secure`/`SameSite=Strict`, límites, CAPTCHA obligatorio) |
+| `FRONTEND_URL` | no | Origen del frontend (CORS) y base de los enlaces de los correos |
+| `LANDING_URL` | no | Origen(es) de la landing, separados por coma (solo `/api/public`) |
+| `TRUST_PROXY` | no | Número de proxies delante del gateway |
+| `VITE_GATEWAY_URL` | no | URL del gateway para el frontend |
+| `PLATFORM_ADMIN_EMAIL`, `PLATFORM_ADMIN_PASSWORD` | no | Primer dueño de la plataforma (vacías = no se crea) |
+| `CAPTCHA_PROVIDER`, `TURNSTILE_SECRET` | prod | Anti-bots del registro público |
+| `GROQ_API_KEY`, `AGENT_ENABLED` | no | Asistente IA (apagado por defecto) |
 
-### Desarrollo local
+Ajustes opcionales del gateway: `REGISTRATION_RATE_LIMIT` (5), `UPSTREAM_TIMEOUT_MS` (15000), `BODY_LIMIT` (100kb), `LOG_LEVEL` (info). El backend admite `stockmind.trial-days`, `stockmind.verification-hours` y `stockmind.terms-version` (en `application.yml`).
 
-Dos formas de correr el sistema:
-- **Manual:** cada servicio en su propia terminal (`mvn spring-boot:run`, `python app.py`, `npm start`, `npm run dev`), con MySQL y MongoDB corriendo localmente o vía contenedores sueltos.
-- **Docker Compose (recomendado desde que se agregó MongoDB):** `docker compose up --build` levanta mysql, mongo, backend, analytics, gateway y frontend juntos, con la red y las variables de entorno entre servicios ya resueltas.
+Archivos locales no versionados: `.env`, `backend/src/main/resources/application.properties` (opcional, plantilla `.example`) y `analytics/config.py` (opcional: dentro de Docker se genera desde el entorno).
 
-### Producción (consideraciones)
+### 7.2 Desarrollo con Docker (recomendado)
 
-- Cambiar `JWT_SECRET` a un valor criptográficamente seguro (mínimo 256 bits)
-- Configurar `spring.jpa.hibernate.ddl-auto=none` (no modificar schema en producción)
-- Usar variables de entorno reales, no archivos `.env` versionados
-- Restringir `cors.allowed-origins` al dominio real del frontend (obligatorio ahora que se depende de cookies — ver sección 4)
-- Usar `gunicorn` para el microservicio Python en lugar del servidor de desarrollo Flask
-- Configurar HTTPS en todos los servicios o usar un reverse proxy (nginx); las cookies `httpOnly` deberían marcarse `Secure` en producción
-- Para el agente IA: mover la API key de Groq a un endpoint proxy en el gateway para no exponerla en el cliente
-- **MongoDB (abierto a evaluación):** la integración actual es exploratoria — se construyó para validar el patrón, no como decisión definitiva de producción. Antes de llevarla a producción vale la pena evaluar: credenciales fuera de `root/root`, un servicio Mongo gestionado (Atlas u otro) en vez de un contenedor propio, política real de retención/TTL de logs, y si el caso de uso no queda mejor cubierto por una solución de logging dedicada (ej. stack tipo ELK) en vez de una base de datos de propósito general.
+```bash
+docker compose up --build --watch
+```
+
+`docker-compose.override.yml` (solo desarrollo) activa el perfil `dev` del backend (datos de ejemplo y enlaces de verificación en el log), publica MySQL en `127.0.0.1:3306` y define las reglas de `--watch`: el frontend sincroniza `src` (Vite recarga), el gateway y analytics sincronizan y se reinician, y el backend se reconstruye. Si `--watch` deja de reaccionar, reconstruir a mano: `docker compose up -d --build <servicio>`.
+
+Reiniciar la base con los datos de ejemplo: `docker compose down -v` y volver a levantar (borra los datos de desarrollo).
+
+### 7.3 Producción (consideraciones pendientes)
+
+- Usar solo `docker-compose.yml` (sin el override), con secretos reales gestionados fuera del repositorio.
+- Imágenes de producción: frontend con `vite build` servido como estático (hoy el contenedor corre `vite dev`), analytics con `gunicorn` (hoy el servidor de desarrollo de Flask), contenedores sin root, `npm ci` y multi-stage.
+- HTTPS en el borde (proxy inverso) y `TRUST_PROXY`; `NODE_ENV=production`.
+- Zona horaria definida (hoy UTC), backups de MySQL probados, monitoreo y alertas, recogida de logs.
+- Proveedor de correo y CAPTCHA configurados; usuario de migraciones separado.
+- Rate limiting con almacén compartido si hay varias réplicas del gateway.
 
 ---
 
-## 7. Dependencias y versiones
+## 8. Pruebas y CI
 
-### Node.js Gateway
-```json
-"axios": "^1.6.0",
-"cookie-parser": "^1.4.6",
-"cors": "^2.8.5",
-"dotenv": "^16.3.1",
-"express": "^4.18.2",
-"express-rate-limit": "^7.1.5",
-"jsonwebtoken": "^9.0.2",
-"mongodb": "^7.2.0",
-"morgan": "^1.10.0"
-```
+| Servicio | Herramienta | Pruebas | Cómo ejecutar |
+|----------|-------------|--------:|---------------|
+| Backend | JUnit + MockMvc (H2 por defecto) | 85 | `mvn test` en `backend/` |
+| Backend contra **MySQL real** | idem, con `MYSQL_TEST_URL` | 85 | `MYSQL_TEST_URL=jdbc:mysql://host:3306/db MYSQL_TEST_USER=... MYSQL_TEST_PASSWORD=... mvn test` |
+| Gateway | `node:test` (sin dependencias) | 122 | `npm test` en `gateway/` |
+| Frontend | Vitest + Testing Library | 55 | `npx vitest run` en `frontend/` |
+| Analytics | pytest | 65 (+4 contra MySQL real) | `python -m pytest` en `analytics/` (con `ANALYTICS_MYSQL_HOST` corre también el aislamiento sobre MySQL) |
 
-### Java Backend
-```xml
-spring-boot-starter-parent: 3.2.0
-Java: 17 LTS
-jjwt: 0.11.5
-mysql-connector-j: (managed by Spring Boot)
-lombok: (managed by Spring Boot)
-```
+Cobertura destacada: roles y tokens, validaciones, ventas con **concurrencia** (nunca se vende más del stock), **aislamiento entre empresas** (listados, por id, escrituras cruzadas, reportes, usuarios, analytics), login, registro y verificación, paginación y orden permitido, cabeceras de seguridad, CORS, límites y logs sin datos sensibles.
 
-### Python Analytics
-```
-flask==3.0.0
-flask-cors==4.0.0
-mysql-connector-python==8.2.0
-pandas==2.1.4
-numpy==1.26.2
-scikit-learn==1.3.2
-```
-
-### Frontend React
-```json
-"react": "^18.x",
-"react-dom": "^18.x",
-"react-router-dom": "^6.x",
-"vite": "^8.x"
-```
-
-### Infraestructura
-```
-mysql: 8.0
-mongo: 7
-```
+**CI** (`.github/workflows/ci.yml`): cinco trabajos en cada push a `main` y pull request (backend con H2, backend con MySQL real y migraciones, gateway, frontend con *build*, analytics con MySQL real). `npm run lint` del frontend aún no está en el CI por 2 errores preexistentes en `AgentBubble.jsx`.
 
 ---
 
-## 8. Estructura de paquetes Java
+## 9. Dependencias y versiones
 
-Sin cambios desde v1.2.0.
+**Gateway** (Node 20): express ^4.18, axios ^1.6, cors, helmet ^8, pino ^10, pino-http ^11, express-rate-limit ^7, jsonwebtoken ^9, cookie-parser, dotenv.
 
-```
-com.stockmind
-├── StockmindApplication       # @SpringBootApplication
-├── config/
-│   ├── JwtConfig              # Generación y validación de JWT
-│   └── SecurityConfig         # Spring Security + JwtAuthFilter
-├── controller/
-│   ├── AuthController         # POST /auth/login, GET /auth/me
-│   ├── ProductController      # CRUD /products
-│   ├── InventoryController    # GET/POST /inventory/movements
-│   ├── SaleController         # GET/POST /sales
-│   ├── UserController         # CRUD /users
-│   └── ReportController       # GET /reports/sales, /top-products
-├── service/
-│   ├── AuthService            # Validación de credenciales + generación JWT
-│   ├── ProductService         # CRUD + validaciones de negocio
-│   └── SaleService            # Registro de ventas con descuento de inventario
-├── repository/
-│   ├── UserRepository
-│   ├── ProductRepository      # findLowStockProducts() JPQL custom
-│   ├── CategoryRepository
-│   ├── SaleRepository         # sumTotalByPeriod(), findTopProductsByPeriod()
-│   └── InventoryMovementRepository
-├── model/
-│   ├── User                   # Enum Role: ADMIN, SELLER
-│   ├── Category
-│   ├── Product                # isLowStock()
-│   ├── Sale                   # Enum Status: COMPLETED, CANCELLED, PENDING
-│   ├── SaleDetail             # calculateSubtotal()
-│   └── InventoryMovement      # Enum MovementType: ENTRY, EXIT, SALE, ADJUSTMENT, RETURN
-├── dto/
-│   ├── LoginRequest / LoginResponse
-│   ├── ProductDTO
-│   └── SaleDTO
-└── exception/
-    ├── ResourceNotFoundException
-    └── GlobalExceptionHandler
-```
+**Backend:** Java 17, Spring Boot 3.2.0, Hibernate 6.4.4 (fijado), Flyway (+ `flyway-mysql`), jjwt 0.11.5, mysql-connector-j, Lombok; pruebas con H2.
+
+**Analytics** (Python 3.11): flask 3.0.0, flask-cors 4.0.0, mysql-connector-python 8.2.0, pandas ≥ 2.2, numpy ≥ 2.0, scikit-learn ≥ 1.4, gunicorn 21.2.0 (aún sin usar).
+
+**Frontend:** react ^19.2, react-router-dom ^7.14, vite ^8, vitest ^4.
+
+**Infraestructura:** MySQL 8.0.
+
+**Actualizaciones recomendadas** (ver `STOCKMIND_TECHNICAL_AUDIT.md`): Node 22 LTS, MySQL 8.4 LTS, Spring Boot 3.4+, flask-cors y gunicorn (avisos de seguridad en las versiones fijadas), fijar versiones de pandas/numpy/scikit-learn.
 
 ---
 
-## 9. Estructura de archivos del Gateway (nuevo)
+## 10. Estructura del código
 
-No existía como sección propia en la v1.2.0 del manual; se agrega dado el crecimiento del gateway desde entonces.
+### 10.1 Backend (`com.stockmind`)
+
+```
+├── StockmindApplication
+├── bootstrap/   PlatformAdminBootstrap                       # primer PLATFORM_ADMIN desde el entorno
+├── config/      JwtConfig · SecurityConfig (+ JwtAuthFilter) · DevDataSeeder
+├── controller/  Auth · Category · Dashboard · Inventory · Platform · Product
+│                PublicRegistration · Report · Sale · User
+├── dto/         InventoryDTO · LoginRequest/Response · PageResponse · ProductDTO
+│                RegistrationDTO · SaleDTO · UserDTO
+├── exception/   ConflictException · ResourceNotFoundException · GlobalExceptionHandler
+├── mail/        EmailSender · DevEmailSender · NoopEmailSender
+├── model/       Category · EmailVerificationToken · InventoryMovement · Organization
+│                Product · Sale · SaleDetail · User
+├── repository/  *Repository (+ spec/ con los filtros combinables)
+├── service/     Auth · Dashboard · Inventory · Product · Registration · Sale
+├── tenant/      TenantContext · TenantIdentifierResolver
+└── util/        Paging
+resources/       application.yml · db/migration/V*.sql · db/dev/seed.sql
+```
+
+### 10.2 Gateway
 
 ```
 gateway/
-├── package.json
-├── server.js                          # Espera conexión a Mongo antes de app.listen()
-├── .env
-├── db/
-│   └── mongo.js                       # Cliente MongoDB centralizado (v1.3.6)
-└── src/
-    ├── config/config.js
-    ├── middleware/
-    │   ├── auth.middleware.js         # Verifica cookie httpOnly (v1.3.2)
-    │   ├── logger.middleware.js
-    │   ├── mongoLogger.middleware.js  # Log de requests a MongoDB (v1.3.6)
-    │   └── errorHandler.middleware.js
-    ├── utils/
-    │   └── authHeader.js              # Reconstruye Authorization hacia Java (v1.3.2)
-    └── routes/
-        ├── auth.routes.js
-        ├── products.routes.js
-        ├── inventory.routes.js
-        ├── sales.routes.js
-        ├── users.routes.js
-        ├── reports.routes.js
-        └── predictions.routes.js
+├── app.js                    # construye la aplicación (testeable)
+├── server.js                 # la arranca
+├── src/
+│   ├── config/config.js      # valida JWT_SECRET e INTERNAL_API_KEY
+│   ├── middleware/           # auth.middleware.js (authenticate, requireRole, requireOrganization)
+│   │                         # errorHandler.middleware.js
+│   ├── routes/               # agent · auth · categories · dashboard · inventory · platform
+│   │                         # predictions · products · public · reports · sales · users
+│   └── utils/                # authHeader.js · internalHeaders.js · captcha.js
+└── test/                     # node:test: auth, rutas, app, logs, CAPTCHA, errores...
+```
+
+### 10.3 Analytics
+
+```
+analytics/
+├── app.py · config.py(.example) · requirements.txt · requirements-dev.txt · pytest.ini
+├── src/{models, routes, services}/
+└── tests/
 ```
 
 ---
 
-*StockMind v1.3.6 — Manual Técnico — Proyecto Académico*
+## 11. Pendientes conocidos
+
+| Área | Pendiente |
+|------|-----------|
+| Planes | Planes, suscripciones, límites por plan, control del estado en cada petición, cobro (hoy simulado), avisos de fin de prueba |
+| Panel de plataforma | Interfaz del superadmin: ver actividad, pausar, reactivar, cambiar plan, cancelar |
+| Cuentas | Recuperación y cambio de contraseña (incluido el cambio obligatorio tras un alta por teléfono) |
+| Correo | Proveedor real de correo (SMTP/SES/...) |
+| Infraestructura | Imágenes de producción, HTTPS, backups, monitoreo, recogida de logs, zona horaria, usuario de migraciones |
+| Datos | Auditoría de negocio por empresa; paginación de las pantallas que aún cargan listas completas; `ADJUSTMENT` como conteo físico |
+| Analytics | Respuesta 503 cuando MySQL falla; evaluación del error del modelo (backtesting) |
+| Calidad | Alinear versiones internas; corregir los 2 errores de lint de `AgentBubble.jsx` y activarlo en el CI; actualizar dependencias (sección 9) |
+| Asistente IA | Reactivar y definir qué datos se envían al proveedor |
+
+---
+
+*StockMind v1.4.0 — Manual Técnico — BlackLabs Dev*
