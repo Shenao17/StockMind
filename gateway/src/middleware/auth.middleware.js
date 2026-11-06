@@ -30,7 +30,15 @@ const authenticate = (req, res, next) => {
 
     try {
         const decoded = jwt.verify(token, config.jwtSecret);
-        req.user = decoded; // { id, username, role, iat, exp }
+        // Todo usuario salvo PLATFORM_ADMIN pertenece a una empresa. Un token sin 'org'
+        // (emitido antes de la multiempresa) se invalida para forzar un nuevo login.
+        if (decoded.role !== 'PLATFORM_ADMIN' && !decoded.org) {
+            return res.status(401).json({
+                error: 'Sesión desactualizada. Inicia sesión nuevamente.',
+                code: 'INVALID_TOKEN'
+            });
+        }
+        req.user = decoded; // { id, role, org, sub (correo), iat, exp }
         next();
     } catch (error) {
         if (error.name === 'TokenExpiredError') {

@@ -15,7 +15,7 @@ const cookieParser = require('cookie-parser');
 const SECRET = process.env.JWT_SECRET;
 
 const tokenFor = (role, opts = {}) =>
-    jwt.sign({ id: 1, username: 'test', role }, opts.secret || SECRET, { expiresIn: opts.expiresIn ?? 300 });
+    jwt.sign({ id: 1, role, ...(opts.noOrg || role === 'PLATFORM_ADMIN' ? {} : { org: 1 }) }, opts.secret || SECRET, { expiresIn: opts.expiresIn ?? 300 });
 
 /** Crea un app Express con el router montado y lo deja escuchando en un puerto libre. */
 async function startApp(mountPath, router) {

@@ -96,7 +96,7 @@ class TestProductsAndPredictions:
         conn = use_cursor(cur)
         db.save_prediction(1, "WEEKLY", "2026-W01", 12.3456, 0.98765, "linear_regression", 30)
         _, params = cur.executed[0]
-        assert params == (1, "WEEKLY", "2026-W01", 12.35, 0.9877, "linear_regression", 30)
+        assert params == ("WEEKLY", "2026-W01", 12.35, 0.9877, "linear_regression", 30, 1)
         assert conn.committed is True
 
     def test_save_prediction_error_does_not_raise(self, use_cursor):

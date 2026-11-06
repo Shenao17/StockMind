@@ -129,19 +129,23 @@ def save_prediction(product_id: int, period_type: str, period_label: str,
     Persiste una predicción de demanda en la tabla demand_predictions.
     Permite rastrear la evolución de las predicciones a lo largo del tiempo.
     """
+    # organization_id se hereda del producto: la predicción pertenece a su empresa
     query = """
         INSERT INTO demand_predictions
-            (product_id, period_type, period_label, predicted_quantity,
+            (organization_id, product_id, period_type, period_label, predicted_quantity,
              confidence, model_used, recommendation)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        SELECT p.organization_id, p.id, %s, %s, %s, %s, %s, %s
+        FROM products p
+        WHERE p.id = %s
     """
     try:
         conn = get_connection()
         cursor = conn.cursor()
         cursor.execute(query, (
-            product_id, period_type, period_label,
+            period_type, period_label,
             round(predicted_qty, 2), round(confidence, 4),
-            model_used, recommendation
+            model_used, recommendation,
+            product_id
         ))
         conn.commit()
         cursor.close()

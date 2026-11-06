@@ -49,6 +49,22 @@ describe('authenticate', () => {
         assert.equal(r.body.code, 'INVALID_TOKEN');
     });
 
+    test('token de ADMIN/SELLER sin empresa (org) → 401 para forzar nuevo login', async () => {
+        const r = await run(authenticate, { cookies: { token: tokenFor('ADMIN', { noOrg: true }) } });
+        assert.equal(r.status, 401);
+        assert.equal(r.body.code, 'INVALID_TOKEN');
+    });
+
+    test('PLATFORM_ADMIN no necesita empresa', async () => {
+        const r = await run(authenticate, { cookies: { token: tokenFor('PLATFORM_ADMIN') } });
+        assert.equal(r.nextCalled, true);
+    });
+
+    test('el token conserva la empresa en req.user', async () => {
+        const r = await run(authenticate, { cookies: { token: tokenFor('SELLER') } });
+        assert.equal(r.req.user.org, 1);
+    });
+
     test('basura en la cookie → 401 INVALID_TOKEN', async () => {
         const r = await run(authenticate, { cookies: { token: 'no.es.un.jwt' } });
         assert.equal(r.status, 401);
