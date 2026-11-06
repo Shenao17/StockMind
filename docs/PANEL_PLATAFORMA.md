@@ -1,6 +1,6 @@
 # StockMind — Panel de plataforma (equipo de BlackLabs)
 
-**Estado:** Fases (a) y (b) implementadas (roles, permisos, equipo, 2FA y ficha de empresa). Fases (c)–(d) por hacer.
+**Estado:** Fases (a), (b) y (c) implementadas (roles, permisos, equipo, 2FA, ficha de empresa, resumen, cobros y auditoría). Fase (d) por hacer.
 Detalle técnico en `docs/manual-tecnico.md` (secciones 5.6 y 6.5).
 
 El panel `/platform` es para quien opera StockMind (no para las empresas clientes). Lo usa el equipo de BlackLabs con roles distintos.
@@ -58,7 +58,7 @@ Protecciones:
 |---|---|---|
 | (a) | Roles y permisos, equipo, 2FA (app + PIN), contraseña temporal, sesiones revocables | ✔ hecho |
 | (b) | Ficha de empresa: datos, uso frente a límites, usuarios, cobros, línea de tiempo; corregir contacto y NIT; reiniciar 2FA de usuarios | ✔ hecho |
-| (c) | Resumen con métricas (empresas por estado, pruebas por vencer, ingresos), pantalla de pagos y de auditoría | pendiente |
+| (c) | Resumen con métricas, pantalla de cobros y de auditoría | ✔ hecho |
 | (d) | Solicitudes con aprobación del Dueño (cancelar, NIT, plan, pago manual, suspender) y editor de planes/precios | pendiente |
 
 ## 4.1 Ficha de empresa (`/platform/orgs/:id`)
@@ -71,6 +71,15 @@ Se abre al pulsar el nombre de una empresa en el listado. Muestra, **sin ningún
 - **Línea de tiempo:** alta, términos, acciones de la auditoría (con quién y detalle) y cobros.
 - **Correcciones:** contacto (nombre, razón social, teléfono, correo, país) por Dueño y Soporte, auditadas con el valor anterior y el nuevo; **NIT solo el Dueño con su PIN** (se normaliza, no puede repetirse).
 
+## 4.2 Navegación, resumen, cobros y auditoría
+
+Barra del panel (cada rol solo ve lo suyo): **Resumen** (`/platform`), **Empresas** (`/platform/companies`), **Cobros** (permiso de cobros), **Auditoría**, **Equipo** (solo Dueño).
+
+- **Resumen:** suscripciones por estado (prueba, activas con cuántas son de cortesía, gracia, suspendidas), altas de los últimos 30 días y empresas sin verificar; **ingresos** (solo con permiso de cobros): cobrado este mes con neto/IVA y variación frente al mes anterior, **MRR** (ingreso mensual recurrente neto: mensual + anual ÷ 12, sin cortesías ni pruebas), cobros pendientes (enlaces vigentes) y fallidos de los últimos 30 días; listas de **pruebas por vencer (≤ 5 días)** y de empresas **en gracia**, enlazadas a su ficha; suscripciones vigentes por plan.
+- **Cobros:** todas las empresas, con filtros (estado: pagado/pendiente/vencido/fallido; empresa, NIT o correo; fechas) y paginación. Muestra el **total pagado dentro del filtro sobre todas las páginas** (neto, IVA y total): útil para cuadrar con el contador. Nunca muestra la referencia de los enlaces de pago.
+- **Auditoría:** quién hizo qué, sobre qué empresa y cuándo, con filtros por acción, persona y fechas; las acciones se muestran en español. Todos los roles del equipo la ven.
+- Ninguna de las tres expone datos de negocio de las empresas.
+
 ## 5. 2FA para las empresas clientes
 
 Implementado junto al del equipo (ver `manual-usuario.md`, sección 9, y `manual-tecnico.md`, 5.7):
@@ -80,6 +89,7 @@ Implementado junto al del equipo (ver `manual-usuario.md`, sección 9, y `manual
 
 ## 6. Pendientes y límites conocidos
 
+- Pendiente natural: exportar cobros a CSV/Excel para el contador. Los ingresos son los cobrados en la plataforma; no incluyen retenciones ni comisiones de la pasarela.
 - Un miembro desactivado o con otro rol ve errores 403 en lugar de volver al login hasta que recarga la página.
 - No hay recuperación de acceso por correo: el Dueño reinicia el acceso de un miembro; si el **Dueño** pierde celular y códigos de respaldo hay que repararlo a mano en la base (borrar `mfa_*`/`pin_hash` de su fila).
 - El cambio de contraseña obligatorio aplica al equipo de plataforma; las empresas creadas por teléfono aún no lo tienen.

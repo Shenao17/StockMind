@@ -411,6 +411,8 @@ Detalle de producto en [`PANEL_PLATAFORMA.md`](PANEL_PLATAFORMA.md). Resumen té
 
 Mismo mecanismo que el equipo de plataforma (5.6, `PlatformSecurityService`/`TotpService`), con estas diferencias:
 
+> `enroll/start` es **idempotente**: si ya hay un secreto pendiente (aún sin activar) lo reutiliza. Sin esto, la pantalla en desarrollo (React StrictMode llama dos veces al montar) o un reintento regeneraban el secreto y el QR escaneado dejaba de servir ("Código incorrecto").
+
 - **Opcional por usuario**; la empresa puede **exigirla** (`organizations.require_mfa`, `PUT /users/mfa-policy`, solo ADMIN). Sin PIN ni contraseña temporal.
 - **Login:** si el usuario la tiene → desafío `MFA`. Si no la tiene y la empresa la exige → desafío `ENROLL` (configura antes de entrar; sin sesión hasta terminar). La cuenta y la empresa se revalidan al completar el segundo paso (una empresa suspendida entre ambos no entra).
 - **Autoservicio** (`/auth/mfa/self/*`, solo ADMIN/SELLER): `status`, `setup/start` (pide la contraseña), `setup/finish` (primer código → 8 códigos de respaldo), `disable` (contraseña + código; no si la empresa la exige). Contraseña incorrecta → 400 (no 401, para no cerrar la sesión).
@@ -479,6 +481,8 @@ Flujo: `POST /billing/checkout` (ADMIN) crea un cobro `PENDING` con la referenci
 | `manual-payment` | registra un pago recibido por fuera |
 
 **Ficha de empresa** (`PlatformDetailController`, permiso `ORG_VIEW`): `GET /platform/organizations/{id}/detail` (datos, plan con uso, usuarios, cobros solo con `PAYMENT_VIEW`, línea de tiempo = alta + términos + `audit_log` + cobros), `PATCH .../contact` (permiso `ORG_EDIT_CONTACT`: Dueño y Soporte; audita antes→después) y `PATCH .../tax-id` (`SENSITIVE` + PIN; normaliza y exige NIT único). Sin datos de negocio. Importante: el conteo de productos de una empresa ajena usa SQL nativo (`ProductRepository.countActiveByOrganizationId`), porque el filtro `@TenantId` queda fijado cuando se abre la sesión de la petición y fijar `TenantContext` a mitad no lo cambia.
+
+**Resumen, cobros y auditoría** (`PlatformStatsController`): `GET /platform/summary` (`ORG_VIEW`; el bloque `revenue` solo con `PAYMENT_VIEW`, si no llega `null`), `GET /platform/payments` (`PAYMENT_VIEW`; filtros `status` incluido `EXPIRED` derivado, `organizationId`, `search`, `from`/`to`, paginación con orden permitido, y totales de lo pagado sobre TODO el filtro vía consulta de criterios agregada) y `GET /platform/audit` (`AUDIT_VIEW`, todos los roles; filtros acción/actor/empresa/fechas). Fechas `yyyy-MM-dd` (400 si no). El umbral de pruebas por vencer (5 días) es el mismo del ciclo diario.
 
 Una empresa sin verificar el correo no puede suspenderse ni reactivarse (409 `ORGANIZATION_PENDING`). **Toda acción queda en `audit_log`.**
 
@@ -577,10 +581,10 @@ Reiniciar la base con los datos de ejemplo: `docker compose down -v` y volver a 
 
 | Servicio | Herramienta | Pruebas | Cómo ejecutar |
 |----------|-------------|--------:|---------------|
-| Backend | JUnit + MockMvc (H2 por defecto) | 171 | `mvn test` en `backend/` |
-| Backend contra **MySQL real** | idem, con `MYSQL_TEST_URL` | 171 | `MYSQL_TEST_URL=jdbc:mysql://host:3306/db MYSQL_TEST_USER=... MYSQL_TEST_PASSWORD=... mvn test` |
-| Gateway | `node:test` (sin dependencias) | 166 | `npm test` en `gateway/` |
-| Frontend | Vitest + Testing Library | 117 | `npx vitest run` en `frontend/` |
+| Backend | JUnit + MockMvc (H2 por defecto) | 180 | `mvn test` en `backend/` |
+| Backend contra **MySQL real** | idem, con `MYSQL_TEST_URL` | 180 | `MYSQL_TEST_URL=jdbc:mysql://host:3306/db MYSQL_TEST_USER=... MYSQL_TEST_PASSWORD=... mvn test` |
+| Gateway | `node:test` (sin dependencias) | 168 | `npm test` en `gateway/` |
+| Frontend | Vitest + Testing Library | 127 | `npx vitest run` en `frontend/` |
 | Analytics | pytest | 65 (+4 contra MySQL real) | `python -m pytest` en `analytics/` (con `ANALYTICS_MYSQL_HOST` corre también el aislamiento sobre MySQL) |
 
 Cobertura destacada: roles y tokens, validaciones, ventas con **concurrencia** (nunca se vende más del stock), **aislamiento entre empresas** (listados, por id, escrituras cruzadas, reportes, usuarios, analytics), login, registro y verificación, planes (solo lectura, bloqueo, funciones y límites), pagos idempotentes, ciclo diario, panel de plataforma, paginación y orden permitido, cabeceras de seguridad, CORS, límites y logs sin datos sensibles.
@@ -615,7 +619,7 @@ Cobertura destacada: roles y tokens, validaciones, ventas con **concurrencia** (
 │                PaymentService · PaymentProvider (+ Simulated) · BillingQueryService · AuditService
 ├── bootstrap/   PlatformAdminBootstrap                       # primer PLATFORM_OWNER desde el entorno
 ├── config/      JwtConfig · SecurityConfig (+ JwtAuthFilter) · SubscriptionAccessFilter · DevDataSeeder
-├── controller/  Auth · Billing · Category · Dashboard · Inventory · MfaSelf · Platform · PlatformDetail · PlatformTeam · Product
+├── controller/  Auth · Billing · Category · Dashboard · Inventory · MfaSelf · Platform · PlatformDetail · PlatformStats · PlatformTeam · Product
 │                PublicBilling · PublicRegistration · Report · Sale · User
 ├── dto/         BillingDTO · InventoryDTO · LoginRequest/Response · PageResponse · PlatformDTO
 │                ProductDTO · RegistrationDTO · SaleDTO · TeamDTO · UserDTO · CompanyDetailDTO
