@@ -228,6 +228,7 @@ router.post('/query', authenticate, async (req, res, next) => {
         'Content-Type':  'application/json',
         'Authorization': `Bearer ${config.groqApiKey}`,
       },
+      signal: AbortSignal.timeout(20000), // un proveedor lento no debe colgar la petición
       body: JSON.stringify({
         model:       'llama-3.3-70b-versatile',
         messages:    groqMessages,
