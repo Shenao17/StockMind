@@ -4,6 +4,7 @@
  */
 process.env.LOG_LEVEL = 'info';
 process.env.FRONTEND_URL = 'http://localhost:5173';
+process.env.LANDING_URL = 'https://landing.stockmind.example';
 
 const { test, describe, before, after } = require('node:test');
 const assert = require('node:assert/strict');
@@ -64,6 +65,29 @@ describe('seguridad HTTP', () => {
         const evil = await fetch(`${base}/health`, { headers: { Origin: 'http://evil.example' } });
         assert.notEqual(evil.headers.get('access-control-allow-origin'), 'http://evil.example');
         assert.notEqual(evil.headers.get('access-control-allow-origin'), '*');
+    });
+});
+
+describe('CORS de la landing', () => {
+    const preflight = (path, origin) => fetch(`${base}${path}`, {
+        method: 'OPTIONS',
+        headers: { Origin: origin, 'Access-Control-Request-Method': 'POST', 'Access-Control-Request-Headers': 'content-type' }
+    });
+
+    test('la landing puede llamar a /api/public, sin cookies', async () => {
+        const r = await preflight('/api/public/registrations', 'https://landing.stockmind.example');
+        assert.equal(r.headers.get('access-control-allow-origin'), 'https://landing.stockmind.example');
+        assert.notEqual(r.headers.get('access-control-allow-credentials'), 'true');
+    });
+
+    test('la landing NO puede usar el resto de la API', async () => {
+        const r = await preflight('/api/products', 'https://landing.stockmind.example');
+        assert.notEqual(r.headers.get('access-control-allow-origin'), 'https://landing.stockmind.example');
+    });
+
+    test('un origen desconocido no recibe permiso en /api/public', async () => {
+        const r = await preflight('/api/public/registrations', 'http://evil.example');
+        assert.notEqual(r.headers.get('access-control-allow-origin'), 'http://evil.example');
     });
 });
 

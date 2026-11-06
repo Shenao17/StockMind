@@ -71,10 +71,14 @@ router.post('/login', async (req, res, next) => {
         if (error.response) {
             const status = error.response.status;
 
-            // Credenciales incorrectas.
+            // Credenciales incorrectas (mensaje genérico) o aviso de cuenta (correo sin verificar,
+            // usuario inactivo, empresa suspendida). Java solo envía estos avisos DESPUÉS de validar
+            // la contraseña, así que mostrarlos no revela qué correos existen.
             if (status === 401 || status === 403) {
+                const javaMessage = error.response.data?.error;
+                const isGeneric = !javaMessage || javaMessage === 'Credenciales inválidas';
                 return res.status(status).json({
-                    error: 'Usuario o contraseña incorrectos.'
+                    error: isGeneric ? 'Correo o contraseña incorrectos.' : javaMessage
                 });
             }
 

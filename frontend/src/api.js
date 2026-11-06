@@ -136,6 +136,11 @@ export const API = {
       apiRequest('POST', '/sales', data),
   },
 
+  // Endpoints públicos (sin sesión): verificación del correo al registrarse
+  public: {
+    verifyEmail: (token) => apiRequest('POST', '/public/verify-email', { token }),
+  },
+
   categories: {
     list: () => apiRequest('GET', '/categories'),
   },

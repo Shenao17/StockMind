@@ -35,6 +35,8 @@ const predictionRoutes = require('./src/routes/predictions.routes');
 const agentRoutes = require('./src/routes/agent.routes');
 const dashboardRoutes = require('./src/routes/dashboard.routes');
 const categoryRoutes = require('./src/routes/categories.routes');
+const publicRoutes = require('./src/routes/public.routes');
+const platformRoutes = require('./src/routes/platform.routes');
 const errorHandler = require('./src/middleware/errorHandler.middleware');
 
 // Todas las llamadas a Java/Python (axios) se cortan si el servicio no responde
@@ -103,12 +105,24 @@ function createApp({ logger = createLogger() } = {}) {
     // ── Seguridad ────────────────────────────────────────────────────────────
     app.use(helmet());
 
-    // Con cookies httpOnly el origin no puede ser '*': debe ser exacto y credentials:true
-    app.use(cors({
-        origin: FRONTEND_ORIGIN,
-        credentials: true,
-        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'Authorization']
+    // Con cookies httpOnly el origin no puede ser '*': debe ser exacto y credentials:true.
+    // La landing (otro dominio) solo puede llamar a /api/public, y SIN cookies.
+    const landingOrigins = (process.env.LANDING_URL || '').split(',').map(o => o.trim()).filter(Boolean);
+    app.use(cors((req, callback) => {
+        if (req.path.startsWith('/api/public')) {
+            return callback(null, {
+                origin: [FRONTEND_ORIGIN, ...landingOrigins],
+                credentials: false,
+                methods: ['POST', 'OPTIONS'],
+                allowedHeaders: ['Content-Type']
+            });
+        }
+        callback(null, {
+            origin: FRONTEND_ORIGIN,
+            credentials: true,
+            methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+            allowedHeaders: ['Content-Type', 'Authorization']
+        });
     }));
 
     // Límite de tamaño del cuerpo (una venta de 200 líneas pesa unos pocos KB)
@@ -158,6 +172,8 @@ function createApp({ logger = createLogger() } = {}) {
     app.use('/api/reports', reportRoutes);
     app.use('/api/dashboard', dashboardRoutes);
     app.use('/api/categories', categoryRoutes);
+    app.use('/api/public', publicRoutes);       // sin sesión: registro y verificación de correo
+    app.use('/api/platform', platformRoutes);   // solo PLATFORM_ADMIN
     app.use('/api/predictions', predictionRoutes);
     app.use('/api/agent', agentRoutes); // asistente IA (en reconstrucción)
 

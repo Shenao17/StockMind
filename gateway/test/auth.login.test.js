@@ -20,6 +20,7 @@ before(async () => {
                 lastBody = raw ? JSON.parse(raw) : null;
                 res.setHeader('Content-Type', 'application/json');
                 if (mode === 'bad') { res.statusCode = 401; return res.end(JSON.stringify({ error: 'Credenciales inválidas' })); }
+                if (mode === 'unverified') { res.statusCode = 401; return res.end(JSON.stringify({ error: 'Falta verificar tu correo electrónico. Revisa el enlace que te enviamos.' })); }
                 if (mode === 'down') { res.statusCode = 500; return res.end(JSON.stringify({ error: 'SQL interno' })); }
                 res.end(JSON.stringify({
                     token: 'jwt-de-prueba', userId: 5, username: 'ana', email: 'ana@empresa.com',
@@ -67,7 +68,15 @@ describe('login', () => {
         mode = 'bad';
         const r = await login({ email: 'ana@empresa.com', password: 'mal' });
         assert.equal(r.status, 401);
-        assert.equal((await r.json()).error, 'Usuario o contraseña incorrectos.');
+        assert.equal((await r.json()).error, 'Correo o contraseña incorrectos.');
+        assert.equal(r.headers.get('set-cookie'), null);
+    });
+
+    test('un aviso de cuenta (p. ej. correo sin verificar) sí llega al usuario', async () => {
+        mode = 'unverified';
+        const r = await login({ email: 'ana@empresa.com', password: 'Clave1234' });
+        assert.equal(r.status, 401);
+        assert.match((await r.json()).error, /verificar tu correo/);
         assert.equal(r.headers.get('set-cookie'), null);
     });
 

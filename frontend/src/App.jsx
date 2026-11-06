@@ -5,6 +5,7 @@ import { ToastContainer } from './components/ui/ToastContainer';
 import Sidebar from './components/layout/Sidebar';
 
 import Login from './pages/Login';
+import VerifyEmail from './pages/VerifyEmail';
 import Dashboard from './pages/Dashboard';
 import Products from './pages/Products';
 import Inventory from './pages/Inventory';
@@ -128,6 +129,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Login />} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="/*" element={<ProtectedLayout showToast={showToast} />} />
         </Routes>
 
