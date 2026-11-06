@@ -1,6 +1,6 @@
 # StockMind — Panel de plataforma (equipo de BlackLabs)
 
-**Estado:** Fase (a) implementada (roles, permisos, equipo, verificación en dos pasos). Fases (b)–(d) por hacer.
+**Estado:** Fases (a) y (b) implementadas (roles, permisos, equipo, 2FA y ficha de empresa). Fases (c)–(d) por hacer.
 Detalle técnico en `docs/manual-tecnico.md` (secciones 5.6 y 6.5).
 
 El panel `/platform` es para quien opera StockMind (no para las empresas clientes). Lo usa el equipo de BlackLabs con roles distintos.
@@ -12,9 +12,9 @@ El panel `/platform` es para quien opera StockMind (no para las empresas cliente
 | Rol | Para quién | Puede |
 |---|---|---|
 | `PLATFORM_OWNER` (Dueño) | Tú | Todo, incluida la gestión del equipo |
-| `PLATFORM_BILLING` (Cobranza) | Finanzas | Ver empresas, crear empresas, reactivar, extender pruebas (≤ 7 días), generar enlaces de pago |
-| `PLATFORM_SUPPORT` (Soporte) | Asesor técnico | Ver empresas, reactivar, extender pruebas (≤ 7 días) |
-| `PLATFORM_VIEWER` (Consulta) | Socio / contador | Solo ver |
+| `PLATFORM_BILLING` (Cobranza) | Finanzas | Ver empresas y **cobros**, crear empresas, reactivar, extender pruebas (≤ 7 días), generar enlaces de pago |
+| `PLATFORM_SUPPORT` (Soporte) | Asesor técnico | Ver empresas (sin cobros), **corregir datos de contacto**, reactivar, extender pruebas (≤ 7 días) |
+| `PLATFORM_VIEWER` (Consulta) | Socio / contador | Solo ver (incluye cobros) |
 
 **Operaciones sensibles** (suspender, cancelar, cambiar de plan, registrar pago manual, extender pruebas más de 7 días): hoy **solo el Dueño** las ejecuta (permiso interno `SENSITIVE`). Cuando se implemente la fase (d), el resto del equipo podrá *solicitarlas* y el Dueño las aprobará.
 
@@ -57,16 +57,26 @@ Protecciones:
 | Fase | Contenido | Estado |
 |---|---|---|
 | (a) | Roles y permisos, equipo, 2FA (app + PIN), contraseña temporal, sesiones revocables | ✔ hecho |
-| (b) | Ficha de empresa: datos, uso frente a límites, historial de pagos, línea de tiempo; corregir datos de contacto | pendiente |
+| (b) | Ficha de empresa: datos, uso frente a límites, usuarios, cobros, línea de tiempo; corregir contacto y NIT; reiniciar 2FA de usuarios | ✔ hecho |
 | (c) | Resumen con métricas (empresas por estado, pruebas por vencer, ingresos), pantalla de pagos y de auditoría | pendiente |
 | (d) | Solicitudes con aprobación del Dueño (cancelar, NIT, plan, pago manual, suspender) y editor de planes/precios | pendiente |
+
+## 4.1 Ficha de empresa (`/platform/orgs/:id`)
+
+Se abre al pulsar el nombre de una empresa en el listado. Muestra, **sin ningún dato de negocio** (productos, ventas, clientes):
+- **Datos:** razón social, NIT, correo, teléfono, país, origen, términos aceptados y si exige 2FA.
+- **Plan y uso:** plan, estado, vencimiento, usuarios y productos activos frente al límite (la barra se pone roja al 90 %), funciones incluidas.
+- **Usuarios:** todos (activos e inactivos) con rol y 2FA. El Dueño puede **reiniciar el 2FA** de uno (con su PIN).
+- **Cobros** (solo con permiso de ver cobros; Soporte no los ve): fecha, plan, neto/IVA/total, estado (un enlace vencido se muestra "Vencido"). La referencia del enlace de pago nunca se muestra.
+- **Línea de tiempo:** alta, términos, acciones de la auditoría (con quién y detalle) y cobros.
+- **Correcciones:** contacto (nombre, razón social, teléfono, correo, país) por Dueño y Soporte, auditadas con el valor anterior y el nuevo; **NIT solo el Dueño con su PIN** (se normaliza, no puede repetirse).
 
 ## 5. 2FA para las empresas clientes
 
 Implementado junto al del equipo (ver `manual-usuario.md`, sección 9, y `manual-tecnico.md`, 5.7):
 - Opcional por usuario desde **Seguridad**; el administrador de la empresa puede **exigirla a todos**.
 - Sin PIN: solo app autenticadora + códigos de respaldo.
-- Si alguien pierde el celular: su administrador le reinicia el 2FA desde **Usuarios**; si es el único administrador, lo reinicia el **Dueño de plataforma con su PIN** (endpoint listo; el botón llegará con la ficha de empresa, fase b). Cuando exista la fase (d), soporte podrá solicitarlo y el Dueño aprobarlo.
+- Si alguien pierde el celular: su administrador le reinicia el 2FA desde **Usuarios**; si es el único administrador, lo reinicia el **Dueño de plataforma con su PIN** (endpoint listo; botón **Reiniciar 2FA** en la ficha de empresa). Cuando exista la fase (d), soporte podrá solicitarlo y el Dueño aprobarlo.
 
 ## 6. Pendientes y límites conocidos
 

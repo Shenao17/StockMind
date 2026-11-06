@@ -108,7 +108,7 @@ Gateway Node.js :3000 ──► Backend Java Spring Boot :8080 ──► MySQL :
 **Responsabilidades**
 - Verificar la sesión (JWT en cookie `httpOnly`) y el rol antes de cada ruta protegida.
 - Proxy hacia Java y Python; el JWT se reenvía a Java como `Authorization: Bearer` (`utils/authHeader.js`).
-- Seguridad: **Helmet**, CORS por ruta, límite de cuerpo (100 KB), timeouts (15 s a Java/Python, 20 s a Groq), rate limiting.
+- Seguridad: **Helmet**, CORS por ruta, límite de cuerpo (100 KB), timeouts (15 s a Java/Python, 20 s a Groq), rate limiting (login y códigos 2FA: 10 intentos FALLIDOS por IP cada 15 min, un solo contador compartido; los accesos correctos y las consultas como `mfa/self/status` no cuentan; en desarrollo 100).
 - Registro estructurado (`pino`/`pino-http`) y manejo unificado de errores.
 
 **Rutas**
@@ -127,7 +127,7 @@ Gateway Node.js :3000 ──► Backend Java Spring Boot :8080 ──► MySQL :
 | `/api/billing/*` | Java | plan y pagos de la empresa (checkout solo ADMIN); siguen disponibles aunque el plan esté vencido |
 | `/api/public/*` | Java | **sin sesión**: registro, verificación, planes y enlaces de pago (ver 5.4 y 6) |
 | `/api/platform/*` | Java | solo roles `PLATFORM_*` (el permiso fino lo decide el backend; ver 5.6 y 6.5) |
-| `/api/auth/mfa/*` | Java | público (usa un token de desafío en el cuerpo); mismo límite que el login |
+| `/api/auth/mfa/*` | Java | público salvo `mfa/self/*` (sesión de empresa); el desafío viaja en el cuerpo |
 | `/health` | — | público, sin datos internos |
 
 **CORS:** el origen del frontend (`FRONTEND_URL`) con `credentials: true`. La landing (otro dominio, `LANDING_URL`) solo puede llamar a `/api/public/*` y **sin cookies**.
@@ -414,7 +414,7 @@ Mismo mecanismo que el equipo de plataforma (5.6, `PlatformSecurityService`/`Tot
 - **Opcional por usuario**; la empresa puede **exigirla** (`organizations.require_mfa`, `PUT /users/mfa-policy`, solo ADMIN). Sin PIN ni contraseña temporal.
 - **Login:** si el usuario la tiene → desafío `MFA`. Si no la tiene y la empresa la exige → desafío `ENROLL` (configura antes de entrar; sin sesión hasta terminar). La cuenta y la empresa se revalidan al completar el segundo paso (una empresa suspendida entre ambos no entra).
 - **Autoservicio** (`/auth/mfa/self/*`, solo ADMIN/SELLER): `status`, `setup/start` (pide la contraseña), `setup/finish` (primer código → 8 códigos de respaldo), `disable` (contraseña + código; no si la empresa la exige). Contraseña incorrecta → 400 (no 401, para no cerrar la sesión).
-- **Reinicio:** el ADMIN reinicia a un compañero (`POST /users/{id}/reset-mfa`, no a sí mismo ni a otra empresa); el dueño de plataforma reinicia a cualquiera con su PIN (`POST /platform/organizations/{id}/users/{userId}/reset-mfa`, permiso `SENSITIVE`, auditado). Aún no hay botón en el panel (llegará con la ficha de empresa).
+- **Reinicio:** el ADMIN reinicia a un compañero (`POST /users/{id}/reset-mfa`, no a sí mismo ni a otra empresa); el dueño de plataforma reinicia a cualquiera con su PIN (`POST /platform/organizations/{id}/users/{userId}/reset-mfa`, permiso `SENSITIVE`, auditado). El botón está en la ficha de empresa del panel.
 - Los usuarios devueltos por `/users` incluyen `mfaEnabledAt` pero ningún secreto, hash ni contador (`@JsonIgnore`; hay prueba que lo vigila).
 - Activar la política no cierra sesiones abiertas: se aplica en el siguiente inicio de sesión.
 
@@ -477,6 +477,8 @@ Flujo: `POST /billing/checkout` (ADMIN) crea un cobro `PENDING` con la referenci
 | `plan` | cambio de plan acordado, sin cobro |
 | `payment-links` | enlace de pago (48 h) para enviar al cliente |
 | `manual-payment` | registra un pago recibido por fuera |
+
+**Ficha de empresa** (`PlatformDetailController`, permiso `ORG_VIEW`): `GET /platform/organizations/{id}/detail` (datos, plan con uso, usuarios, cobros solo con `PAYMENT_VIEW`, línea de tiempo = alta + términos + `audit_log` + cobros), `PATCH .../contact` (permiso `ORG_EDIT_CONTACT`: Dueño y Soporte; audita antes→después) y `PATCH .../tax-id` (`SENSITIVE` + PIN; normaliza y exige NIT único). Sin datos de negocio. Importante: el conteo de productos de una empresa ajena usa SQL nativo (`ProductRepository.countActiveByOrganizationId`), porque el filtro `@TenantId` queda fijado cuando se abre la sesión de la petición y fijar `TenantContext` a mitad no lo cambia.
 
 Una empresa sin verificar el correo no puede suspenderse ni reactivarse (409 `ORGANIZATION_PENDING`). **Toda acción queda en `audit_log`.**
 
@@ -575,10 +577,10 @@ Reiniciar la base con los datos de ejemplo: `docker compose down -v` y volver a 
 
 | Servicio | Herramienta | Pruebas | Cómo ejecutar |
 |----------|-------------|--------:|---------------|
-| Backend | JUnit + MockMvc (H2 por defecto) | 162 | `mvn test` en `backend/` |
-| Backend contra **MySQL real** | idem, con `MYSQL_TEST_URL` | 162 | `MYSQL_TEST_URL=jdbc:mysql://host:3306/db MYSQL_TEST_USER=... MYSQL_TEST_PASSWORD=... mvn test` |
-| Gateway | `node:test` (sin dependencias) | 160 | `npm test` en `gateway/` |
-| Frontend | Vitest + Testing Library | 109 | `npx vitest run` en `frontend/` |
+| Backend | JUnit + MockMvc (H2 por defecto) | 171 | `mvn test` en `backend/` |
+| Backend contra **MySQL real** | idem, con `MYSQL_TEST_URL` | 171 | `MYSQL_TEST_URL=jdbc:mysql://host:3306/db MYSQL_TEST_USER=... MYSQL_TEST_PASSWORD=... mvn test` |
+| Gateway | `node:test` (sin dependencias) | 166 | `npm test` en `gateway/` |
+| Frontend | Vitest + Testing Library | 117 | `npx vitest run` en `frontend/` |
 | Analytics | pytest | 65 (+4 contra MySQL real) | `python -m pytest` en `analytics/` (con `ANALYTICS_MYSQL_HOST` corre también el aislamiento sobre MySQL) |
 
 Cobertura destacada: roles y tokens, validaciones, ventas con **concurrencia** (nunca se vende más del stock), **aislamiento entre empresas** (listados, por id, escrituras cruzadas, reportes, usuarios, analytics), login, registro y verificación, planes (solo lectura, bloqueo, funciones y límites), pagos idempotentes, ciclo diario, panel de plataforma, paginación y orden permitido, cabeceras de seguridad, CORS, límites y logs sin datos sensibles.
@@ -613,10 +615,10 @@ Cobertura destacada: roles y tokens, validaciones, ventas con **concurrencia** (
 │                PaymentService · PaymentProvider (+ Simulated) · BillingQueryService · AuditService
 ├── bootstrap/   PlatformAdminBootstrap                       # primer PLATFORM_OWNER desde el entorno
 ├── config/      JwtConfig · SecurityConfig (+ JwtAuthFilter) · SubscriptionAccessFilter · DevDataSeeder
-├── controller/  Auth · Billing · Category · Dashboard · Inventory · Platform · PlatformTeam · Product
+├── controller/  Auth · Billing · Category · Dashboard · Inventory · MfaSelf · Platform · PlatformDetail · PlatformTeam · Product
 │                PublicBilling · PublicRegistration · Report · Sale · User
 ├── dto/         BillingDTO · InventoryDTO · LoginRequest/Response · PageResponse · PlatformDTO
-│                ProductDTO · RegistrationDTO · SaleDTO · TeamDTO · UserDTO
+│                ProductDTO · RegistrationDTO · SaleDTO · TeamDTO · UserDTO · CompanyDetailDTO
 ├── exception/   ConflictException · PinException · ResourceNotFoundException · GlobalExceptionHandler
 ├── platform/    PlatformPermission · PlatformSecurityService · TotpService · MfaCrypto   # roles, 2FA y PIN
 ├── mail/        EmailSender · DevEmailSender · NoopEmailSender
