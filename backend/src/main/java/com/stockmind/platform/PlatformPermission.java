@@ -17,7 +17,8 @@ public enum PlatformPermission {
     ORG_VIEW,        // ver empresas
     ORG_CREATE,      // crear empresa
     ORG_EDIT_CONTACT, // corregir nombre, teléfono y correo de contacto de una empresa
-    PAYMENT_VIEW,    // ver los cobros de una empresa
+    PAYMENT_VIEW,    // ver los cobros (de una empresa y la pantalla de cobros) y los ingresos
+    AUDIT_VIEW,      // ver la auditoría
     ORG_REACTIVATE,  // reactivar una empresa suspendida
     TRIAL_EXTEND,    // extender la prueba (hasta MAX_TRIAL_EXTENSION_DAYS salvo SENSITIVE)
     PAYMENT_LINK,    // generar enlaces de pago
@@ -34,9 +35,9 @@ public enum PlatformPermission {
     public static Set<PlatformPermission> of(User.Role role) {
         return switch (role) {
             case PLATFORM_OWNER -> EnumSet.allOf(PlatformPermission.class);
-            case PLATFORM_BILLING -> EnumSet.of(ORG_VIEW, ORG_CREATE, ORG_REACTIVATE, TRIAL_EXTEND, PAYMENT_LINK, PAYMENT_VIEW);
-            case PLATFORM_SUPPORT -> EnumSet.of(ORG_VIEW, ORG_EDIT_CONTACT, ORG_REACTIVATE, TRIAL_EXTEND);
-            case PLATFORM_VIEWER -> EnumSet.of(ORG_VIEW, PAYMENT_VIEW);
+            case PLATFORM_BILLING -> EnumSet.of(ORG_VIEW, ORG_CREATE, ORG_REACTIVATE, TRIAL_EXTEND, PAYMENT_LINK, PAYMENT_VIEW, AUDIT_VIEW);
+            case PLATFORM_SUPPORT -> EnumSet.of(ORG_VIEW, ORG_EDIT_CONTACT, ORG_REACTIVATE, TRIAL_EXTEND, AUDIT_VIEW);
+            case PLATFORM_VIEWER -> EnumSet.of(ORG_VIEW, PAYMENT_VIEW, AUDIT_VIEW);
             default -> EnumSet.noneOf(PlatformPermission.class);
         };
     }

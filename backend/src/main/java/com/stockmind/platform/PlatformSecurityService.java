@@ -113,15 +113,24 @@ public class PlatformSecurityService {
 
     public record Enrollment(String secret, String otpauthUri) {}
 
-    /** Genera (y guarda cifrado, aún sin activar) un secreto nuevo para configurar la app. */
+    /**
+     * Genera (y guarda cifrado, aún sin activar) el secreto para configurar la app. Si ya hay uno pendiente
+     * (aún no activado) lo reutiliza: así dos llamadas seguidas (p. ej. la pantalla pidiéndolo dos veces o
+     * un reintento) muestran siempre la MISMA clave y no se invalida el QR que el usuario ya escaneó.
+     */
     @Transactional
     public Enrollment startEnrollment(User user) {
         if (mfaEnrolled(user)) {
             throw new BadCredentialsException("La verificación en dos pasos ya está configurada");
         }
-        String secret = totp.newSecret();
-        user.setMfaSecret(crypto.encrypt(secret));
-        userRepository.save(user);
+        String secret;
+        if (user.getMfaSecret() != null) {
+            secret = crypto.decrypt(user.getMfaSecret());
+        } else {
+            secret = totp.newSecret();
+            user.setMfaSecret(crypto.encrypt(secret));
+            userRepository.save(user);
+        }
         return new Enrollment(secret, totp.otpauthUri(ISSUER, user.getEmail(), secret));
     }
 

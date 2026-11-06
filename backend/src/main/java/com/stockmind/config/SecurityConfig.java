@@ -66,7 +66,9 @@ public class SecurityConfig {
                 .requestMatchers("/auth/me").hasAnyRole("ADMIN", "SELLER", "PLATFORM_OWNER", "PLATFORM_BILLING",
                     "PLATFORM_SUPPORT", "PLATFORM_VIEWER")
                 // Equipo de plataforma: cada endpoint exige un PERMISO (no un rol concreto)
-                .requestMatchers(HttpMethod.GET, "/platform/organizations/**").hasAuthority(PERM_VIEW)
+                .requestMatchers(HttpMethod.GET, "/platform/organizations/**", "/platform/summary").hasAuthority(PERM_VIEW)
+                .requestMatchers(HttpMethod.GET, "/platform/payments").hasAuthority(PlatformPermission.PAYMENT_VIEW.authority())
+                .requestMatchers(HttpMethod.GET, "/platform/audit").hasAuthority(PlatformPermission.AUDIT_VIEW.authority())
                 .requestMatchers(HttpMethod.POST, "/platform/organizations").hasAuthority(PlatformPermission.ORG_CREATE.authority())
                 .requestMatchers(HttpMethod.PATCH, "/platform/organizations/*/contact").hasAuthority(PlatformPermission.ORG_EDIT_CONTACT.authority())
                 .requestMatchers(HttpMethod.PATCH, "/platform/organizations/*/tax-id").hasAuthority(PlatformPermission.SENSITIVE.authority())
