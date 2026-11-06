@@ -43,6 +43,16 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage());
     }
 
+    /** Límite de plan, función no incluida o pagos no disponibles → 402/503 con código estable */
+    @ExceptionHandler(BillingException.class)
+    public ResponseEntity<Map<String, Object>> handleBilling(BillingException ex) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("error", ex.getMessage());
+        body.put("code", ex.getCode());
+        body.put("timestamp", LocalDateTime.now().toString());
+        return ResponseEntity.status(ex.getStatus()).body(body);
+    }
+
     /** Datos ya registrados (NIT, correo) → 409 */
     @ExceptionHandler(ConflictException.class)
     public ResponseEntity<Map<String, Object>> handleConflict(ConflictException ex) {

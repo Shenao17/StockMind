@@ -1,5 +1,6 @@
 package com.stockmind.service;
 
+import com.stockmind.billing.EntitlementService;
 import com.stockmind.dto.PageResponse;
 import com.stockmind.exception.ResourceNotFoundException;
 import com.stockmind.model.Product;
@@ -20,6 +21,7 @@ import java.util.List;
 public class ProductService {
 
     private final ProductRepository productRepository;
+    private final EntitlementService entitlementService;
 
     public List<Product> findAll() {
         return productRepository.findByActiveTrue();
@@ -47,6 +49,7 @@ public class ProductService {
     }
 
     public Product create(Product product) {
+        entitlementService.assertCanAddProduct();
         if (productRepository.existsBySku(product.getSku())) {
             throw new IllegalArgumentException("Ya existe un producto con SKU: " + product.getSku());
         }

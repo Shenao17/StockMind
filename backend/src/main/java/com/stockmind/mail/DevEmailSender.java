@@ -14,4 +14,9 @@ public class DevEmailSender implements EmailSender {
     public void sendVerificationEmail(String toEmail, String recipientName, String verifyUrl) {
         log.warn("[DEV] Enlace de verificación para {}: {}", toEmail, verifyUrl);
     }
+
+    @Override
+    public void sendBillingNotice(String toEmail, String recipientName, BillingNotice kind, int daysLeft, String billingUrl) {
+        log.warn("[DEV] Aviso {} ({} días) para {}: {}", kind, daysLeft, toEmail, billingUrl);
+    }
 }

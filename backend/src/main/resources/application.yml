@@ -24,6 +24,18 @@ stockmind:
   platform-admin:
     email: ${PLATFORM_ADMIN_EMAIL:}
     password: ${PLATFORM_ADMIN_PASSWORD:}
+  billing:
+    default-plan: PRO         # plan con el que prueba quien no elige uno
+    iva-rate: 0.19            # IVA que se suma al precio de los planes
+    grace-days: 7             # tras vencer: solo lectura durante estos días
+    retention-days: 90        # suspendida: los datos se conservan este tiempo antes de cancelar
+    payment-link-hours: 48    # vigencia de un enlace de pago
+    cache-seconds: 30         # caché del estado de la suscripción (ver EntitlementService)
+    cron: "0 0 6 * * *"       # ciclo diario: avisos y cambios de estado
+    scheduler-enabled: true
+  payments:
+    # simulated = pasarela de pruebas (solo desarrollo/demos). Sin valor, los cobros responden 503.
+    provider: ${STOCKMIND_PAYMENTS_PROVIDER:}
 
 app:
   public-url: ${APP_PUBLIC_URL:http://localhost:5173}   # base de los enlaces que van en los correos

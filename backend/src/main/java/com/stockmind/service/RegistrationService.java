@@ -1,10 +1,14 @@
 package com.stockmind.service;
 
+import com.stockmind.billing.PaymentService;
+import com.stockmind.billing.SubscriptionService;
 import com.stockmind.dto.RegistrationDTO;
 import com.stockmind.exception.ConflictException;
 import com.stockmind.mail.EmailSender;
 import com.stockmind.model.EmailVerificationToken;
 import com.stockmind.model.Organization;
+import com.stockmind.model.Plan;
+import com.stockmind.model.Subscription;
 import com.stockmind.model.User;
 import com.stockmind.repository.EmailVerificationTokenRepository;
 import com.stockmind.repository.OrganizationRepository;
@@ -55,6 +59,8 @@ public class RegistrationService {
     private final EmailVerificationTokenRepository tokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailSender emailSender;
+    private final SubscriptionService subscriptionService;
+    private final PaymentService paymentService;
 
     @Value("${stockmind.trial-days:14}")
     private int trialDays;
@@ -79,6 +85,7 @@ public class RegistrationService {
             throw new ConflictException(GENERIC_CONFLICT);
         }
 
+        Plan plan = subscriptionService.planByCode(req.getPlanCode());   // 400 si el plan no existe
         Organization org = newOrganization(req, taxId, email, Organization.Status.PENDING,
             Organization.Origin.SELF_SIGNUP);
         org.setTermsAcceptedAt(LocalDateTime.now());
@@ -86,6 +93,7 @@ public class RegistrationService {
         org = organizationRepository.save(org);
 
         User admin = userRepository.save(newAdmin(org, email, req.getPassword(), false));
+        subscriptionService.createPendingTrial(org, plan);   // la prueba corre al verificar el correo
         issueTokenAndSend(admin);
         log.info("Autoregistro: empresa {} creada en estado PENDING", org.getId());
         return org;
@@ -107,9 +115,20 @@ public class RegistrationService {
 
         String contact = req.getContactEmail() == null || req.getContactEmail().isBlank()
             ? email : normalizeEmail(req.getContactEmail());
+        Plan plan = subscriptionService.planByCode(req.getPlanCode());
         Organization org = organizationRepository.save(newOrganization(req, taxId, contact,
             Organization.Status.ACTIVE, Organization.Origin.PLATFORM_ADMIN));
         userRepository.save(newAdmin(org, email, req.getPassword(), true));
+
+        switch (req.getMode() == null ? RegistrationDTO.ByPlatform.Mode.TRIAL : req.getMode()) {
+            case COMPLIMENTARY -> subscriptionService.createComplimentary(org, plan);
+            case PAID -> {
+                // Pago acordado por teléfono: se registra y el plan queda activo de inmediato
+                subscriptionService.createPendingTrial(org, plan);
+                paymentService.recordManualPayment(org.getId(), plan.getCode(), req.getBillingCycle());
+            }
+            default -> subscriptionService.createTrial(org, plan);
+        }
         log.info("Empresa {} creada desde el panel de plataforma", org.getId());
         return org;
     }
@@ -137,7 +156,8 @@ public class RegistrationService {
             .orElseThrow(() -> new IllegalStateException(INVALID_TOKEN));
         if (org.getStatus() == Organization.Status.PENDING) {
             org.setStatus(Organization.Status.ACTIVE);
-            org.setTrialEndsAt(now.plusDays(trialDays));
+            Subscription started = subscriptionService.startTrial(org.getId());
+            org.setTrialEndsAt(started.getTrialEndsAt());
             organizationRepository.save(org);
             log.info("Empresa {} activada; prueba gratis hasta {}", org.getId(), org.getTrialEndsAt());
         }

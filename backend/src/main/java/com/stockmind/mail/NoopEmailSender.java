@@ -17,4 +17,9 @@ public class NoopEmailSender implements EmailSender {
     public void sendVerificationEmail(String toEmail, String recipientName, String verifyUrl) {
         log.error("No hay proveedor de correo configurado: NO se envió el correo de verificación a {}", toEmail);
     }
+
+    @Override
+    public void sendBillingNotice(String toEmail, String recipientName, BillingNotice kind, int daysLeft, String billingUrl) {
+        log.error("No hay proveedor de correo configurado: NO se envió el aviso {} a {}", kind, toEmail);
+    }
 }

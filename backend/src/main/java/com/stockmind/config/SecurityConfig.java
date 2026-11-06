@@ -41,6 +41,7 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
+    private final SubscriptionAccessFilter subscriptionAccessFilter;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -64,10 +65,14 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.PUT, "/products/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.DELETE, "/products/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.POST, "/inventory/**").hasRole("ADMIN")
+                .requestMatchers("/billing/payments").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.POST, "/billing/**").hasRole("ADMIN")
                 // Cualquier otro endpoint: ADMIN o SELLER (un token sin rol válido no pasa)
                 .anyRequest().hasAnyRole("ADMIN", "SELLER")
             )
-            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+            // Después de autenticar (ya hay empresa en el contexto): aplica plan, solo lectura y bloqueo
+            .addFilterAfter(subscriptionAccessFilter, JwtAuthFilter.class);
 
         return http.build();
     }
@@ -100,15 +105,25 @@ class JwtAuthFilter extends OncePerRequestFilter {
                                     FilterChain filterChain)
             throws ServletException, IOException {
 
-        final String authHeader = request.getHeader("Authorization");
-
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        // Cada petición empieza SIN empresa (aunque el hilo trajera una): la empresa sale solo del
+        // token de ESTA petición. Al terminar se restaura lo que había (en producción siempre null;
+        // en pruebas con MockMvc es la empresa del test).
+        final Long previousTenant = TenantContext.get();
+        TenantContext.clear();
+        try {
+            authenticate(request);
             filterChain.doFilter(request, response);
+        } finally {
+            if (previousTenant == null) TenantContext.clear(); else TenantContext.set(previousTenant);
+        }
+    }
+
+    private void authenticate(HttpServletRequest request) {
+        final String authHeader = request.getHeader("Authorization");
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             return;
         }
-
         final String token = authHeader.substring(7);
-        final Long previousTenant = TenantContext.get();
 
         if (jwtConfig.isTokenValid(token) &&
                 SecurityContextHolder.getContext().getAuthentication() == null) {
@@ -133,14 +148,6 @@ class JwtAuthFilter extends OncePerRequestFilter {
             if (valid && organizationId != null) {
                 TenantContext.set(organizationId);
             }
-        }
-
-        try {
-            filterChain.doFilter(request, response);
-        } finally {
-            // El ThreadLocal nunca debe filtrarse a otra petición: se restaura lo que había antes
-            // (en producción siempre es null; en pruebas con MockMvc es la empresa del test)
-            if (previousTenant == null) TenantContext.clear(); else TenantContext.set(previousTenant);
         }
     }
 }

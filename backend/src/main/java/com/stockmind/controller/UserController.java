@@ -1,5 +1,6 @@
 package com.stockmind.controller;
 
+import com.stockmind.billing.EntitlementService;
 import com.stockmind.dto.PageResponse;
 import com.stockmind.dto.UserDTO;
 import com.stockmind.exception.ResourceNotFoundException;
@@ -36,6 +37,7 @@ public class UserController {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final EntitlementService entitlementService;
 
     private static final Set<String> SORT_FIELDS = Set.of("id", "username", "email", "role", "createdAt");
 
@@ -69,6 +71,7 @@ public class UserController {
 
         Long organizationId = TenantContext.require();
         assertAssignableRole(body.getRole());
+        entitlementService.assertCanAddUser(organizationId);
 
         if (userRepository.existsByOrganizationIdAndUsername(organizationId, username)) {
             return ResponseEntity.badRequest()
@@ -97,6 +100,9 @@ public class UserController {
                                      Authentication authentication) {
         User user = findInOwnOrganization(id);
         if (body.getRole() != null) assertAssignableRole(body.getRole());
+        if (Boolean.TRUE.equals(body.getActive()) && !Boolean.TRUE.equals(user.getActive())) {
+            entitlementService.assertCanAddUser(user.getOrganizationId());   // reactivar también cuenta contra el límite
+        }
 
         // Evita que un administrador se quede sin acceso a sí mismo
         boolean isSelf = user.getEmail().equals(authentication.getName());

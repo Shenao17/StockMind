@@ -47,6 +47,10 @@ public class RegistrationDTO {
     public static class SelfSignup extends Company {
         @AssertTrue(message = "Debes aceptar los términos y condiciones")
         private boolean acceptTerms;
+
+        /** Plan con el que prueba (STARTER, PRO, BUSINESS); si no se indica, el predeterminado. */
+        @Size(max = 20, message = "El plan no es válido")
+        private String planCode;
     }
 
     /** Alta hecha por el dueño de la plataforma (p. ej. tras hablar con el cliente por teléfono). */
@@ -56,6 +60,17 @@ public class RegistrationDTO {
         @Email(message = "El correo de contacto no es válido")
         @Size(max = 100, message = "El correo de contacto no puede superar 100 caracteres")
         private String contactEmail;
+
+        @Size(max = 20, message = "El plan no es válido")
+        private String planCode;
+
+        /** TRIAL: prueba gratis desde hoy · PAID: pago ya recibido (se registra) · COMPLIMENTARY: cortesía sin cobro. */
+        private Mode mode = Mode.TRIAL;
+
+        private com.stockmind.model.Subscription.BillingCycle billingCycle =
+            com.stockmind.model.Subscription.BillingCycle.MONTHLY;
+
+        public enum Mode { TRIAL, PAID, COMPLIMENTARY }
     }
 
     @Data
