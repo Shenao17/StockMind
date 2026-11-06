@@ -430,7 +430,7 @@ La prueba (14 días) empieza al **verificar el correo** (autoregistro) o desde e
 Flujo: `POST /billing/checkout` (ADMIN) crea un cobro `PENDING` con la referencia (24 bytes aleatorios) y devuelve la URL de pago → la pasarela confirma → `PaymentService.markPaid(referencia)` activa el plan. `markPaid` es **idempotente** (un webhook repetido no extiende el plan dos veces). Renovar antes de vencer suma el nuevo periodo al final del actual. El enlace vence a las 48 h (la caducidad se deriva de `expires_at`).
 
 - **`PaymentProvider`** abstrae la pasarela. Hoy solo existe `SimulatedPaymentProvider`, activo con `STOCKMIND_PAYMENTS_PROVIDER=simulated` (el override de desarrollo lo define): el "checkout" es la página `/pay/{referencia}` con un botón de prueba. **Sin esa variable no hay proveedor y los cobros responden 503**: un enlace de pago nunca puede "pagarse" solo en producción.
-- Para cobrar de verdad se agrega una implementación (p. ej. Wompi) que crea el cobro, devuelve su URL y confirma con un **webhook firmado**; el resto no cambia.
+- Para cobrar de verdad se agrega una implementación (p. ej. Wompi) que crea el cobro, devuelve su URL y confirma con un **webhook firmado**; el resto no cambia. El plan de integración con Wompi (flujo, webhook, seguridad, pendientes) está en [`INTEGRACION_WOMPI.md`](INTEGRACION_WOMPI.md).
 - `POST /platform/organizations/{id}/manual-payment` registra un pago recibido por fuera (p. ej. acordado por teléfono) y activa el plan.
 - **Facturación electrónica DIAN:** aún no integrada; debe estar lista antes del primer cobro real.
 
@@ -492,7 +492,7 @@ Un error inesperado **nunca** devuelve su mensaje interno al cliente.
 
 ## 8. Configuración de entornos
 
-### 7.1 Variables de entorno (`.env` en la raíz)
+### 8.1 Variables de entorno (`.env` en la raíz)
 
 El `.env` no se versiona; `.env.example` es la plantilla. Docker Compose lo lee y falla con un mensaje claro si falta un valor obligatorio. Para generar valores: `openssl rand -hex 32`.
 
@@ -516,7 +516,7 @@ Ajustes opcionales del gateway: `ENTITLEMENT_CACHE_SECONDS` (30), `REGISTRATION_
 
 Archivos locales no versionados: `.env`, `backend/src/main/resources/application.properties` (opcional, plantilla `.example`) y `analytics/config.py` (opcional: dentro de Docker se genera desde el entorno).
 
-### 7.2 Desarrollo con Docker (recomendado)
+### 8.2 Desarrollo con Docker (recomendado)
 
 ```bash
 docker compose up --build --watch
@@ -526,7 +526,7 @@ docker compose up --build --watch
 
 Reiniciar la base con los datos de ejemplo: `docker compose down -v` y volver a levantar (borra los datos de desarrollo).
 
-### 7.3 Producción (consideraciones pendientes)
+### 8.3 Producción (consideraciones pendientes)
 
 - Usar solo `docker-compose.yml` (sin el override), con secretos reales gestionados fuera del repositorio.
 - Imágenes de producción: frontend con `vite build` servido como estático (hoy el contenedor corre `vite dev`), analytics con `gunicorn` (hoy el servidor de desarrollo de Flask), contenedores sin root, `npm ci` y multi-stage.
@@ -571,7 +571,7 @@ Cobertura destacada: roles y tokens, validaciones, ventas con **concurrencia** (
 
 ## 11. Estructura del código
 
-### 10.1 Backend (`com.stockmind`)
+### 11.1 Backend (`com.stockmind`)
 
 ```
 ├── StockmindApplication
@@ -594,7 +594,7 @@ Cobertura destacada: roles y tokens, validaciones, ventas con **concurrencia** (
 resources/       application.yml · db/migration/V*.sql · db/dev/seed.sql
 ```
 
-### 10.2 Gateway
+### 11.2 Gateway
 
 ```
 gateway/
@@ -610,7 +610,7 @@ gateway/
 └── test/                     # node:test: auth, rutas, app, logs, CAPTCHA, errores...
 ```
 
-### 10.3 Analytics
+### 11.3 Analytics
 
 ```
 analytics/
