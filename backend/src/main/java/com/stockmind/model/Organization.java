@@ -54,6 +54,11 @@ public class Organization {
     @Column(name = "trial_ends_at")
     private LocalDateTime trialEndsAt;
 
+    /** El administrador exige la verificación en dos pasos a todos los usuarios de la empresa. */
+    @Column(name = "require_mfa", nullable = false)
+    @Builder.Default
+    private Boolean requireMfa = false;
+
     @Column(name = "terms_accepted_at")
     private LocalDateTime termsAcceptedAt;
 

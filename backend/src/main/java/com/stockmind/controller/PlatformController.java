@@ -6,6 +6,8 @@ import com.stockmind.billing.SubscriptionService;
 import com.stockmind.dto.BillingDTO;
 import com.stockmind.dto.PageResponse;
 import com.stockmind.dto.PlatformDTO;
+import com.stockmind.dto.TeamDTO;
+import com.stockmind.model.User;
 import com.stockmind.dto.RegistrationDTO;
 import com.stockmind.exception.ResourceNotFoundException;
 import com.stockmind.model.Organization;
@@ -61,6 +63,8 @@ public class PlatformController {
     private final SubscriptionService subscriptionService;
     private final PaymentService paymentService;
     private final AuditService auditService;
+    private final com.stockmind.repository.UserRepository userRepository;
+    private final com.stockmind.platform.PlatformSecurityService platformSecurity;
 
     @PostMapping("/organizations")
     public ResponseEntity<PlatformDTO.OrganizationView> create(
@@ -183,6 +187,27 @@ public class PlatformController {
         auditService.record(auth.getName(), "MANUAL_PAYMENT_RECORDED", id,
             "plan=" + body.getPlanCode() + " total=" + payment.getAmountTotal());
         return ResponseEntity.status(HttpStatus.CREATED).body(BillingDTO.PaymentView.of(payment, null, false, null));
+    }
+
+    /**
+     * Reinicia el 2FA de un usuario de empresa que perdió su celular y sus códigos (p. ej. el único
+     * administrador). Operación sensible: solo el dueño, con su PIN, y queda auditada.
+     */
+    @PostMapping("/organizations/{id}/users/{userId}/reset-mfa")
+    public ResponseEntity<java.util.Map<String, String>> resetUserMfa(
+            @PathVariable Long id, @PathVariable Long userId,
+            @Valid @RequestBody TeamDTO.Confirm body, Authentication auth) {
+        find(id);
+        User actor = userRepository.findByEmail(auth.getName())
+            .orElseThrow(() -> new org.springframework.security.authentication.BadCredentialsException("Sesión no válida"));
+        platformSecurity.verifyPin(actor, body.getPin());
+        User target = userRepository.findById(userId)
+            .filter(u -> id.equals(u.getOrganizationId()))
+            .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado en esa empresa"));
+        platformSecurity.resetFactors(target);
+        userRepository.save(target);
+        auditService.record(auth.getName(), "COMPANY_USER_MFA_RESET", id, target.getEmail());
+        return ResponseEntity.ok(java.util.Map.of("message", "Verificación en dos pasos reiniciada"));
     }
 
     // ───────────────────────────── Internos ─────────────────────────────

@@ -44,7 +44,7 @@ public class AuthController {
     public record EnrollStartRequest(@jakarta.validation.constraints.NotBlank String challengeToken) {}
     public record EnrollFinishRequest(@jakarta.validation.constraints.NotBlank String challengeToken,
                                       @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max = 20) String code,
-                                      @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max = 20) String pin,
+                                      @jakarta.validation.constraints.Size(max = 20) String pin,   // solo el equipo de plataforma
                                       @jakarta.validation.constraints.Size(max = 72) String newPassword) {}
 
     @PostMapping("/mfa/verify")

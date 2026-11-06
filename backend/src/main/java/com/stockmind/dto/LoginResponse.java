@@ -26,6 +26,7 @@ public class LoginResponse {
     private Boolean mfaRequired;          // ya tiene app autenticadora: pedir el código
     private Boolean enrollmentRequired;   // primer acceso: configurar app, PIN (y contraseña si es temporal)
     private Boolean mustChangePassword;
+    private Boolean pinRequired;          // solo el equipo de plataforma elige un PIN al configurar
     private String challengeToken;
     private java.util.List<String> backupCodes;   // solo al terminar la configuración, una vez
 }

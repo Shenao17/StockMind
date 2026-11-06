@@ -5,7 +5,11 @@ import com.stockmind.dto.PageResponse;
 import com.stockmind.dto.UserDTO;
 import com.stockmind.exception.ResourceNotFoundException;
 import com.stockmind.model.User;
+import com.stockmind.repository.OrganizationRepository;
 import com.stockmind.repository.UserRepository;
+import com.stockmind.billing.AuditService;
+import com.stockmind.platform.PlatformSecurityService;
+import com.stockmind.model.Organization;
 import com.stockmind.tenant.TenantContext;
 import com.stockmind.repository.spec.UserSpecs;
 import com.stockmind.util.Paging;
@@ -38,6 +42,9 @@ public class UserController {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final EntitlementService entitlementService;
+    private final OrganizationRepository organizationRepository;
+    private final PlatformSecurityService platformSecurity;
+    private final AuditService auditService;
 
     private static final Set<String> SORT_FIELDS = Set.of("id", "username", "email", "role", "createdAt");
 
@@ -143,6 +150,45 @@ public class UserController {
         user.setActive(false);
         userRepository.save(user);
         return ResponseEntity.ok(Map.of("message", "Usuario desactivado correctamente"));
+    }
+
+    // ── Verificación en dos pasos de la empresa ──
+
+    public record MfaPolicyBody(@jakarta.validation.constraints.NotNull Boolean required) {}
+
+    /** GET /users/mfa-policy → { required } : ¿la empresa exige 2FA a todos sus usuarios? */
+    @GetMapping("/mfa-policy")
+    public ResponseEntity<Map<String, Boolean>> mfaPolicy() {
+        return ResponseEntity.ok(Map.of("required", ownOrganization().getRequireMfa()));
+    }
+
+    /** PUT /users/mfa-policy { required } : exigir (o no) 2FA a todos. Quien no lo tenga lo configura al entrar. */
+    @PutMapping("/mfa-policy")
+    public ResponseEntity<Map<String, Boolean>> setMfaPolicy(@Valid @RequestBody MfaPolicyBody body,
+                                                            Authentication authentication) {
+        Organization org = ownOrganization();
+        org.setRequireMfa(body.required());
+        organizationRepository.save(org);
+        auditService.record(authentication.getName(), "ORG_MFA_POLICY_CHANGED", org.getId(), "required=" + body.required());
+        return ResponseEntity.ok(Map.of("required", org.getRequireMfa()));
+    }
+
+    /** POST /users/{id}/reset-mfa : el admin reinicia el 2FA de un compañero que perdió su celular. */
+    @PostMapping("/{id}/reset-mfa")
+    public ResponseEntity<Map<String, String>> resetMfa(@PathVariable Long id, Authentication authentication) {
+        User user = findInOwnOrganization(id);
+        if (user.getEmail().equals(authentication.getName())) {
+            throw new IllegalStateException("No puedes reiniciar tu propia verificación; pídelo a otro administrador");
+        }
+        platformSecurity.resetFactors(user);
+        userRepository.save(user);
+        auditService.record(authentication.getName(), "MFA_RESET_BY_ADMIN", user.getOrganizationId(), user.getEmail());
+        return ResponseEntity.ok(Map.of("message", "Verificación en dos pasos reiniciada"));
+    }
+
+    private Organization ownOrganization() {
+        return organizationRepository.findById(TenantContext.require())
+            .orElseThrow(() -> new ResourceNotFoundException("Empresa no encontrada"));
     }
 
     /** Un usuario de otra empresa se comporta como si no existiera (404), nunca como prohibido. */

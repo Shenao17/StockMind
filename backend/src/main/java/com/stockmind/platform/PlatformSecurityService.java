@@ -52,6 +52,10 @@ public class PlatformSecurityService {
 
     // ───────────────────────── Desafíos ─────────────────────────
 
+    public long backupCodesLeft(User user) {
+        return backupCodeRepository.countByUserIdAndUsedAtIsNull(user.getId());
+    }
+
     public boolean mfaEnrolled(User user) {
         return user.getMfaEnabledAt() != null && user.getMfaSecret() != null;
     }
@@ -71,7 +75,7 @@ public class PlatformSecurityService {
             }
             User u = userRepository.findByEmail(jwtConfig.extractUsername(challengeToken))
                 .orElseThrow(() -> new BadCredentialsException("La verificación expiró. Inicia sesión de nuevo."));
-            if (!u.getActive() || !u.isPlatformUser()) {
+            if (!u.getActive()) {
                 throw new BadCredentialsException("La verificación expiró. Inicia sesión de nuevo.");
             }
             return u;
@@ -131,7 +135,8 @@ public class PlatformSecurityService {
             throw new BadCredentialsException("Inicia la configuración de nuevo");
         }
         assertNotLocked(user.getMfaLockedUntil(), "verificación");
-        if (pin == null || !pin.matches(PIN_REGEX)) {
+        // El PIN es del equipo de plataforma (confirma acciones sensibles); los usuarios de empresa no lo usan
+        if (user.isPlatformUser() && (pin == null || !pin.matches(PIN_REGEX))) {
             throw new IllegalArgumentException(PIN_MSG);
         }
         if (Boolean.TRUE.equals(user.getMustChangePassword())) {
@@ -151,9 +156,11 @@ public class PlatformSecurityService {
         user.setMfaEnabledAt(LocalDateTime.now());
         user.setMfaFailedAttempts(0);
         user.setMfaLockedUntil(null);
-        user.setPinHash(passwordEncoder.encode(pin));
-        user.setPinFailedAttempts(0);
-        user.setPinLockedUntil(null);
+        if (user.isPlatformUser()) {
+            user.setPinHash(passwordEncoder.encode(pin));
+            user.setPinFailedAttempts(0);
+            user.setPinLockedUntil(null);
+        }
         if (Boolean.TRUE.equals(user.getMustChangePassword())) {
             user.setPasswordHash(passwordEncoder.encode(newPassword));
             user.setMustChangePassword(false);

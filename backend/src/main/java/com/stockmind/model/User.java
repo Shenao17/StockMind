@@ -63,13 +63,16 @@ public class User {
     @Column(name = "mfa_enabled_at")
     private LocalDateTime mfaEnabledAt;       // null = pendiente de configurar
 
+    @JsonIgnore
     @Column(name = "mfa_last_step")
     private Long mfaLastStep;
 
+    @JsonIgnore
     @Column(name = "mfa_failed_attempts", nullable = false)
     @Builder.Default
     private Integer mfaFailedAttempts = 0;
 
+    @JsonIgnore
     @Column(name = "mfa_locked_until")
     private LocalDateTime mfaLockedUntil;
 
@@ -77,10 +80,12 @@ public class User {
     @Column(name = "pin_hash")
     private String pinHash;
 
+    @JsonIgnore
     @Column(name = "pin_failed_attempts", nullable = false)
     @Builder.Default
     private Integer pinFailedAttempts = 0;
 
+    @JsonIgnore
     @Column(name = "pin_locked_until")
     private LocalDateTime pinLockedUntil;
 
@@ -89,6 +94,7 @@ public class User {
     private Boolean mustChangePassword = false;
 
     /** Las sesiones emitidas antes de esta fecha dejan de valer (cambio de rol, reinicio de acceso). */
+    @JsonIgnore
     @Column(name = "sessions_valid_from")
     private LocalDateTime sessionsValidFrom;
 

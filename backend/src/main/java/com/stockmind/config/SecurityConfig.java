@@ -58,6 +58,7 @@ public class SecurityConfig {
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/auth/mfa/self/**").hasAnyRole("ADMIN", "SELLER")   // desde el perfil, con sesión de empresa
                 .requestMatchers("/auth/login", "/auth/mfa/**").permitAll()
                 // Registro y verificación de correo: sin sesión (el gateway pone CAPTCHA y límites)
                 .requestMatchers("/public/**").permitAll()
@@ -70,6 +71,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/platform/organizations/*/reactivate").hasAuthority(PlatformPermission.ORG_REACTIVATE.authority())
                 .requestMatchers(HttpMethod.POST, "/platform/organizations/*/extend-trial").hasAuthority(PlatformPermission.TRIAL_EXTEND.authority())
                 .requestMatchers(HttpMethod.POST, "/platform/organizations/*/payment-links").hasAuthority(PlatformPermission.PAYMENT_LINK.authority())
+                .requestMatchers(HttpMethod.POST, "/platform/organizations/*/users/*/reset-mfa").hasAuthority(PlatformPermission.SENSITIVE.authority())
                 .requestMatchers(HttpMethod.POST, "/platform/organizations/*/*").hasAuthority(PlatformPermission.SENSITIVE.authority())
                 .requestMatchers("/platform/team/**").hasAuthority(PlatformPermission.TEAM_MANAGE.authority())
                 .requestMatchers("/platform/**").denyAll()

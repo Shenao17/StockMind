@@ -52,32 +52,18 @@ public class AuthService {
             throw new BadCredentialsException("Credenciales inválidas");
         }
 
-        if (!user.getActive()) {
-            throw new BadCredentialsException("Usuario inactivo. Contacte al administrador.");
-        }
+        Organization org = assertAccountUsable(user);
 
-        // La empresa debe estar activa (pendiente de verificar, suspendida o cancelada no entran)
-        if (user.getOrganizationId() != null) {
-            Organization org = organizationRepository.findById(user.getOrganizationId()).orElse(null);
-            if (org == null) {
-                throw new BadCredentialsException("La cuenta de la empresa no está activa. Contacte a soporte.");
-            }
-            if (org.getStatus() == Organization.Status.PENDING) {
-                throw new BadCredentialsException(
-                    "Falta verificar tu correo electrónico. Revisa el enlace que te enviamos para activar la cuenta.");
-            }
-            if (org.getStatus() != Organization.Status.ACTIVE) {
-                throw new BadCredentialsException("La cuenta de la empresa no está activa. Contacte a soporte.");
-            }
-        }
-
-        // Equipo de plataforma: la contraseña no basta, falta el segundo factor. Aún no hay sesión.
-        if (user.isPlatformUser()) {
-            boolean enrolled = platformSecurity.mfaEnrolled(user);
+        // Segundo factor: siempre en el equipo de plataforma; en las empresas, si el usuario lo activó
+        // o si la empresa lo exige (en ese caso lo configura ahora, antes de entrar).
+        boolean enrolled = platformSecurity.mfaEnrolled(user);
+        boolean forced = !enrolled && org != null && Boolean.TRUE.equals(org.getRequireMfa());
+        if (user.isPlatformUser() || enrolled || forced) {
             return LoginResponse.builder()
                 .mfaRequired(enrolled)
                 .enrollmentRequired(!enrolled)
                 .mustChangePassword(Boolean.TRUE.equals(user.getMustChangePassword()))
+                .pinRequired(user.isPlatformUser())
                 .challengeToken(platformSecurity.challengeFor(user))
                 .fullName(user.getFullName())
                 .build();
@@ -86,6 +72,30 @@ public class AuthService {
         return session(user);
     }
 
+    /**
+     * Usuario activo y, si es de una empresa, con la empresa activa (no pendiente, suspendida ni cancelada).
+     * Se vuelve a comprobar al terminar el segundo factor. Devuelve la empresa (null en plataforma).
+     */
+    public Organization assertAccountUsable(User user) {
+        if (!user.getActive()) {
+            throw new BadCredentialsException("Usuario inactivo. Contacte al administrador.");
+        }
+        if (user.getOrganizationId() == null) {
+            return null;
+        }
+        Organization org = organizationRepository.findById(user.getOrganizationId()).orElse(null);
+        if (org == null) {
+            throw new BadCredentialsException("La cuenta de la empresa no está activa. Contacte a soporte.");
+        }
+        if (org.getStatus() == Organization.Status.PENDING) {
+            throw new BadCredentialsException(
+                "Falta verificar tu correo electrónico. Revisa el enlace que te enviamos para activar la cuenta.");
+        }
+        if (org.getStatus() != Organization.Status.ACTIVE) {
+            throw new BadCredentialsException("La cuenta de la empresa no está activa. Contacte a soporte.");
+        }
+        return org;
+    }
     /** Sesión completa (token de acceso) tras superar todos los pasos. */
     public LoginResponse session(User user) {
         return LoginResponse.builder()
@@ -102,17 +112,20 @@ public class AuthService {
     /** Segundo paso del inicio de sesión del equipo de plataforma. */
     public LoginResponse verifyMfa(String challengeToken, String code) {
         User user = platformSecurity.userFromChallenge(challengeToken, PlatformSecurityService.TYPE_MFA);
+        assertAccountUsable(user);
         platformSecurity.verifySecondFactor(user, code);
         return session(user);
     }
 
     public PlatformSecurityService.Enrollment startEnrollment(String challengeToken) {
-        return platformSecurity.startEnrollment(
-            platformSecurity.userFromChallenge(challengeToken, PlatformSecurityService.TYPE_ENROLL));
+        User user = platformSecurity.userFromChallenge(challengeToken, PlatformSecurityService.TYPE_ENROLL);
+        assertAccountUsable(user);
+        return platformSecurity.startEnrollment(user);
     }
 
     public LoginResponse finishEnrollment(String challengeToken, String code, String pin, String newPassword) {
         User user = platformSecurity.userFromChallenge(challengeToken, PlatformSecurityService.TYPE_ENROLL);
+        assertAccountUsable(user);
         java.util.List<String> backup = platformSecurity.finishEnrollment(user, code, pin, newPassword);
         LoginResponse r = session(user);
         r.setBackupCodes(backup);
