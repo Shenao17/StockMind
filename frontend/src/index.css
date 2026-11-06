@@ -4251,3 +4251,13 @@ select option {
 }
 .platform-tabs { display: flex; gap: 6px; margin-bottom: 14px; }
 .platform-tabs button[aria-selected="true"] { border-color: var(--accent, #6c8cff); }
+
+/* ── Ficha de empresa (panel de plataforma) ─────────────────────────────── */
+.company-data { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px 20px; margin: 0; }
+.company-data dt { font-size: .72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; }
+.company-data dd { margin: 2px 0 0; }
+.timeline { list-style: none; margin: 0; padding: 0 0 0 14px; border-left: 1px solid var(--border, rgba(255,255,255,.12)); }
+.timeline li { display: flex; flex-direction: column; gap: 2px; padding: 0 0 14px 14px; position: relative; }
+.timeline li::before { content: ''; position: absolute; left: -19px; top: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent, #6c8cff); }
+.timeline-date { font-size: .72rem; color: var(--text-muted); }
+.timeline-detail { font-size: .8rem; color: var(--text-muted); }

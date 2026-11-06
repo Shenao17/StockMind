@@ -176,6 +176,10 @@ export const API = {
     create:        (data)           => apiRequest('POST', '/platform/organizations', data),
     // action: suspend | reactivate | cancel | extend-trial | plan | payment-links | manual-payment
     action:        (id, action, body) => apiRequest('POST', `/platform/organizations/${id}/${action}`, body || {}),
+    // Ficha de empresa y correcciones (contacto: dueño y soporte; NIT: solo el dueño, con su PIN)
+    detail:        (id)             => apiRequest('GET',   `/platform/organizations/${id}/detail`),
+    updateContact: (id, data)       => apiRequest('PATCH', `/platform/organizations/${id}/contact`, data),
+    updateTaxId:   (id, taxId, pin) => apiRequest('PATCH', `/platform/organizations/${id}/tax-id`, { taxId, pin }),
     // Reinicia el 2FA de un usuario de una empresa (solo el dueño, con su PIN)
     resetUserMfa: (orgId, userId, pin) => apiRequest('POST', `/platform/organizations/${orgId}/users/${userId}/reset-mfa`, { pin }),
     // Gestión del equipo (solo el dueño; cada cambio exige su PIN)

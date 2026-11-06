@@ -9,6 +9,7 @@ import VerifyEmail from './pages/VerifyEmail';
 import Pay from './pages/Pay';
 import Billing from './pages/Billing';
 import Platform from './pages/Platform';
+import PlatformCompany from './pages/PlatformCompany';
 import Security from './pages/Security';
 import { isPlatformRole, PLATFORM_ROLE_LABELS } from './platformRoles';
 import { SubscriptionProvider } from './context/SubscriptionContext';
@@ -72,6 +73,7 @@ function ProtectedLayout({ showToast }) {
         <main className="main-content">
           <Routes>
             <Route path="/platform" element={<Platform showToast={showToast} />} />
+            <Route path="/platform/orgs/:id" element={<PlatformCompany showToast={showToast} />} />
             <Route path="*" element={<Navigate to="/platform" replace />} />
           </Routes>
         </main>

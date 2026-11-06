@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { API, fmt, fmtDate } from '../api';
 import Modal from '../components/ui/Modal';
 import Pagination from '../components/ui/Pagination';
@@ -159,7 +160,7 @@ export default function Platform({ showToast }) {
             <tbody>
               {orgs.map((o) => (
                 <tr key={o.id}>
-                  <td><strong>{o.name}</strong><div className="mono" style={{ fontSize: '.75rem', color: 'var(--text-muted)' }}>{o.taxId || '—'} · {o.contactEmail}</div></td>
+                  <td><Link to={`/platform/orgs/${o.id}`} className="company-link"><strong>{o.name}</strong></Link><div className="mono" style={{ fontSize: '.75rem', color: 'var(--text-muted)' }}>{o.taxId || '—'} · {o.contactEmail}</div></td>
                   <td><span className={`badge ${o.status === 'ACTIVE' ? 'badge-success' : o.status === 'PENDING' ? 'badge-muted' : 'badge-danger'}`}>{STATUS_LABELS[o.status]}</span></td>
                   <td>{o.subscription ? `${o.subscription.planName} · ${SUB_LABELS[o.subscription.status]}${o.subscription.complimentary ? ' (cortesía)' : ''}` : '—'}</td>
                   <td className="mono">{expiry(o.subscription)}</td>

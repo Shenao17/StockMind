@@ -1,4 +1,5 @@
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { vi } from 'vitest';
 import Platform from '../pages/Platform';
 import { AuthContext } from '../context/AuthContext';
@@ -22,7 +23,7 @@ function setup(list = envelope([org()]), permissions = OWNER_PERMS) {
   vi.spyOn(apiModule.API.public, 'plans').mockResolvedValue(plans);
   const toast = vi.fn();
   const user = { id: 1, email: 'd@x.com', role: 'PLATFORM_OWNER', permissions };
-  render(<AuthContext.Provider value={{ user }}><Platform showToast={toast} /></AuthContext.Provider>);
+  render(<MemoryRouter><AuthContext.Provider value={{ user }}><Platform showToast={toast} /></AuthContext.Provider></MemoryRouter>);
   return { orgsSpy, toast };
 }
 
