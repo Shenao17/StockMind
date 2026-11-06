@@ -13,9 +13,11 @@ public final class UserSpecs {
 
     private UserSpecs() {}
 
-    public static Specification<User> filter(String search, User.Role role, Boolean active) {
+    public static Specification<User> filter(Long organizationId, String search, User.Role role, Boolean active) {
         return (root, query, cb) -> {
             List<Predicate> ps = new ArrayList<>();
+            // Aislamiento por empresa: SIEMPRE se filtra (los usuarios no usan @TenantId)
+            ps.add(cb.equal(root.get("organizationId"), organizationId));
             if (search != null && !search.isBlank()) {
                 String like = Paging.likePattern(search);
                 ps.add(cb.or(

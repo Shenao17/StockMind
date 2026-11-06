@@ -23,6 +23,9 @@
     <properties>
         <java.version>17</java.version>
         <jjwt.version>0.11.5</jjwt.version>
+        <!-- Hibernate 6.4: CurrentTenantIdentifierResolver<T> genérico (empresa como Long con @TenantId).
+             Spring Boot 3.2.0 trae 6.3.1; 6.4.x es la versión que usan los parches posteriores de Boot 3.2. -->
+        <hibernate.version>6.4.4.Final</hibernate.version>
     </properties>
 
     <dependencies>

@@ -53,14 +53,14 @@ public class SaleService {
      *    ventas que incluyen los mismos productos en distinto orden.
      *  - Cada movimiento de inventario guarda directamente el ID de su venta.
      *
-     * @param username Usuario que realiza la venta (del token JWT)
+     * @param email    Correo del usuario que realiza la venta (subject del token JWT)
      * @param request  Líneas (productId, quantity) y notas
      * @return Venta persistida con todos sus detalles
      */
     @Transactional
-    public Sale registerSale(String username, SaleDTO.Request request) {
-        User seller = userRepository.findByUsername(username)
-            .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado: " + username));
+    public Sale registerSale(String email, SaleDTO.Request request) {
+        User seller = userRepository.findByEmail(email)
+            .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
 
         Sale sale = Sale.builder()
             .user(seller)

@@ -1,6 +1,7 @@
 package com.stockmind.model;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.TenantId;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
@@ -16,7 +17,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
  * Clasificación de productos. Un producto pertenece a exactamente una categoría.
  */
 @Entity
-@Table(name = "categories")
+@Table(name = "categories", uniqueConstraints = @UniqueConstraint(name = "uk_categories_org_name", columnNames = {"organization_id", "name"}))
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -27,7 +28,13 @@ public class Category {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true, length = 80)
+    /** Empresa dueña de la fila. Hibernate la filtra y la asigna solo (@TenantId). */
+    @TenantId
+    @JsonIgnore
+    @Column(name = "organization_id", nullable = false, updatable = false)
+    private Long organizationId;
+
+    @Column(nullable = false, length = 80)
     private String name;
 
     @Column(length = 255)

@@ -1,5 +1,6 @@
 package com.stockmind.config;
 
+import com.stockmind.tenant.TenantContext;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -103,26 +104,39 @@ class JwtAuthFilter extends OncePerRequestFilter {
         }
 
         final String token = authHeader.substring(7);
+        final Long previousTenant = TenantContext.get();
 
         if (jwtConfig.isTokenValid(token) &&
                 SecurityContextHolder.getContext().getAuthentication() == null) {
 
-            String username = jwtConfig.extractUsername(token);
+            String email = jwtConfig.extractUsername(token);
             String role = jwtConfig.extractRole(token);
+            Long organizationId = jwtConfig.extractOrganizationId(token);
 
-            // El rol sale del claim firmado del JWT. Sin rol válido no se
-            // concede ninguna autoridad (los endpoints protegidos dan 403).
+            // ADMIN y SELLER SIEMPRE pertenecen a una empresa: un token suyo sin "org" no
+            // concede nada (p. ej. tokens emitidos antes de la multiempresa). PLATFORM_ADMIN
+            // no tiene empresa.
+            boolean tenantUser = "ADMIN".equals(role) || "SELLER".equals(role);
+            boolean valid = (tenantUser && organizationId != null) || "PLATFORM_ADMIN".equals(role);
+
             List<SimpleGrantedAuthority> authorities =
-                ("ADMIN".equals(role) || "SELLER".equals(role))
-                    ? List.of(new SimpleGrantedAuthority("ROLE_" + role))
-                    : List.of();
+                valid ? List.of(new SimpleGrantedAuthority("ROLE_" + role)) : List.of();
 
             UsernamePasswordAuthenticationToken authToken =
-                new UsernamePasswordAuthenticationToken(username, null, authorities);
-
+                new UsernamePasswordAuthenticationToken(email, null, authorities);
             SecurityContextHolder.getContext().setAuthentication(authToken);
+
+            if (valid && organizationId != null) {
+                TenantContext.set(organizationId);
+            }
         }
 
-        filterChain.doFilter(request, response);
+        try {
+            filterChain.doFilter(request, response);
+        } finally {
+            // El ThreadLocal nunca debe filtrarse a otra petición: se restaura lo que había antes
+            // (en producción siempre es null; en pruebas con MockMvc es la empresa del test)
+            if (previousTenant == null) TenantContext.clear(); else TenantContext.set(previousTenant);
+        }
     }
 }

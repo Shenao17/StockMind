@@ -1,6 +1,7 @@
 package com.stockmind.controller;
 
 import com.stockmind.repository.SaleRepository;
+import com.stockmind.tenant.TenantContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -36,7 +37,7 @@ public class ReportController {
         LocalDateTime toDt   = LocalDateTime.parse(to + "T23:59:59");
 
         List<?> sales = saleRepository.findByCreatedAtBetweenOrderByCreatedAtDesc(fromDt, toDt);
-        BigDecimal totalRevenue = saleRepository.sumTotalByPeriod(fromDt, toDt);
+        BigDecimal totalRevenue = saleRepository.sumTotalByPeriod(TenantContext.require(), fromDt, toDt);
 
         if (totalRevenue == null) totalRevenue = BigDecimal.ZERO;
 
@@ -60,9 +61,10 @@ public class ReportController {
             @RequestParam(defaultValue = "10") int limit) {
 
         LocalDateTime from = LocalDateTime.now().minusDays(30);
-        LocalDateTime to   = LocalDateTime.now();
+        // +1 s: MySQL redondea DATETIME al segundo y una venta recién hecha podría quedar "en el futuro"
+        LocalDateTime to   = LocalDateTime.now().plusSeconds(1);
 
-        List<Object[]> rows = saleRepository.findTopProductsByPeriod(from, to);
+        List<Object[]> rows = saleRepository.findTopProductsByPeriod(TenantContext.require(), from, to);
 
         List<Map<String, Object>> result = new ArrayList<>();
         int count = 0;

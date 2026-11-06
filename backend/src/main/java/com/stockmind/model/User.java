@@ -10,7 +10,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "users")
+@Table(name = "users", uniqueConstraints = @UniqueConstraint(name = "uk_users_org_username", columnNames = {"organization_id", "username"}))
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -21,7 +21,15 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true, length = 50)
+    /**
+     * Empresa del usuario. NULL solo para PLATFORM_ADMIN (dueño de la plataforma).
+     * Los usuarios NO usan @TenantId porque el login debe poder buscarlos por correo
+     * antes de conocer la empresa; el aislamiento de usuarios se aplica en UserController.
+     */
+    @Column(name = "organization_id")
+    private Long organizationId;
+
+    @Column(nullable = false, length = 50)
     private String username;
 
     @Column(nullable = false, unique = true, length = 100)
@@ -32,7 +40,7 @@ public class User {
     private String passwordHash;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 10)
+    @Column(nullable = false, length = 20)
     private Role role;
 
     @Column(nullable = false)
@@ -53,6 +61,8 @@ public class User {
     }
 
     public enum Role {
-        ADMIN, SELLER
+        PLATFORM_ADMIN, // dueño de la plataforma: sin empresa
+        ADMIN,          // administrador de UNA empresa
+        SELLER          // vendedor de una empresa
     }
 }

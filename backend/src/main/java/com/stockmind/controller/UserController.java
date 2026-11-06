@@ -5,6 +5,7 @@ import com.stockmind.dto.UserDTO;
 import com.stockmind.exception.ResourceNotFoundException;
 import com.stockmind.model.User;
 import com.stockmind.repository.UserRepository;
+import com.stockmind.tenant.TenantContext;
 import com.stockmind.repository.spec.UserSpecs;
 import com.stockmind.util.Paging;
 import jakarta.validation.Valid;
@@ -53,7 +54,7 @@ public class UserController {
                                     @RequestParam(required = false) Integer size,
                                     @RequestParam(required = false) String sort,
                                     @RequestParam(required = false) String dir) {
-        var spec = UserSpecs.filter(search, role, active);
+        var spec = UserSpecs.filter(TenantContext.require(), search, role, active);
         if (Paging.isRequested(page, size)) {
             Pageable pageable = Paging.of(page, size, sort, dir, SORT_FIELDS, Sort.by("username"));
             return ResponseEntity.ok(PageResponse.of(userRepository.findAll(spec, pageable)));
@@ -66,7 +67,10 @@ public class UserController {
         String username = body.getUsername().trim();
         String email    = body.getEmail().trim().toLowerCase();
 
-        if (userRepository.existsByUsername(username)) {
+        Long organizationId = TenantContext.require();
+        assertAssignableRole(body.getRole());
+
+        if (userRepository.existsByOrganizationIdAndUsername(organizationId, username)) {
             return ResponseEntity.badRequest()
                 .body(Map.of("error", "El nombre de usuario ya existe"));
         }
@@ -76,6 +80,7 @@ public class UserController {
         }
 
         User user = User.builder()
+            .organizationId(organizationId)
             .username(username)
             .email(email)
             .passwordHash(passwordEncoder.encode(body.getPassword()))
@@ -90,11 +95,11 @@ public class UserController {
     public ResponseEntity<?> update(@PathVariable Long id,
                                      @Valid @RequestBody UserDTO.UpdateRequest body,
                                      Authentication authentication) {
-        User user = userRepository.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
+        User user = findInOwnOrganization(id);
+        if (body.getRole() != null) assertAssignableRole(body.getRole());
 
         // Evita que un administrador se quede sin acceso a sí mismo
-        boolean isSelf = user.getUsername().equals(authentication.getName());
+        boolean isSelf = user.getEmail().equals(authentication.getName());
         if (isSelf && (Boolean.FALSE.equals(body.getActive())
                 || (body.getRole() != null && body.getRole() != user.getRole()))) {
             throw new IllegalStateException(
@@ -123,15 +128,29 @@ public class UserController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Map<String, String>> delete(@PathVariable Long id,
                                                        Authentication authentication) {
-        User user = userRepository.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
+        User user = findInOwnOrganization(id);
 
-        if (user.getUsername().equals(authentication.getName())) {
+        if (user.getEmail().equals(authentication.getName())) {
             throw new IllegalStateException("No puedes desactivar tu propia cuenta");
         }
 
         user.setActive(false);
         userRepository.save(user);
         return ResponseEntity.ok(Map.of("message", "Usuario desactivado correctamente"));
+    }
+
+    /** Un usuario de otra empresa se comporta como si no existiera (404), nunca como prohibido. */
+    private User findInOwnOrganization(Long id) {
+        Long organizationId = TenantContext.require();
+        return userRepository.findById(id)
+            .filter(u -> organizationId.equals(u.getOrganizationId()))
+            .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
+    }
+
+    /** Un administrador de empresa solo puede asignar ADMIN o SELLER, nunca PLATFORM_ADMIN. */
+    private void assertAssignableRole(User.Role role) {
+        if (role == User.Role.PLATFORM_ADMIN) {
+            throw new IllegalStateException("No se puede asignar ese rol");
+        }
     }
 }

@@ -31,7 +31,7 @@ public class InventoryService {
     private final UserRepository userRepository;
 
     @Transactional
-    public InventoryMovement registerMovement(String username, InventoryDTO.MovementRequest request) {
+    public InventoryMovement registerMovement(String email, InventoryDTO.MovementRequest request) {
         MovementType type = request.getType();
         if (type == MovementType.SALE || type == MovementType.RETURN) {
             throw new IllegalStateException(
@@ -40,7 +40,7 @@ public class InventoryService {
 
         Product product = productRepository.findByIdForUpdate(request.getProductId())
             .orElseThrow(() -> new ResourceNotFoundException("Producto no encontrado"));
-        User user = userRepository.findByUsername(username)
+        User user = userRepository.findByEmail(email)
             .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
 
         int quantity = request.getQuantity();

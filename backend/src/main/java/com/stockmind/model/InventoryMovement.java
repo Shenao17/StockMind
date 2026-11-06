@@ -1,6 +1,8 @@
 package com.stockmind.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+import org.hibernate.annotations.TenantId;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
@@ -25,6 +27,12 @@ public class InventoryMovement {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    /** Empresa dueña de la fila. Hibernate la filtra y la asigna solo (@TenantId). */
+    @TenantId
+    @JsonIgnore
+    @Column(name = "organization_id", nullable = false, updatable = false)
+    private Long organizationId;
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "product_id", nullable = false)

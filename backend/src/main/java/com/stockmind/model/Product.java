@@ -1,6 +1,8 @@
 package com.stockmind.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+import org.hibernate.annotations.TenantId;
 import jakarta.validation.constraints.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -17,7 +19,7 @@ import java.time.LocalDateTime;
  * o movimiento de inventario registrado por el servicio correspondiente.
  */
 @Entity
-@Table(name = "products")
+@Table(name = "products", uniqueConstraints = @UniqueConstraint(name = "uk_products_org_sku", columnNames = {"organization_id", "sku"}))
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -28,6 +30,12 @@ public class Product {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** Empresa dueña de la fila. Hibernate la filtra y la asigna solo (@TenantId). */
+    @TenantId
+    @JsonIgnore
+    @Column(name = "organization_id", nullable = false, updatable = false)
+    private Long organizationId;
+
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "category_id", nullable = false)
     private Category category;
@@ -37,7 +45,7 @@ public class Product {
     private String name;
 
     @NotBlank(message = "El SKU es obligatorio")
-    @Column(nullable = false, unique = true, length = 50)
+    @Column(nullable = false, length = 50)
     private String sku;
 
     @Column(columnDefinition = "TEXT")

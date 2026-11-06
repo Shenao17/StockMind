@@ -18,6 +18,15 @@ import java.util.Optional;
 @Repository
 public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpecificationExecutor<Product> {
 
+    /**
+     * Redeclarado con JPQL a propósito: el método heredado usa EntityManager.find(), que en
+     * Hibernate NO aplica el filtro de empresa (@TenantId) y permitiría leer por id datos de
+     * otra empresa. La consulta JPQL sí lo aplica. Un test de arquitectura impide quitarlo.
+     */
+    @Query("SELECT p FROM Product p WHERE p.id = :id")
+    java.util.Optional<Product> findById(@Param("id") Long id);
+
+
     Optional<Product> findBySku(String sku);
 
     List<Product> findByActiveTrue();

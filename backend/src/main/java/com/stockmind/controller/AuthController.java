@@ -40,12 +40,13 @@ public class AuthController {
     @GetMapping("/me")
     public ResponseEntity<?> me(Authentication authentication) {
         String username = authentication.getName();
-        return userRepository.findByUsername(username)
+        return userRepository.findByEmail(username)
             .map(user -> ResponseEntity.ok(Map.of(
                 "id", user.getId(),
                 "username", user.getUsername(),
                 "email", user.getEmail(),
-                "role", user.getRole().name()
+                "role", user.getRole().name(),
+                "organizationId", user.getOrganizationId() == null ? 0L : user.getOrganizationId()
             )))
             .orElse(ResponseEntity.notFound().build());
     }

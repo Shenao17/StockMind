@@ -6,6 +6,7 @@ import com.stockmind.repository.ProductRepository;
 import com.stockmind.repository.SaleRepository;
 import com.stockmind.repository.spec.ProductSpecs;
 import com.stockmind.repository.spec.SaleSpecs;
+import com.stockmind.tenant.TenantContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -63,7 +64,7 @@ public class DashboardService {
     }
 
     private Map<String, Object> salesBlock(LocalDateTime from, LocalDateTime to) {
-        BigDecimal total = saleRepository.sumTotalByPeriod(from, to);
+        BigDecimal total = saleRepository.sumTotalByPeriod(TenantContext.require(), from, to);
         long count = saleRepository.count(SaleSpecs.filter(from, to, Sale.Status.COMPLETED, null));
         Map<String, Object> block = new LinkedHashMap<>();
         block.put("total", total == null ? BigDecimal.ZERO : total);

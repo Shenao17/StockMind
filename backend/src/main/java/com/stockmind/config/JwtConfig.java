@@ -40,16 +40,19 @@ public class JwtConfig {
 
     /**
      * Genera un token JWT para el usuario autenticado.
-     * El payload incluye: sub (username), id, role.
+     * El payload incluye: sub (correo, único en la plataforma), id, role y org (id de la empresa).
      */
     public String generateToken(User user) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("id", user.getId());
         claims.put("role", user.getRole().name());
+        if (user.getOrganizationId() != null) {
+            claims.put("org", user.getOrganizationId());
+        }
 
         return Jwts.builder()
                 .setClaims(claims)
-                .setSubject(user.getUsername())
+                .setSubject(user.getEmail())
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + expirationMs))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
@@ -57,7 +60,7 @@ public class JwtConfig {
     }
 
     /**
-     * Extrae el username del token.
+     * Extrae el correo (subject) del token.
      */
     public String extractUsername(String token) {
         return extractClaims(token).getSubject();
@@ -68,6 +71,14 @@ public class JwtConfig {
      */
     public String extractRole(String token) {
         return extractClaims(token).get("role", String.class);
+    }
+
+    /**
+     * Extrae el id de la empresa del claim "org"; null si el token no lo trae (PLATFORM_ADMIN).
+     */
+    public Long extractOrganizationId(String token) {
+        Object org = extractClaims(token).get("org");
+        return org instanceof Number n ? n.longValue() : null;
     }
 
     /**

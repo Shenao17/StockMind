@@ -17,14 +17,24 @@ import java.util.List;
 @Repository
 public interface SaleRepository extends JpaRepository<Sale, Long>, JpaSpecificationExecutor<Sale> {
 
+    /**
+     * Redeclarado con JPQL a propósito: el método heredado usa EntityManager.find(), que en
+     * Hibernate NO aplica el filtro de empresa (@TenantId) y permitiría leer por id datos de
+     * otra empresa. La consulta JPQL sí lo aplica. Un test de arquitectura impide quitarlo.
+     */
+    @Query("SELECT s FROM Sale s WHERE s.id = :id")
+    java.util.Optional<Sale> findById(@Param("id") Long id);
+
+
     List<Sale> findByCreatedAtBetweenOrderByCreatedAtDesc(
         LocalDateTime from, LocalDateTime to);
 
     List<Sale> findByUserIdOrderByCreatedAtDesc(Long userId);
 
-    @Query("SELECT SUM(s.total) FROM Sale s WHERE s.status = 'COMPLETED' " +
+    @Query("SELECT SUM(s.total) FROM Sale s WHERE s.organizationId = :orgId AND s.status = 'COMPLETED' " +
            "AND s.createdAt BETWEEN :from AND :to")
-    BigDecimal sumTotalByPeriod(@Param("from") LocalDateTime from,
+    BigDecimal sumTotalByPeriod(@Param("orgId") Long organizationId,
+                                 @Param("from") LocalDateTime from,
                                  @Param("to") LocalDateTime to);
 
     /**
@@ -33,9 +43,10 @@ public interface SaleRepository extends JpaRepository<Sale, Long>, JpaSpecificat
      */
     @Query("SELECT sd.product.id, sd.product.name, SUM(sd.quantity), SUM(sd.subtotal) " +
            "FROM SaleDetail sd JOIN sd.sale s " +
-           "WHERE s.status = 'COMPLETED' AND s.createdAt BETWEEN :from AND :to " +
+           "WHERE s.organizationId = :orgId AND s.status = 'COMPLETED' AND s.createdAt BETWEEN :from AND :to " +
            "GROUP BY sd.product.id, sd.product.name " +
            "ORDER BY SUM(sd.quantity) DESC")
-    List<Object[]> findTopProductsByPeriod(@Param("from") LocalDateTime from,
+    List<Object[]> findTopProductsByPeriod(@Param("orgId") Long organizationId,
+                                            @Param("from") LocalDateTime from,
                                             @Param("to") LocalDateTime to);
 }
