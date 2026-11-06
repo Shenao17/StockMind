@@ -31,14 +31,14 @@ const COOKIE_OPTIONS = {
 
 /**
  * POST /api/auth/login
- * Body: { username, password }
- * Respuesta: { user: { id, username, role } }
+ * Body: { email, password }
+ * Respuesta: { user: { id, username, email, organizationId, role } }
  * Efecto: setea cookie httpOnly "token"
  */
 router.post('/login', async (req, res, next) => {
     try {
         const response = await axios.post(`${JAVA}/auth/login`, req.body);
-        const { token, userId, username, role } = response.data;
+        const { token, userId, username, email, organizationId, role } = response.data;
 
         if (!token) {
             return res.status(502).json({
@@ -55,6 +55,8 @@ router.post('/login', async (req, res, next) => {
             user: {
                 id: userId,
                 username,
+                email,
+                organizationId,
                 role
             }
         });

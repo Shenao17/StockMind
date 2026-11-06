@@ -15,7 +15,5 @@ import java.util.Optional;
 public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificationExecutor<User> {
     Optional<User> findByEmail(String email);
     boolean existsByOrganizationIdAndUsername(Long organizationId, String username);
-    /** Solo para el inicio de sesión de transición con usuario (sin correo) */
-    List<User> findAllByUsername(String username);
     boolean existsByEmail(String email);
 }

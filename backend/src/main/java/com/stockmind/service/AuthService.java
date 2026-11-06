@@ -12,8 +12,6 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
-import java.util.Optional;
 
 /**
  * AuthService — Servicio de autenticación
@@ -40,7 +38,9 @@ public class AuthService {
      * @throws BadCredentialsException si las credenciales son incorrectas
      */
     public LoginResponse login(LoginRequest request) {
-        User user = findUserForLogin(request.getUsername())
+        // El correo es único en toda la plataforma: identifica al usuario y, con él, a su empresa
+        String email = request.getEmail().trim().toLowerCase();
+        User user = userRepository.findByEmail(email)
             .orElseThrow(() -> new BadCredentialsException("Credenciales inválidas"));
 
         if (!user.getActive()) {
@@ -66,21 +66,9 @@ public class AuthService {
             .token(token)
             .userId(user.getId())
             .username(user.getUsername())
+            .email(user.getEmail())
+            .organizationId(user.getOrganizationId())
             .role(user.getRole().name())
             .build();
-    }
-
-    /**
-     * El identificador de login es el CORREO (único en toda la plataforma).
-     * Transición: si no contiene '@' se acepta el nombre de usuario SOLO cuando
-     * identifica a una única persona; si hay ambigüedad entre empresas, se rechaza.
-     */
-    private Optional<User> findUserForLogin(String identifier) {
-        String id = identifier == null ? "" : identifier.trim();
-        if (id.contains("@")) {
-            return userRepository.findByEmail(id.toLowerCase());
-        }
-        List<User> matches = userRepository.findAllByUsername(id);
-        return matches.size() == 1 ? Optional.of(matches.get(0)) : Optional.empty();
     }
 }

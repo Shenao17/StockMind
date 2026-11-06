@@ -43,7 +43,7 @@ class LoginIntegrationTest extends IntegrationTestBase {
 
     private ResultActions login(String identifier, String password) throws Exception {
         return mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
-            .content(json.writeValueAsString(Map.of("username", identifier, "password", password))));
+            .content(json.writeValueAsString(Map.of("email", identifier, "password", password))));
     }
 
     @Test
@@ -65,17 +65,37 @@ class LoginIntegrationTest extends IntegrationTestBase {
     }
 
     @Test
-    @DisplayName("Transición: el nombre de usuario sirve solo si identifica a una única persona")
-    void usernameFallbackOnlyWhenUnique() throws Exception {
-        login("ana", PASSWORD).andExpect(status().isOk());
+    @DisplayName("El nombre de usuario ya no sirve para iniciar sesión: solo el correo")
+    void usernameIsNotAnIdentifier() throws Exception {
+        login("ana", PASSWORD).andExpect(status().isUnauthorized());
+    }
 
+    @Test
+    @DisplayName("Dos empresas pueden tener el mismo username; cada una entra con su propio correo")
+    void sameUsernameDifferentOrganizations() throws Exception {
         Organization other = createOrganization("Empresa B");
         User anaB = User.builder().organizationId(other.getId()).username("ana").email("ana@empresab.com")
             .passwordHash(encoder.encode(PASSWORD)).role(User.Role.ADMIN).active(true).build();
         userRepository.save(anaB);
 
-        login("ana", PASSWORD).andExpect(status().isUnauthorized());           // ambiguo entre empresas
-        login("ana@empresab.com", PASSWORD).andExpect(status().isOk());       // el correo siempre resuelve
+        for (String email : new String[]{"ana@test.com", "ana@empresab.com"}) {
+            String body = login(email, PASSWORD).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+            String token = json.readTree(body).get("token").asText();
+            Long expectedOrg = email.equals("ana@test.com") ? org.getId() : other.getId();
+            assertEquals(expectedOrg, jwtConfig.extractOrganizationId(token));
+        }
+    }
+
+    @Test
+    @DisplayName("La respuesta incluye correo y empresa, y no se acepta el cuerpo sin correo")
+    void responseAndValidation() throws Exception {
+        login("ana@test.com", PASSWORD).andExpect(status().isOk())
+            .andExpect(jsonPath("$.email").value("ana@test.com"))
+            .andExpect(jsonPath("$.organizationId").value(org.getId()))
+            .andExpect(jsonPath("$.username").value("ana"));
+        mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"username\":\"ana\",\"password\":\"" + PASSWORD + "\"}"))
+            .andExpect(status().isBadRequest());
     }
 
     @Test
