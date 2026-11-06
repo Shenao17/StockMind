@@ -103,6 +103,18 @@ jobs:
   analytics:
     name: Analytics (Flask)
     runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ci_root_password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -uroot -pci_root_password"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
     defaults:
       run:
         working-directory: analytics
@@ -114,5 +126,10 @@ jobs:
           cache: pip
           cache-dependency-path: analytics/requirements-dev.txt
       - run: pip install -r requirements-dev.txt
-      # Las pruebas usan datos simulados: no necesitan MySQL ni config.py
+      # Las pruebas unitarias usan datos simulados (sin MySQL ni config.py).
+      # Las de aislamiento entre empresas corren contra el MySQL real del servicio.
       - run: python -m pytest
+        env:
+          ANALYTICS_MYSQL_HOST: 127.0.0.1
+          ANALYTICS_MYSQL_USER: root
+          ANALYTICS_MYSQL_PASSWORD: ci_root_password

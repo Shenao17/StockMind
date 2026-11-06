@@ -49,6 +49,7 @@ services:
       DB_NAME: stockmind_db
       DB_USER: ${MYSQL_USER}
       DB_PASSWORD: ${MYSQL_PASSWORD}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?Falta INTERNAL_API_KEY en .env}
     depends_on:
       mysql:
         condition: service_healthy
@@ -64,6 +65,7 @@ services:
       JAVA_API_URL: http://backend:8080
       PYTHON_API_URL: http://analytics:8000
       JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en .env}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?Falta INTERNAL_API_KEY en .env}
       NODE_ENV: ${NODE_ENV:-development}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
       GROQ_API_KEY: ${GROQ_API_KEY:-}
