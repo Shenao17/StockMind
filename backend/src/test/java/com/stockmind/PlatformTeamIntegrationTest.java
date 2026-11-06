@@ -152,6 +152,18 @@ class PlatformTeamIntegrationTest extends IntegrationTestBase {
     }
 
     @Test
+    @DisplayName("Pedir el secreto dos veces antes de activar devuelve la MISMA clave (no invalida el QR ya escaneado)")
+    void enrollStartIsIdempotent() throws Exception {
+        User u = platformUser("dueno", User.Role.PLATFORM_OWNER);
+        String challenge = login(u).get("challengeToken").asText();
+        String a = read(post("/auth/mfa/enroll/start", Map.of("challengeToken", challenge)).andExpect(status().isOk())).get("secret").asText();
+        String b = read(post("/auth/mfa/enroll/start", Map.of("challengeToken", challenge)).andExpect(status().isOk())).get("secret").asText();
+        assertEquals(a, b);
+        // y con esa clave se puede terminar
+        post("/auth/mfa/enroll/finish", Map.of("challengeToken", challenge, "code", totp.currentCode(a), "pin", PIN)).andExpect(status().isOk());
+    }
+
+    @Test
     @DisplayName("Segundo inicio de sesión: pide el código; uno malo falla, el bueno entra y no se puede reutilizar")
     void secondLogin() throws Exception {
         User u = platformUser("dueno", User.Role.PLATFORM_OWNER);
@@ -226,7 +238,7 @@ class PlatformTeamIntegrationTest extends IntegrationTestBase {
         JsonNode me = read(get("/auth/me", token).andExpect(status().isOk()));
         assertEquals("PLATFORM_SUPPORT", me.get("role").asText());
         assertEquals("Ana Soporte", me.get("fullName").asText());
-        assertEquals(java.util.List.of("ORG_EDIT_CONTACT", "ORG_REACTIVATE", "ORG_VIEW", "TRIAL_EXTEND"),
+        assertEquals(java.util.List.of("AUDIT_VIEW", "ORG_EDIT_CONTACT", "ORG_REACTIVATE", "ORG_VIEW", "TRIAL_EXTEND"),
             java.util.stream.StreamSupport.stream(me.get("permissions").spliterator(), false).map(JsonNode::asText).toList());
 
         String challenge = login(platformUser("otro", User.Role.PLATFORM_VIEWER)).get("challengeToken").asText();
