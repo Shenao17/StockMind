@@ -2,12 +2,17 @@ package com.stockmind.support;
 
 import com.stockmind.config.JwtConfig;
 import com.stockmind.model.Category;
+import com.stockmind.billing.EntitlementService;
 import com.stockmind.model.Organization;
+import com.stockmind.model.Plan;
+import com.stockmind.model.Subscription;
 import com.stockmind.model.Product;
 import com.stockmind.model.User;
 import com.stockmind.repository.CategoryRepository;
 import com.stockmind.repository.InventoryMovementRepository;
 import com.stockmind.repository.OrganizationRepository;
+import com.stockmind.repository.PlanRepository;
+import com.stockmind.repository.SubscriptionRepository;
 import com.stockmind.repository.ProductRepository;
 import com.stockmind.repository.SaleRepository;
 import com.stockmind.repository.UserRepository;
@@ -64,6 +69,9 @@ public abstract class IntegrationTestBase {
     @Autowired protected JwtConfig jwtConfig;
     @Autowired protected JdbcTemplate jdbc;
     @Autowired protected CapturingEmailSender emails;
+    @Autowired protected PlanRepository planRepository;
+    @Autowired protected SubscriptionRepository subscriptionRepository;
+    @Autowired protected EntitlementService entitlements;
 
     /** Empresa por defecto de cada prueba (la "A"); el contexto de empresa queda apuntando a ella. */
     protected Organization org;
@@ -74,7 +82,7 @@ public abstract class IntegrationTestBase {
         emails.clear();
         // SQL directo (sin filtro de empresa) para vaciar TODAS las empresas, hijos primero
         for (String table : new String[]{"email_verification_tokens", "inventory_movements", "sale_details", "sales", "demand_predictions",
-                "products", "categories", "users", "organizations"}) {
+                "products", "categories", "payments", "subscriptions", "audit_log", "users", "organizations"}) {
             try {
                 jdbc.update("DELETE FROM " + table);
             } catch (DataAccessException e) {
@@ -82,6 +90,7 @@ public abstract class IntegrationTestBase {
                 if (!table.equals("demand_predictions")) throw e;
             }
         }
+        ensurePlans();
         org = createOrganization("Empresa A");
         TenantContext.set(org.getId());
     }
@@ -91,13 +100,45 @@ public abstract class IntegrationTestBase {
         TenantContext.clear();
     }
 
+    /** Los planes son datos de referencia: en MySQL los crea la migración V4; en H2 se crean aquí. */
+    protected void ensurePlans() {
+        if (planRepository.count() > 0) return;
+        planRepository.save(plan("STARTER", "Starter", 59900, 599000, 2, 300, 15000, 1));
+        planRepository.save(plan("PRO", "Pro", 119900, 1199000, 5, 3000, 15000, 2, "REPORTS", "PREDICTIONS", "EXPORT"));
+        planRepository.save(plan("BUSINESS", "Business", 249900, 2499000, 15, 20000, 12000, 3,
+            "REPORTS", "PREDICTIONS", "EXPORT", "AI_ASSISTANT", "API"));
+    }
+
+    private Plan plan(String code, String name, long monthly, long yearly, int users, int products,
+                      long extra, int order, String... features) {
+        return Plan.builder().code(code).name(name).priceMonthly(monthly).priceYearly(yearly)
+            .maxUsers(users).maxProducts(products).extraUserPrice(extra).sortOrder(order)
+            .features(new java.util.HashSet<>(java.util.Arrays.asList(features))).build();
+    }
+
+    /** Empresa ACTIVE con suscripción de cortesía (plan Business): acceso completo, sin límites prácticos. */
     protected Organization createOrganization(String name) {
-        return organizationRepository.save(Organization.builder()
+        Organization o = organizationRepository.save(Organization.builder()
             .name(name)
             .contactEmail(name.toLowerCase().replace(' ', '.') + "@test.com")
             .status(Organization.Status.ACTIVE)
             .origin(Organization.Origin.PLATFORM_ADMIN)
             .build());
+        subscriptionRepository.save(Subscription.builder().organizationId(o.getId())
+            .plan(planRepository.findByCode("BUSINESS").orElseThrow())
+            .status(Subscription.Status.ACTIVE).complimentary(true).build());
+        return o;
+    }
+
+    /** Fija el estado/plan de la suscripción de una empresa (y limpia la caché de permisos). */
+    protected Subscription setSubscription(Long orgId, String planCode, Subscription.Status status) {
+        Subscription s = subscriptionRepository.findByOrganizationId(orgId).orElseThrow();
+        s.setPlan(planRepository.findByCode(planCode).orElseThrow());
+        s.setStatus(status);
+        s.setComplimentary(false);
+        Subscription saved = subscriptionRepository.save(s);
+        entitlements.evict(orgId);
+        return saved;
     }
 
     protected User createUser(String username, User.Role role) {

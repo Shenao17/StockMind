@@ -15,7 +15,19 @@ public class CapturingEmailSender implements EmailSender {
         }
     }
 
+    public record Notice(String to, BillingNotice kind, int daysLeft) {}
+
     private final List<Sent> sent = new CopyOnWriteArrayList<>();
+    private final List<Notice> notices = new CopyOnWriteArrayList<>();
+
+    @Override
+    public void sendBillingNotice(String toEmail, String recipientName, BillingNotice kind, int daysLeft, String billingUrl) {
+        notices.add(new Notice(toEmail, kind, daysLeft));
+    }
+
+    public List<Notice> notices() {
+        return notices;
+    }
 
     @Override
     public void sendVerificationEmail(String toEmail, String recipientName, String verifyUrl) {
@@ -32,5 +44,6 @@ public class CapturingEmailSender implements EmailSender {
 
     public void clear() {
         sent.clear();
+        notices.clear();
     }
 }

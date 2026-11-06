@@ -6,6 +6,7 @@ import com.stockmind.model.Organization;
 import com.stockmind.model.User;
 import com.stockmind.repository.EmailVerificationTokenRepository;
 import com.stockmind.support.IntegrationTestBase;
+import com.stockmind.model.Subscription;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -153,6 +154,70 @@ class RegistrationIntegrationTest extends IntegrationTestBase {
     void emailAlreadyUsedByAnotherOrganization() throws Exception {
         createUser("existente", User.Role.ADMIN);   // existente@test.com en la Empresa A
         post("/public/registrations", signup("900123456-7", "existente@test.com")).andExpect(status().isConflict());
+    }
+
+    // ───────────────────────────── Suscripción ─────────────────────────────
+
+    private Subscription subOf(String tax) {
+        return subscriptionRepository.findByOrganizationId(orgByTax(tax).getId()).orElseThrow();
+    }
+
+    @Test
+    @DisplayName("Autoregistro: queda en prueba pero sin reloj hasta verificar el correo; plan por defecto Pro")
+    void selfSignupCreatesTrialSubscription() throws Exception {
+        post("/public/registrations", signup("900123456-7", "g@tornillo.com")).andExpect(status().isAccepted());
+        Subscription s = subOf("900123456-7");
+        assertEquals(Subscription.Status.TRIAL, s.getStatus());
+        assertEquals("PRO", s.getPlan().getCode());
+        assertNull(s.getTrialEndsAt());
+
+        post("/public/verify-email", Map.of("token", emails.last().token())).andExpect(status().isOk());
+        s = subOf("900123456-7");
+        assertTrue(s.getTrialEndsAt().isAfter(LocalDateTime.now().plusDays(13)));
+        assertTrue(s.getTrialEndsAt().isBefore(LocalDateTime.now().plusDays(15)));
+    }
+
+    @Test
+    @DisplayName("Autoregistro: se puede elegir el plan; uno inexistente se rechaza sin crear nada")
+    void selfSignupWithPlan() throws Exception {
+        Map<String, Object> starter = signup("900123456-7", "g@tornillo.com");
+        starter.put("planCode", "starter");
+        post("/public/registrations", starter).andExpect(status().isAccepted());
+        assertEquals("STARTER", subOf("900123456-7").getPlan().getCode());
+
+        long orgs = organizationRepository.count();
+        Map<String, Object> bad = signup("900555666-7", "h@tornillo.com");
+        bad.put("planCode", "GRATIS");
+        post("/public/registrations", bad).andExpect(status().isBadRequest());
+        assertEquals(orgs, organizationRepository.count());
+    }
+
+    @Test
+    @DisplayName("Alta por plataforma: prueba desde hoy, pago ya recibido o cortesía")
+    void platformCreationModes() throws Exception {
+        String owner = bearer(createUser("dueno", User.Role.PLATFORM_ADMIN));
+        String[][] cases = {{"TRIAL", "901111111-1", "t@c.com"}, {"PAID", "902222222-2", "p@c.com"}, {"COMPLIMENTARY", "903333333-3", "c@c.com"}};
+        for (String[] c : cases) {
+            Map<String, Object> body = company(c[1], c[2]);
+            body.put("mode", c[0]);
+            body.put("planCode", "BUSINESS");
+            mvc.perform(MockMvcRequestBuilders.post("/platform/organizations").header("Authorization", owner)
+                .contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(body)))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.subscription.planCode").value("BUSINESS"));
+        }
+        Subscription trial = subOf("901111111-1");
+        assertEquals(Subscription.Status.TRIAL, trial.getStatus());
+        assertTrue(trial.getTrialEndsAt().isAfter(LocalDateTime.now().plusDays(13)));
+
+        Subscription paid = subOf("902222222-2");
+        assertEquals(Subscription.Status.ACTIVE, paid.getStatus());
+        assertNotNull(paid.getCurrentPeriodEnd());
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM payments WHERE provider = 'MANUAL' AND organization_id = ?",
+            Integer.class, orgByTax("902222222-2").getId()));
+
+        Subscription comp = subOf("903333333-3");
+        assertTrue(comp.getComplimentary());
+        assertEquals(Subscription.Status.ACTIVE, comp.getStatus());
     }
 
     // ───────────────────────────── Verificación ─────────────────────────────
