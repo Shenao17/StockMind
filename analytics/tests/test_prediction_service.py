@@ -24,8 +24,8 @@ def saved(monkeypatch):
 
 class TestPredictionForProduct:
     def test_returns_prediction_and_persists_weekly_and_monthly(self, monkeypatch, saved):
-        monkeypatch.setattr(svc, "get_sales_history", lambda pid, days: history([10, 20, 30, 40, 50]))
-        r = svc.get_prediction_for_product(5, stock_current=2, stock_minimum=5)
+        monkeypatch.setattr(svc, "get_sales_history", lambda org, pid, days: history([10, 20, 30, 40, 50]))
+        r = svc.get_prediction_for_product(7, 5, stock_current=2, stock_minimum=5)
 
         assert r["productId"] == 5
         assert r["modelUsed"] == "linear_regression"
@@ -37,10 +37,11 @@ class TestPredictionForProduct:
         assert weekly["period_label"] == r["periodWeek"]
         assert monthly["period_label"] == r["periodMonth"]
         assert weekly["product_id"] == 5
+        assert all(c["organization_id"] == 7 for c in saved)   # se guarda en la empresa correcta
 
     def test_no_confidence_is_saved_as_zero(self, monkeypatch, saved):
-        monkeypatch.setattr(svc, "get_sales_history", lambda pid, days: history([]))
-        r = svc.get_prediction_for_product(1, 0, 5)
+        monkeypatch.setattr(svc, "get_sales_history", lambda org, pid, days: history([]))
+        r = svc.get_prediction_for_product(7, 1, 0, 5)
         assert r["confidence"] is None
         assert all(c["confidence"] == 0.0 for c in saved)
 
@@ -55,11 +56,11 @@ class TestRecommendations:
         ]
 
     def test_filters_sorts_and_flags_critical(self, monkeypatch, saved):
-        monkeypatch.setattr(svc, "get_all_active_products", self.products)
+        monkeypatch.setattr(svc, "get_all_active_products", lambda org: self.products())
         sales = {1: [1, 1, 1], 2: [50, 50, 50], 3: [1, 1, 1], 4: [30, 30, 30]}
-        monkeypatch.setattr(svc, "get_sales_history", lambda pid, days: history(sales[pid]))
+        monkeypatch.setattr(svc, "get_sales_history", lambda org, pid, days: history(sales[pid]))
 
-        recs = svc.get_all_recommendations()
+        recs = svc.get_all_recommendations(7)
         ids = [r["productId"] for r in recs]
 
         assert 3 not in ids                       # stock de sobra y sin recomendación
@@ -68,18 +69,24 @@ class TestRecommendations:
         assert ids[-1] == 4                       # no crítico al final
 
     def test_failing_product_is_skipped(self, monkeypatch, saved):
-        monkeypatch.setattr(svc, "get_all_active_products", self.products)
+        monkeypatch.setattr(svc, "get_all_active_products", lambda org: self.products())
 
-        def flaky(pid, days):
+        def flaky(org, pid, days):
             if pid == 2:
                 raise RuntimeError("boom")
             return history([5, 5, 5])
         monkeypatch.setattr(svc, "get_sales_history", flaky)
 
-        ids = [r["productId"] for r in svc.get_all_recommendations()]
+        ids = [r["productId"] for r in svc.get_all_recommendations(7)]
         assert 2 not in ids
         assert 1 in ids
 
     def test_no_products(self, monkeypatch):
-        monkeypatch.setattr(svc, "get_all_active_products", lambda: [])
-        assert svc.get_all_recommendations() == []
+        monkeypatch.setattr(svc, "get_all_active_products", lambda org: [])
+        assert svc.get_all_recommendations(7) == []
+
+    def test_only_the_organizations_products_are_used(self, monkeypatch, saved):
+        asked = []
+        monkeypatch.setattr(svc, "get_all_active_products", lambda org: asked.append(org) or [])
+        svc.get_all_recommendations(42)
+        assert asked == [42]

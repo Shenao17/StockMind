@@ -3,6 +3,7 @@
  * Usa el runner nativo de Node (node:test): no requiere dependencias nuevas.
  */
 process.env.JWT_SECRET = 'secreto-solo-para-pruebas-automaticas-0123456789abcdef';
+process.env.INTERNAL_API_KEY = 'clave-interna-solo-para-pruebas-0123456789abcdef';
 // Upstreams inexistentes: las pruebas nunca deben hablar con servicios reales
 // (puerto 9 = discard, conexión rechazada → el gateway responde 503)
 process.env.JAVA_API_URL = 'http://127.0.0.1:9';
@@ -15,7 +16,7 @@ const cookieParser = require('cookie-parser');
 const SECRET = process.env.JWT_SECRET;
 
 const tokenFor = (role, opts = {}) =>
-    jwt.sign({ id: 1, role, ...(opts.noOrg || role === 'PLATFORM_ADMIN' ? {} : { org: 1 }) }, opts.secret || SECRET, { expiresIn: opts.expiresIn ?? 300 });
+    jwt.sign({ id: 1, role, ...(opts.noOrg || role === 'PLATFORM_ADMIN' ? {} : { org: opts.org ?? 1 }) }, opts.secret || SECRET, { expiresIn: opts.expiresIn ?? 300 });
 
 /** Crea un app Express con el router montado y lo deja escuchando en un puerto libre. */
 async function startApp(mountPath, router) {

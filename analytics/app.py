@@ -19,6 +19,7 @@ Puerto: 8000 (configurable en config.py)
 from flask import Flask, jsonify
 from flask_cors import CORS
 
+import config
 from config import PORT, DEBUG
 from src.routes.predictions import predictions_bp
 
@@ -33,6 +34,10 @@ CORS(app, origins=[
     "http://localhost:5173",
     "http://gateway:3000",      # nombre del servicio en Docker
 ])
+
+# Sin clave interna, ninguna ruta de predicción aceptaría llamadas: mejor no arrancar
+if not getattr(config, "INTERNAL_API_KEY", ""):
+    raise RuntimeError("INTERNAL_API_KEY no está definida. Revisa tu archivo .env / config.py")
 
 # Registro del blueprint de predicciones
 app.register_blueprint(predictions_bp)

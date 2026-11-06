@@ -76,4 +76,18 @@ const requireRole = (...roles) => {
     };
 };
 
-module.exports = { authenticate, requireRole };
+/**
+ * Exige que el usuario pertenezca a una empresa (todo salvo PLATFORM_ADMIN).
+ * Se usa en rutas que consultan servicios internos con datos de UNA empresa.
+ */
+const requireOrganization = (req, res, next) => {
+    if (!req.user?.org) {
+        return res.status(403).json({
+            error: 'Esta operación requiere pertenecer a una empresa',
+            code: 'ORGANIZATION_REQUIRED'
+        });
+    }
+    next();
+};
+
+module.exports = { authenticate, requireRole, requireOrganization };

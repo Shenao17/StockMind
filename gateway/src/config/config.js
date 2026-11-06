@@ -1,10 +1,15 @@
 /**
  * StockMind Gateway — Configuración centralizada
  * Exporta todas las variables de entorno.
- * JWT_SECRET es obligatorio: sin él el gateway no arranca (no hay valor por defecto).
+ * JWT_SECRET e INTERNAL_API_KEY son obligatorios: sin ellos el gateway no arranca (no hay valor por defecto).
  */
 if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
     throw new Error('JWT_SECRET no está definido o tiene menos de 32 caracteres. Revisa tu archivo .env');
+}
+
+// Clave compartida gateway ↔ analytics: demuestra a Python que la petición viene del gateway
+if (!process.env.INTERNAL_API_KEY || process.env.INTERNAL_API_KEY.length < 32) {
+    throw new Error('INTERNAL_API_KEY no está definido o tiene menos de 32 caracteres. Revisa tu archivo .env');
 }
 
 module.exports = {
@@ -12,6 +17,7 @@ module.exports = {
     javaApiUrl: process.env.JAVA_API_URL || 'http://localhost:8080',
     pythonApiUrl: process.env.PYTHON_API_URL || 'http://localhost:8000',
     jwtSecret: process.env.JWT_SECRET,
+    internalApiKey: process.env.INTERNAL_API_KEY,
     nodeEnv: process.env.NODE_ENV || 'development',
     groqApiKey: process.env.GROQ_API_KEY || '',
     // El asistente IA está en reconstrucción: apagado salvo AGENT_ENABLED=true

@@ -15,7 +15,7 @@ from src.models.demand_model import predict_demand
 from config import HISTORY_DAYS
 
 
-def get_prediction_for_product(product_id: int, stock_current: int = 0,
+def get_prediction_for_product(organization_id: int, product_id: int, stock_current: int = 0,
                                 stock_minimum: int = 5) -> dict:
     """
     Genera la predicción de demanda completa para un producto.
@@ -27,6 +27,7 @@ def get_prediction_for_product(product_id: int, stock_current: int = 0,
     4. Retorna el resultado enriquecido
 
     Args:
+        organization_id: Empresa dueña del producto (todas las consultas se limitan a ella)
         product_id:    ID del producto en la base de datos
         stock_current: Stock actual del producto
         stock_minimum: Stock mínimo configurado
@@ -35,7 +36,7 @@ def get_prediction_for_product(product_id: int, stock_current: int = 0,
         dict con predicción completa lista para serializar como JSON
     """
     # 1. Historial de ventas
-    history_df = get_sales_history(product_id, HISTORY_DAYS)
+    history_df = get_sales_history(organization_id, product_id, HISTORY_DAYS)
 
     # 2. Generar predicción
     result = predict_demand(history_df, stock_current, stock_minimum)
@@ -47,6 +48,7 @@ def get_prediction_for_product(product_id: int, stock_current: int = 0,
 
     # 4. Persistir predicción semanal
     save_prediction(
+        organization_id = organization_id,
         product_id  = product_id,
         period_type = "WEEKLY",
         period_label = week_label,
@@ -58,6 +60,7 @@ def get_prediction_for_product(product_id: int, stock_current: int = 0,
 
     # 5. Persistir predicción mensual
     save_prediction(
+        organization_id = organization_id,
         product_id  = product_id,
         period_type = "MONTHLY",
         period_label = month_label,
@@ -76,7 +79,7 @@ def get_prediction_for_product(product_id: int, stock_current: int = 0,
     return result
 
 
-def get_all_recommendations() -> list:
+def get_all_recommendations(organization_id: int) -> list:
     """
     Genera recomendaciones de reabastecimiento para todos los productos activos.
 
@@ -88,7 +91,7 @@ def get_all_recommendations() -> list:
     Returns:
         Lista de dicts ordenada por prioridad (stock crítico primero)
     """
-    products = get_all_active_products()
+    products = get_all_active_products(organization_id)
     recommendations = []
 
     for product in products:
@@ -97,7 +100,7 @@ def get_all_recommendations() -> list:
         stock_minimum = product["stock_minimum"]
 
         try:
-            prediction = get_prediction_for_product(pid, stock_current, stock_minimum)
+            prediction = get_prediction_for_product(organization_id, pid, stock_current, stock_minimum)
 
             is_critical = stock_current <= stock_minimum
 

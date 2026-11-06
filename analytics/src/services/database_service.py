@@ -34,7 +34,7 @@ def test_connection() -> bool:
         return False
 
 
-def get_sales_history(product_id: int, days: int = 90) -> pd.DataFrame:
+def get_sales_history(organization_id: int, product_id: int, days: int = 90) -> pd.DataFrame:
     """
     Obtiene el historial de ventas de un producto en los últimos N días.
 
@@ -52,7 +52,8 @@ def get_sales_history(product_id: int, days: int = 90) -> pd.DataFrame:
             SUM(sd.quantity)   AS quantity_sold
         FROM sale_details sd
         JOIN sales s ON sd.sale_id = s.id
-        WHERE sd.product_id = %s
+        WHERE s.organization_id = %s
+          AND sd.product_id = %s
           AND s.status = 'COMPLETED'
           AND s.created_at >= DATE_SUB(NOW(), INTERVAL %s DAY)
         GROUP BY DATE(s.created_at)
@@ -61,7 +62,7 @@ def get_sales_history(product_id: int, days: int = 90) -> pd.DataFrame:
     try:
         conn = get_connection()
         cursor = conn.cursor(dictionary=True)
-        cursor.execute(query, (product_id, days))
+        cursor.execute(query, (organization_id, product_id, days))
         rows = cursor.fetchall()
         cursor.close()
         conn.close()
@@ -91,9 +92,9 @@ def get_sales_history(product_id: int, days: int = 90) -> pd.DataFrame:
         return pd.DataFrame(columns=["sale_date", "quantity_sold"])
 
 
-def get_all_active_products() -> list:
+def get_all_active_products(organization_id: int) -> list:
     """
-    Retorna todos los productos activos con su stock actual y mínimo.
+    Retorna los productos activos DE UNA EMPRESA con su stock actual y mínimo.
     Usado por el endpoint /recommend para generar recomendaciones globales.
     """
     query = """
@@ -107,12 +108,13 @@ def get_all_active_products() -> list:
         FROM products p
         JOIN categories c ON p.category_id = c.id
         WHERE p.active = TRUE
+          AND p.organization_id = %s
         ORDER BY p.name
     """
     try:
         conn = get_connection()
         cursor = conn.cursor(dictionary=True)
-        cursor.execute(query)
+        cursor.execute(query, (organization_id,))
         products = cursor.fetchall()
         cursor.close()
         conn.close()
@@ -122,21 +124,21 @@ def get_all_active_products() -> list:
         return []
 
 
-def save_prediction(product_id: int, period_type: str, period_label: str,
+def save_prediction(organization_id: int, product_id: int, period_type: str, period_label: str,
                     predicted_qty: float, confidence: float,
                     model_used: str, recommendation: int):
     """
     Persiste una predicción de demanda en la tabla demand_predictions.
     Permite rastrear la evolución de las predicciones a lo largo del tiempo.
     """
-    # organization_id se hereda del producto: la predicción pertenece a su empresa
+    # El producto debe pertenecer a la empresa: si no, el SELECT no devuelve filas y no se guarda nada
     query = """
         INSERT INTO demand_predictions
             (organization_id, product_id, period_type, period_label, predicted_quantity,
              confidence, model_used, recommendation)
         SELECT p.organization_id, p.id, %s, %s, %s, %s, %s, %s
         FROM products p
-        WHERE p.id = %s
+        WHERE p.id = %s AND p.organization_id = %s
     """
     try:
         conn = get_connection()
@@ -145,7 +147,7 @@ def save_prediction(product_id: int, period_type: str, period_label: str,
             period_type, period_label,
             round(predicted_qty, 2), round(confidence, 4),
             model_used, recommendation,
-            product_id
+            product_id, organization_id
         ))
         conn.commit()
         cursor.close()

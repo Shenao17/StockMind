@@ -7,3 +7,6 @@ DB_PORT = 3306
 DB_NAME = "stockmind_db"
 DB_USER = "TU_USUARIO_MYSQL"
 DB_PASSWORD = "TU_PASSWORD_MYSQL"
+
+# Clave compartida con el gateway (mínimo 32 caracteres; la misma que INTERNAL_API_KEY del gateway)
+INTERNAL_API_KEY = "CAMBIA_ESTO_POR_UNA_CLAVE_LARGA_Y_ALEATORIA"

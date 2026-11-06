@@ -29,6 +29,7 @@ DB_CONFIG = {\n\
     'user':     os.getenv('DB_USER', 'root'),\n\
     'password': os.getenv('DB_PASSWORD', ''),\n\
 }\n\
+INTERNAL_API_KEY = os.getenv('INTERNAL_API_KEY', '')\n\
 HISTORY_DAYS = int(os.getenv('HISTORY_DAYS', 90))\n\
 MOVING_AVG_WINDOW = int(os.getenv('MOVING_AVG_WINDOW', 4))\n\
 SAFETY_STOCK_PCT = float(os.getenv('SAFETY_STOCK_PCT', 0.20))\n\

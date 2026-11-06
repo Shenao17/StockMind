@@ -7,14 +7,36 @@ GET /predict/<product_id>   → Predicción de demanda para un producto
 GET /recommend              → Recomendaciones para todos los productos
 """
 
-from flask import Blueprint, jsonify, request
+import hmac
+
+from flask import Blueprint, g, jsonify, request
 from src.services.prediction_service import (
     get_prediction_for_product,
     get_all_recommendations
 )
 from src.services.database_service import get_all_active_products
+import config
 
 predictions_bp = Blueprint("predictions", __name__)
+
+
+@predictions_bp.before_request
+def require_gateway_and_organization():
+    """
+    Analytics no verifica el JWT: confía en el gateway, que le manda
+      X-Internal-Key      → clave compartida (demuestra que la llamada viene del gateway)
+      X-Organization-Id   → empresa tomada del token ya verificado
+    Sin clave válida → 401. Sin empresa válida → 400. Todas las consultas se limitan a esa empresa.
+    """
+    expected = getattr(config, "INTERNAL_API_KEY", "") or ""
+    provided = request.headers.get("X-Internal-Key", "")
+    if not expected or not hmac.compare_digest(provided.encode(), expected.encode()):
+        return jsonify({"error": "No autorizado", "code": "UNAUTHORIZED"}), 401
+
+    raw_org = request.headers.get("X-Organization-Id", "")
+    if not raw_org.isdigit() or int(raw_org) <= 0:
+        return jsonify({"error": "Empresa inválida", "code": "INVALID_ORGANIZATION"}), 400
+    g.organization_id = int(raw_org)
 
 
 @predictions_bp.route("/predict/<int:product_id>", methods=["GET"])
@@ -43,7 +65,7 @@ def predict(product_id: int):
     }
     """
     # Obtener stock actual del producto desde BD (si no se pasan como query params)
-    products = get_all_active_products()
+    products = get_all_active_products(g.organization_id)
     product_data = next((p for p in products if p["id"] == product_id), None)
 
     if not product_data:
@@ -63,7 +85,7 @@ def predict(product_id: int):
         }), 400
 
     try:
-        result = get_prediction_for_product(product_id, stock_current, stock_minimum)
+        result = get_prediction_for_product(g.organization_id, product_id, stock_current, stock_minimum)
 
         # Enriquecer con datos del producto
         result["productName"] = product_data["name"]
@@ -107,7 +129,7 @@ def recommend():
     ]
     """
     try:
-        recommendations = get_all_recommendations()
+        recommendations = get_all_recommendations(g.organization_id)
         return jsonify({
             "total": len(recommendations),
             "critical": sum(1 for r in recommendations if r["isCritical"]),

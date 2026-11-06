@@ -7,9 +7,9 @@
 const express = require('express');
 const axios = require('axios');
 const router = express.Router();
-const { authenticate } = require('../middleware/auth.middleware');
+const { authenticate, requireOrganization } = require('../middleware/auth.middleware');
 const config = require('../config/config');
-const { authHeader } = require('../utils/authHeader');
+const { internalHeaders } = require('../utils/internalHeaders');
 
 const PYTHON = config.pythonApiUrl;
 
@@ -17,9 +17,9 @@ const PYTHON = config.pythonApiUrl;
  * GET /api/predictions/recommendations
  * Retorna recomendaciones de reabastecimiento para todos los productos
  */
-router.get('/recommendations', authenticate, async (req, res, next) => {
+router.get('/recommendations', authenticate, requireOrganization, async (req, res, next) => {
     try {
-        const response = await axios.get(`${PYTHON}/recommend`);
+        const response = await axios.get(`${PYTHON}/recommend`, { headers: internalHeaders(req) });
         res.status(response.status).json(response.data);
     } catch (error) {
         next(error);
@@ -30,10 +30,14 @@ router.get('/recommendations', authenticate, async (req, res, next) => {
  * GET /api/predictions/:productId
  * Retorna predicción de demanda semanal y mensual para un producto específico
  */
-router.get('/:productId', authenticate, async (req, res, next) => {
+router.get('/:productId', authenticate, requireOrganization, async (req, res, next) => {
     try {
         const { productId } = req.params;
-        const response = await axios.get(`${PYTHON}/predict/${productId}`);
+        // Solo dígitos: evita que un valor como "../health" cambie la ruta pedida a Python
+        if (!/^\d{1,18}$/.test(productId)) {
+            return res.status(400).json({ error: 'Identificador de producto inválido', code: 'INVALID_PRODUCT_ID' });
+        }
+        const response = await axios.get(`${PYTHON}/predict/${productId}`, { headers: internalHeaders(req) });
         res.status(response.status).json(response.data);
     } catch (error) {
         next(error);
