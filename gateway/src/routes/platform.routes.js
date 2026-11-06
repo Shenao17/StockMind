@@ -68,6 +68,18 @@ router.get('/organizations/:id', ...guard, async (req, res, next) => {
     } catch (e) { next(e); }
 });
 
+// Reinicia el 2FA de un usuario de una empresa (solo el dueño, con su PIN) — antes de '/:id/:action'
+router.post('/organizations/:id/users/:userId/reset-mfa', ...guard, async (req, res, next) => {
+    try {
+        const { id, userId } = req.params;
+        if (!/^\d{1,18}$/.test(id) || !/^\d{1,18}$/.test(userId)) return res.status(400).json({ error: 'Identificador inválido' });
+        const r = await axios.post(`${JAVA}/platform/organizations/${id}/users/${userId}/reset-mfa`, pick(req.body, ['pin']), {
+            headers: { ...authHeader(req), 'Content-Type': 'application/json' }
+        });
+        res.status(r.status).json(r.data);
+    } catch (e) { next(e); }
+});
+
 router.post('/organizations/:id/:action', ...guard, async (req, res, next) => {
     try {
         const { id, action } = req.params;

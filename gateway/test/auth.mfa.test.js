@@ -57,7 +57,7 @@ describe('login del equipo de plataforma', () => {
         assert.equal(r.headers.get('set-cookie'), null);
         const b = await r.json();
         assert.deepEqual(b.challenge, { token: 'desafio-xyz', mfaRequired: false, enrollmentRequired: true,
-            mustChangePassword: true, fullName: 'Sebas' });
+            mustChangePassword: true, pinRequired: false, fullName: 'Sebas' });
         assert.equal(b.user, undefined);
         assert.deepEqual(last.body, { email: 'd@x.com', password: 'Clave1234' }, 'solo se reenvían los campos esperados');
     });

@@ -16,7 +16,8 @@ const express = require('express');
 const axios = require('axios');
 const jwt = require('jsonwebtoken');
 const router = express.Router();
-const { authenticate } = require('../middleware/auth.middleware');
+const { authenticate, requireOrganization } = require('../middleware/auth.middleware');
+const { authHeader } = require('../utils/authHeader');
 const config = require('../config/config');
 
 const JAVA = config.javaApiUrl;
@@ -49,6 +50,7 @@ function respondWithSession(res, response) {
                     mfaRequired: !!d.mfaRequired,
                     enrollmentRequired: !!d.enrollmentRequired,
                     mustChangePassword: !!d.mustChangePassword,
+                    pinRequired: !!d.pinRequired,
                     fullName: d.fullName || null
                 }
             });
@@ -105,6 +107,29 @@ router.post('/mfa/enroll/finish', async (req, res, next) => {
         return respondWithSession(res, r);
     } catch (e) { return mfaError(e, res, next); }
 });
+
+// ── 2FA de usuarios de empresa, desde su perfil (requieren sesión de empresa) ──
+
+const selfGuard = [authenticate, requireOrganization];
+
+router.get('/mfa/self/status', ...selfGuard, async (req, res, next) => {
+    try {
+        const r = await axios.get(`${JAVA}/auth/mfa/self/status`, { headers: authHeader(req) });
+        res.status(r.status).json(r.data);
+    } catch (e) { mfaError(e, res, next); }
+});
+
+const SELF_POSTS = { 'setup/start': ['password'], 'setup/finish': ['code'], disable: ['password', 'code'] };
+for (const [path, fields] of Object.entries(SELF_POSTS)) {
+    router.post(`/mfa/self/${path}`, ...selfGuard, async (req, res, next) => {
+        try {
+            const r = await axios.post(`${JAVA}/auth/mfa/self/${path}`, pick(req.body, fields), {
+                headers: { ...authHeader(req), 'Content-Type': 'application/json' }
+            });
+            res.status(r.status).json(r.data);
+        } catch (e) { mfaError(e, res, next); }
+    });
+}
 
 /**
  * POST /api/auth/login
