@@ -67,6 +67,11 @@ public class EntitlementService {
         cache.remove(organizationId);
     }
 
+    /** Tras editar un plan: todas las empresas deben ver los nuevos límites y funciones de inmediato. */
+    public void evictAll() {
+        cache.clear();
+    }
+
     private Snapshot compute(Long organizationId) {
         // Una empresa sin suscripción no debería existir: se bloquea (falla cerrado)
         return subscriptionRepository.findByOrganizationId(organizationId)

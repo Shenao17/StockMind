@@ -60,6 +60,7 @@ public class PlatformDetailController {
     private final ProductRepository productRepository;
     private final PlatformSecurityService platformSecurity;
     private final AuditService auditService;
+    private final com.stockmind.platform.PlatformActionService actions;
 
     @GetMapping("/detail")
     public ResponseEntity<CompanyDetailDTO.Detail> detail(@PathVariable Long id, Authentication auth) {
@@ -127,17 +128,8 @@ public class PlatformDetailController {
             .orElseThrow(() -> new BadCredentialsException("Sesión no válida"));
         platformSecurity.verifyPin(actor, body.getPin());
 
-        String taxId = RegistrationService.normalizeTaxId(body.getTaxId());
-        if (taxId.equals(org.getTaxId())) {
-            throw new IllegalArgumentException("El NIT es el mismo que ya tiene la empresa");
-        }
-        if (organizationRepository.existsByTaxId(taxId)) {
-            throw new ConflictException("Ya existe una empresa con el NIT " + taxId);
-        }
-        String before = org.getTaxId();
-        org.setTaxId(taxId);
-        organizationRepository.save(org);
-        auditService.record(auth.getName(), "ORGANIZATION_TAX_ID_UPDATED", id, nullToDash(before) + " → " + taxId);
+        actions.changeTaxId(id, body.getTaxId(), auth.getName(), null);
+        org = find(id);
         return ResponseEntity.ok(PlatformDTO.OrganizationView.of(org, subscriptionRepository.findByOrganizationId(id).orElse(null)));
     }
 

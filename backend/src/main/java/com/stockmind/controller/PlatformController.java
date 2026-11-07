@@ -63,6 +63,7 @@ public class PlatformController {
     private final SubscriptionService subscriptionService;
     private final PaymentService paymentService;
     private final AuditService auditService;
+    private final com.stockmind.platform.PlatformActionService actions;
     private final com.stockmind.repository.UserRepository userRepository;
     private final com.stockmind.platform.PlatformSecurityService platformSecurity;
 
@@ -117,9 +118,7 @@ public class PlatformController {
 
     @PostMapping("/organizations/{id}/suspend")
     public ResponseEntity<PlatformDTO.OrganizationView> suspend(@PathVariable Long id, Authentication auth) {
-        find(id);
-        subscriptionService.suspend(id);
-        auditService.record(auth.getName(), "ORGANIZATION_SUSPENDED", id, null);
+        actions.suspend(id, auth.getName(), null);
         return ResponseEntity.ok(view(find(id)));
     }
 
@@ -133,9 +132,7 @@ public class PlatformController {
 
     @PostMapping("/organizations/{id}/cancel")
     public ResponseEntity<PlatformDTO.OrganizationView> cancel(@PathVariable Long id, Authentication auth) {
-        find(id);
-        subscriptionService.cancel(id);
-        auditService.record(auth.getName(), "ORGANIZATION_CANCELLED", id, null);
+        actions.cancel(id, auth.getName(), null);
         return ResponseEntity.ok(view(find(id)));
     }
 
@@ -152,19 +149,14 @@ public class PlatformController {
             throw new org.springframework.security.access.AccessDeniedException("Solo el dueño extiende más de "
                 + com.stockmind.platform.PlatformPermission.MAX_TRIAL_EXTENSION_DAYS + " días");
         }
-        subscriptionService.extendTrial(id, body.getDays());
-        auditService.record(auth.getName(), "TRIAL_EXTENDED", id, "días=" + body.getDays());
+        actions.extendTrial(id, body.getDays(), auth.getName(), null);
         return ResponseEntity.ok(view(find(id)));
     }
 
     @PostMapping("/organizations/{id}/plan")
     public ResponseEntity<PlatformDTO.OrganizationView> changePlan(
             @PathVariable Long id, @Valid @RequestBody PlatformDTO.PlanChange body, Authentication auth) {
-        find(id);
-        Plan plan = subscriptionService.planByCode(body.getPlanCode());
-        subscriptionService.changePlan(id, plan, body.getBillingCycle(), body.getComplimentary());
-        auditService.record(auth.getName(), "PLAN_CHANGED", id,
-            "plan=" + plan.getCode() + " cortesía=" + body.getComplimentary());
+        actions.changePlan(id, body.getPlanCode(), body.getBillingCycle(), body.getComplimentary(), auth.getName(), null);
         return ResponseEntity.ok(view(find(id)));
     }
 
@@ -182,10 +174,7 @@ public class PlatformController {
     @PostMapping("/organizations/{id}/manual-payment")
     public ResponseEntity<BillingDTO.PaymentView> manualPayment(
             @PathVariable Long id, @Valid @RequestBody PlatformDTO.PaymentLink body, Authentication auth) {
-        find(id);
-        Payment payment = paymentService.recordManualPayment(id, body.getPlanCode(), body.getBillingCycle());
-        auditService.record(auth.getName(), "MANUAL_PAYMENT_RECORDED", id,
-            "plan=" + body.getPlanCode() + " total=" + payment.getAmountTotal());
+        Payment payment = actions.manualPayment(id, body.getPlanCode(), body.getBillingCycle(), auth.getName(), null);
         return ResponseEntity.status(HttpStatus.CREATED).body(BillingDTO.PaymentView.of(payment, null, false, null));
     }
 

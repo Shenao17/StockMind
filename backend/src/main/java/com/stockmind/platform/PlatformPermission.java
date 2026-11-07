@@ -23,6 +23,9 @@ public enum PlatformPermission {
     TRIAL_EXTEND,    // extender la prueba (hasta MAX_TRIAL_EXTENSION_DAYS salvo SENSITIVE)
     PAYMENT_LINK,    // generar enlaces de pago
     SENSITIVE,       // operaciones que requieren al dueño
+    REQUEST_CREATE,  // pedir acciones sensibles al dueño (con motivo)
+    REQUEST_REVIEW,  // aprobar o rechazar solicitudes (solo el dueño)
+    PLANS_MANAGE,    // editar planes, precios y límites (solo el dueño)
     TEAM_MANAGE;     // gestionar el equipo de plataforma
 
     public static final int MAX_TRIAL_EXTENSION_DAYS = 7;
@@ -35,8 +38,8 @@ public enum PlatformPermission {
     public static Set<PlatformPermission> of(User.Role role) {
         return switch (role) {
             case PLATFORM_OWNER -> EnumSet.allOf(PlatformPermission.class);
-            case PLATFORM_BILLING -> EnumSet.of(ORG_VIEW, ORG_CREATE, ORG_REACTIVATE, TRIAL_EXTEND, PAYMENT_LINK, PAYMENT_VIEW, AUDIT_VIEW);
-            case PLATFORM_SUPPORT -> EnumSet.of(ORG_VIEW, ORG_EDIT_CONTACT, ORG_REACTIVATE, TRIAL_EXTEND, AUDIT_VIEW);
+            case PLATFORM_BILLING -> EnumSet.of(ORG_VIEW, ORG_CREATE, ORG_REACTIVATE, TRIAL_EXTEND, PAYMENT_LINK, PAYMENT_VIEW, AUDIT_VIEW, REQUEST_CREATE);
+            case PLATFORM_SUPPORT -> EnumSet.of(ORG_VIEW, ORG_EDIT_CONTACT, ORG_REACTIVATE, TRIAL_EXTEND, AUDIT_VIEW, REQUEST_CREATE);
             case PLATFORM_VIEWER -> EnumSet.of(ORG_VIEW, PAYMENT_VIEW, AUDIT_VIEW);
             default -> EnumSet.noneOf(PlatformPermission.class);
         };
