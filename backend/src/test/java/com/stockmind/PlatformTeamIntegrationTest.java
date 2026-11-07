@@ -238,7 +238,7 @@ class PlatformTeamIntegrationTest extends IntegrationTestBase {
         JsonNode me = read(get("/auth/me", token).andExpect(status().isOk()));
         assertEquals("PLATFORM_SUPPORT", me.get("role").asText());
         assertEquals("Ana Soporte", me.get("fullName").asText());
-        assertEquals(java.util.List.of("AUDIT_VIEW", "ORG_EDIT_CONTACT", "ORG_REACTIVATE", "ORG_VIEW", "TRIAL_EXTEND"),
+        assertEquals(java.util.List.of("AUDIT_VIEW", "ORG_EDIT_CONTACT", "ORG_REACTIVATE", "ORG_VIEW", "REQUEST_CREATE", "TRIAL_EXTEND"),
             java.util.stream.StreamSupport.stream(me.get("permissions").spliterator(), false).map(JsonNode::asText).toList());
 
         String challenge = login(platformUser("otro", User.Role.PLATFORM_VIEWER)).get("challengeToken").asText();

@@ -82,7 +82,7 @@ public abstract class IntegrationTestBase {
         emails.clear();
         // SQL directo (sin filtro de empresa) para vaciar TODAS las empresas, hijos primero
         for (String table : new String[]{"platform_backup_codes", "email_verification_tokens", "inventory_movements", "sale_details", "sales", "demand_predictions",
-                "products", "categories", "payments", "subscriptions", "audit_log", "users", "organizations"}) {
+                "products", "categories", "payments", "subscriptions", "audit_log", "platform_requests", "users", "organizations"}) {
             try {
                 jdbc.update("DELETE FROM " + table);
             } catch (DataAccessException e) {
