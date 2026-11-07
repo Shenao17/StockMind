@@ -1,3 +1,4 @@
+import BrandLogo from '../components/ui/BrandLogo';
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { API, fmt } from '../api';
@@ -35,7 +36,7 @@ export default function Pay() {
       <div className="login-orb login-orb-one"></div>
       <div className="login-orb login-orb-two"></div>
       <div className="login-content">
-        <div className="login-brand"><h1>StockMind</h1><p>Pago de tu plan</p></div>
+        <div className="login-brand"><h1><BrandLogo height={64} /></h1><p>Pago de tu plan</p></div>
 
         <div className="login-card">
           {!payment && !error && <p>Cargando...</p>}

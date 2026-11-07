@@ -4,6 +4,7 @@ import { API } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { isPlatformRole } from '../platformRoles';
 import MfaStep from '../components/MfaStep';
+import BrandLogo from '../components/ui/BrandLogo';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -85,7 +86,7 @@ export default function Login() {
 
         {/* Identidad */}
         <div className="login-brand">
-          <h1>StockMind</h1>
+          <h1><BrandLogo height={64} /></h1>
           <p>Gestión inteligente de inventario</p>
         </div>
 

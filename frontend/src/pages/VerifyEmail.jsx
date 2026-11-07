@@ -1,3 +1,4 @@
+import BrandLogo from '../components/ui/BrandLogo';
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { API } from '../api';
@@ -42,7 +43,7 @@ export default function VerifyEmail() {
 
       <div className="login-content">
         <div className="login-brand">
-          <h1>StockMind</h1>
+          <h1><BrandLogo height={64} /></h1>
           <p>Gestión inteligente de inventario</p>
         </div>
 

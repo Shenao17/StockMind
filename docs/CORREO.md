@@ -15,6 +15,7 @@ StockMind envía correos en tres casos: **verificación de cuenta** (autoregistr
    EMAIL_REPLY_TO=soporte@tu-dominio.com
    ```
    `EMAIL_REPLY_TO` es opcional (a dónde llegan las respuestas de los clientes).
+   `EMAIL_LOGO_URL` también es opcional: la dirección pública `https` del PNG del logo (por ejemplo `https://app.tu-dominio.com/brand/logo-color.png`) para el encabezado de los correos. Sin ella el encabezado lleva el nombre en texto (ver `MARCA.md`).
 4. **Reinicia el backend:** `docker compose up -d --force-recreate backend`. En el log debe aparecer `Correo: Resend activo (remitente ...)`.
    Si falta la llave o el remitente está mal escrito, **el backend no arranca** y dice qué falta (mejor que fallar en silencio).
 5. **Compruébalo:** en el panel, *Equipo → Correo del sistema → Enviar correo de prueba*. Si falla, el mensaje trae el motivo que da Resend (dominio sin verificar, llave inválida, destinatario no permitido en modo prueba...).

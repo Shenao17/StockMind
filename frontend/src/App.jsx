@@ -1,3 +1,5 @@
+import { useCallback, useState } from 'react';
+import { useTableLabels } from './hooks/useTableLabels';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { useToast } from './hooks/useToast';
@@ -17,6 +19,7 @@ import PlatformTeam from './pages/PlatformTeam';
 import PlatformRequests from './pages/PlatformRequests';
 import PlatformPlans from './pages/PlatformPlans';
 import PlatformNav from './components/PlatformNav';
+import BrandLogo from './components/ui/BrandLogo';
 import Security from './pages/Security';
 import { isPlatformRole, PLATFORM_ROLE_LABELS } from './platformRoles';
 import { SubscriptionProvider } from './context/SubscriptionContext';
@@ -71,12 +74,14 @@ function ProtectedLayout({ showToast }) {
     return (
       <div className="app-layout platform-layout">
         <header className="topbar">
+          <BrandLogo height={30} alt="StockMind" className="topbar-logo brand-full" />
+          <BrandLogo variant="icon" height={30} alt="" className="topbar-logo brand-icon" />
           <div className="topbar-heading">
             <span className="topbar-title">{PAGE_TITLES['/platform']}</span>
             <span className="topbar-subtitle">{PAGE_SUBTITLES['/platform']}</span>
           </div>
           <div className="topbar-actions">
-            <span className="mono" style={{ fontSize: '.8rem' }}>{user.fullName || user.email} · {PLATFORM_ROLE_LABELS[user.role]}</span>
+            <span className="mono topbar-user" style={{ fontSize: '.8rem' }}>{user.fullName || user.email} · {PLATFORM_ROLE_LABELS[user.role]}</span>
             <button className="btn btn-ghost btn-sm" onClick={logout}>Cerrar sesión</button>
           </div>
         </header>
@@ -108,6 +113,8 @@ function ProtectedLayout({ showToast }) {
 function CompanyLayout({ showToast }) {
   const location = useLocation();
   const { blocked } = useSubscription();
+  const [navOpen, setNavOpen] = useState(false);          // cajón del menú (solo celular)
+  const closeNav = useCallback(() => setNavOpen(false), []);
 
   const title = PAGE_TITLES[location.pathname] || 'StockMind';
   const subtitle = PAGE_SUBTITLES[location.pathname] || 'Gestión inteligente de inventario';
@@ -122,12 +129,20 @@ function CompanyLayout({ showToast }) {
 
   return (
     <div className="app-layout">
-      <Sidebar />
+      <Sidebar open={navOpen} onClose={closeNav} />
 
       <header className="topbar">
-        <div className="topbar-heading">
-          <span className="topbar-title">{title}</span>
-          <span className="topbar-subtitle">{subtitle}</span>
+        <div className="topbar-start">
+          <button type="button" className="nav-toggle" onClick={() => setNavOpen(true)}
+            aria-label="Abrir menú" aria-expanded={navOpen} aria-controls="app-sidebar">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+              <path d="M4 7h16" /><path d="M4 12h16" /><path d="M4 17h16" />
+            </svg>
+          </button>
+          <div className="topbar-heading">
+            <span className="topbar-title">{title}</span>
+            <span className="topbar-subtitle">{subtitle}</span>
+          </div>
         </div>
 
         <div className="topbar-actions">
@@ -194,6 +209,7 @@ function PredictionsTopbar() {
 }
 
 export default function App() {
+  useTableLabels();   // tablas como tarjetas en celular
   const { toasts, showToast } = useToast();
 
   return (

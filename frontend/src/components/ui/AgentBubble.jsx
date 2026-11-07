@@ -38,6 +38,13 @@ const styles = `
     animation: panelOpen 0.25s cubic-bezier(0.34,1.56,0.64,1) forwards;
   }
 
+  /* Celular: la burbuja no tapa contenido ni el menú, y el panel ocupa casi todo el ancho */
+  @media (max-width: 640px) {
+    .agent-fab { bottom: calc(14px + env(safe-area-inset-bottom)); right: 14px; }
+    .agent-panel { width: calc(100vw - 28px); height: min(72dvh, 520px); }
+  }
+  body.nav-open .agent-fab { display: none; }
+
   @keyframes panelOpen {
     from {
       opacity: 0;

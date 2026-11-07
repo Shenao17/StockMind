@@ -444,7 +444,7 @@ export default function Sales({ showToast }) {
               CART
               ================================================= */}
 
-          <aside className="cart-panel">
+          <aside className="cart-panel" id="cart-panel">
 
             <div className="cart-orb cart-orb-one" />
             <div className="cart-orb cart-orb-two" />
@@ -636,6 +636,16 @@ export default function Sales({ showToast }) {
             </div>
 
           </aside>
+
+          {/* Celular: el carrito queda al final de la página; esta barra lo muestra siempre y lleva hasta él */}
+          {cartItemsCount > 0 && (
+            <button type="button" className="mobile-cart-bar"
+              onClick={() => document.getElementById('cart-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+              <span>🛒 {cartItemsCount} {cartItemsCount === 1 ? 'producto' : 'productos'}</span>
+              <strong>{fmt(cartTotal)}</strong>
+              <span className="mobile-cart-go">Ver carrito ↓</span>
+            </button>
+          )}
 
         </div>
 

@@ -41,6 +41,8 @@ La v1.4.0 convierte StockMind de una aplicación de un solo negocio en una plata
 
 ---
 
+> **Responsive:** la interfaz se adapta a escritorio, tablet y celular (sección 2.1.1). **Marca:** logo, favicon, paleta y reglas de uso en [`MARCA.md`](MARCA.md) (componente `BrandLogo`, archivos en `frontend/public/brand/`).
+
 ## 1. Visión general de la arquitectura
 
 StockMind es un sistema distribuido de servicios independientes que se comunican por HTTP/REST. **MySQL es el único almacén de datos**, accedido por el backend Java (lógica de negocio y esquema) y por el servicio Python (lectura de ventas y escritura de predicciones).
@@ -100,6 +102,22 @@ Gateway Node.js :3000 ──► Backend Java Spring Boot :8080 ──► MySQL :
 **Sesión:** no se lee ni guarda el token. Si el gateway responde 401 en cualquier llamada (salvo `/auth/me` y `/auth/login`), el cliente limpia la sesión y vuelve al login. Los tokens emitidos antes de la multiempresa (sin empresa) reciben 401 y obligan a iniciar sesión de nuevo.
 
 **Pantallas que aún cargan listas completas** (sin paginar): el catálogo del punto de venta, el selector de producto de Inventario, Predicciones y Reportes. Con catálogos grandes necesitan una solución propia (búsqueda mientras se escribe, por ejemplo).
+
+#### 2.1.1 Diseño adaptable (responsive)
+
+| Ancho | Comportamiento |
+|---|---|
+| ≥ 1025 px | Menú lateral completo |
+| 769–1024 px | Menú **compacto** (solo íconos, con el nombre como ayuda al pasar el cursor); tablas con desplazamiento lateral |
+| ≤ 768 px | Menú en **cajón** (botón ☰ en la barra superior; se cierra con la X, tocando fuera, con Esc o al elegir una sección); se oculta la burbuja del asistente mientras está abierto |
+| ≤ 640 px | **Tablas como tarjetas** ("Columna: valor", la primera celda es el título), diálogos como hoja que sube desde abajo, formularios en una columna, filtros a todo el ancho |
+| Punto de venta (celular) | Barra fija "🛒 N productos · total · Ver carrito" que lleva al carrito |
+
+Cómo funciona y cómo mantenerlo:
+- Las tablas dentro de `.table-container` se vuelven tarjetas **sin tocar cada página**: `useTableLabels` (en `App`) copia el texto de cada `<th>` a un `data-label` en las celdas, y el CSS (`index.css`, sección *RESPONSIVE*) las dibuja. Una tabla nueva solo necesita `<thead>` con encabezados y estar en un `.table-container`; la primera columna debe ser la que identifica la fila. Las celdas con botones o `select` quedan como fila de acciones.
+- Los campos usan 16 px en celular (evita el zoom automático de iOS) y los botones tienen alto táctil mínimo.
+- `Modal` bloquea el desplazamiento de la página de atrás (`body.modal-open`); el cajón usa `body.nav-open`. `viewport-fit=cover` + `env(safe-area-inset-bottom)` respetan el borde inferior de los celulares.
+- Pendiente/limitaciones: se probó con la ventana del navegador emulada a 375, 900 y 1400 px, no en dispositivos reales (iOS/Android); las gráficas de Reportes y Predicciones se revisaron solo en lo general.
 
 ### 2.2 API Gateway (Node.js + Express)
 
@@ -552,7 +570,7 @@ El `.env` no se versiona; `.env.example` es la plantilla. Docker Compose lo lee 
 | `TRUST_PROXY` | no | Número de proxies delante del gateway |
 | `VITE_GATEWAY_URL` | no | URL del gateway para el frontend |
 | `PLATFORM_ADMIN_EMAIL`, `PLATFORM_ADMIN_PASSWORD`, `PLATFORM_ADMIN_NAME` | no | Primer dueño de la plataforma (vacías = no se crea; nombre opcional) |
-| `STOCKMIND_EMAIL_PROVIDER`, `RESEND_API_KEY`, `EMAIL_FROM`, `EMAIL_REPLY_TO` | prod: sí | Correo real con Resend (ver [`CORREO.md`](CORREO.md)); sin proveedor no se envía nada (en dev el enlace va al log). `EMAIL_REPLY_TO` es opcional |
+| `STOCKMIND_EMAIL_PROVIDER`, `RESEND_API_KEY`, `EMAIL_FROM`, `EMAIL_REPLY_TO`, `EMAIL_LOGO_URL` | prod: sí | Correo real con Resend (ver [`CORREO.md`](CORREO.md)); sin proveedor no se envía nada (en dev el enlace va al log). `EMAIL_REPLY_TO` y `EMAIL_LOGO_URL` son opcionales (ver [`MARCA.md`](MARCA.md)) |
 | `STOCKMIND_MFA_KEY` | prod: sí | Llave que cifra los secretos TOTP; vacía = derivada de `JWT_SECRET` (solo desarrollo) |
 | `CAPTCHA_PROVIDER`, `TURNSTILE_SECRET` | prod | Anti-bots del registro público |
 | `STOCKMIND_PAYMENTS_PROVIDER` | no | `simulated` = pasarela de pruebas (solo desarrollo); vacío = pagos desactivados (503) |
@@ -587,10 +605,10 @@ Reiniciar la base con los datos de ejemplo: `docker compose down -v` y volver a 
 
 | Servicio | Herramienta | Pruebas | Cómo ejecutar |
 |----------|-------------|--------:|---------------|
-| Backend | JUnit + MockMvc (H2 por defecto) | 206 | `mvn test` en `backend/` |
-| Backend contra **MySQL real** | idem, con `MYSQL_TEST_URL` | 206 | `MYSQL_TEST_URL=jdbc:mysql://host:3306/db MYSQL_TEST_USER=... MYSQL_TEST_PASSWORD=... mvn test` |
+| Backend | JUnit + MockMvc (H2 por defecto) | 208 | `mvn test` en `backend/` |
+| Backend contra **MySQL real** | idem, con `MYSQL_TEST_URL` | 208 | `MYSQL_TEST_URL=jdbc:mysql://host:3306/db MYSQL_TEST_USER=... MYSQL_TEST_PASSWORD=... mvn test` |
 | Gateway | `node:test` (sin dependencias) | 173 | `npm test` en `gateway/` |
-| Frontend | Vitest + Testing Library | 150 | `npx vitest run` en `frontend/` |
+| Frontend | Vitest + Testing Library | 157 | `npx vitest run` en `frontend/` |
 | Analytics | pytest | 65 (+4 contra MySQL real) | `python -m pytest` en `analytics/` (con `ANALYTICS_MYSQL_HOST` corre también el aislamiento sobre MySQL) |
 
 Cobertura destacada: roles y tokens, validaciones, ventas con **concurrencia** (nunca se vende más del stock), **aislamiento entre empresas** (listados, por id, escrituras cruzadas, reportes, usuarios, analytics), login, registro y verificación, planes (solo lectura, bloqueo, funciones y límites), pagos idempotentes, ciclo diario, panel de plataforma, paginación y orden permitido, cabeceras de seguridad, CORS, límites y logs sin datos sensibles.
