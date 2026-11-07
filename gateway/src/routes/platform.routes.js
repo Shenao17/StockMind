@@ -21,6 +21,7 @@
  * POST /api/platform/requests/:id/reject               { note }       (solo el dueño)
  * POST /api/platform/requests/:id/cancel               (quien la pidió)
  * GET  /api/platform/plans · PUT /api/platform/plans/:code   → editor de planes (solo el dueño, con PIN)
+ * POST /api/platform/email-test                       { to }  (solo el dueño: correo de prueba)
  * GET  /api/platform/team                              → miembros (solo el dueño)
  * POST /api/platform/team                              { fullName, email, role, pin }
  * PATCH /api/platform/team/:id                         { role, active, fullName, pin }
@@ -179,6 +180,15 @@ router.put('/plans/:code', ...guard, async (req, res, next) => {
                 headers: { ...authHeader(req), 'Content-Type': 'application/json' }
             });
         clearEntitlementCache();   // los límites y funciones nuevos aplican de inmediato
+        res.status(r.status).json(r.data);
+    } catch (e) { next(e); }
+});
+
+router.post('/email-test', ...guard, async (req, res, next) => {
+    try {
+        const r = await axios.post(`${JAVA}/platform/email-test`, pick(req.body, ['to']), {
+            headers: { ...authHeader(req), 'Content-Type': 'application/json' }
+        });
         res.status(r.status).json(r.data);
     } catch (e) { next(e); }
 });

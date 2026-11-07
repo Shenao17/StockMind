@@ -198,3 +198,13 @@ describe('solicitudes y planes', () => {
         }
     });
 });
+
+describe('correo de prueba', () => {
+    test('reenvía solo el destino y exige rol de plataforma', async () => {
+        javaCalls.length = 0;
+        await req('POST', '/email-test', tokenFor('PLATFORM_OWNER'), { to: 'a@b.com', from: 'otro@x.com', html: '<b>x</b>' });
+        assert.deepEqual(javaCalls[0], { method: 'POST', url: '/platform/email-test', body: { to: 'a@b.com' } });
+        assert.equal((await req('POST', '/email-test', tokenFor('ADMIN'), {})).status, 403);
+        assert.equal((await req('POST', '/email-test', undefined, {})).status, 401);
+    });
+});

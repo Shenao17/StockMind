@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { vi } from 'vitest';
 import PlatformTeam from '../pages/PlatformTeam';
+import { AuthContext } from '../context/AuthContext';
 import * as apiModule from '../api';
 
 const owner = { id: 1, fullName: 'Sebas', email: 'dueno@x.com', role: 'PLATFORM_OWNER', active: true, mfaEnabled: true, mustChangePassword: false, createdAt: '2026-11-01T10:00:00' };
@@ -10,7 +11,7 @@ function setup(list = [owner, ana]) {
   const team = apiModule.API.platform.team;
   vi.spyOn(team, 'list').mockResolvedValue(list);
   const toast = vi.fn();
-  render(<PlatformTeam showToast={toast} />);
+  render(<AuthContext.Provider value={{ user: { email: 'dueno@x.com' } }}><PlatformTeam showToast={toast} /></AuthContext.Provider>);
   return { team, toast };
 }
 afterEach(() => vi.restoreAllMocks());
@@ -75,5 +76,28 @@ describe('PlatformTeam', () => {
     fireEvent.click(screen.getByRole('button', { name: /^confirmar$/i }));
     await waitFor(() => expect(team.resetAccess).toHaveBeenCalledWith(2, '482915'));
     expect(await screen.findByTestId('temp-password')).toHaveTextContent('A9OtraTemporal12');
+  });
+
+  it('el correo de prueba va al correo indicado (por defecto el del dueño) y muestra el resultado', async () => {
+    const { team } = setup();
+    const test = vi.spyOn(apiModule.API.platform, 'emailTest').mockResolvedValue({ provider: 'resend', sent: true, to: 'dueno@x.com' });
+    await screen.findByText('Ana Soporte');
+    expect(screen.getByLabelText('Correo de destino')).toHaveValue('dueno@x.com');
+    fireEvent.click(screen.getByRole('button', { name: /enviar correo de prueba/i }));
+    await waitFor(() => expect(test).toHaveBeenCalledWith('dueno@x.com'));
+    expect(await screen.findByRole('status')).toHaveTextContent(/enviado a dueno@x.com/i);
+    expect(team.list).toHaveBeenCalled();
+  });
+
+  it('sin proveedor real avisa que no se envió; un error del proveedor se muestra tal cual', async () => {
+    setup();
+    const test = vi.spyOn(apiModule.API.platform, 'emailTest').mockResolvedValueOnce({ provider: 'dev', sent: false, to: 'dueno@x.com' });
+    await screen.findByText('Ana Soporte');
+    fireEvent.click(screen.getByRole('button', { name: /enviar correo de prueba/i }));
+    expect(await screen.findByRole('status')).toHaveTextContent(/modo desarrollo/i);
+
+    test.mockRejectedValueOnce(new Error('Resend rechazó el correo (prueba) con HTTP 403: The domain is not verified'));
+    fireEvent.click(screen.getByRole('button', { name: /enviar correo de prueba/i }));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/domain is not verified/i));
   });
 });

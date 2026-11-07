@@ -188,6 +188,8 @@ export const API = {
     cancelRequest:  (id)             => apiRequest('POST', `/platform/requests/${id}/cancel`),
     plans:          ()               => apiRequest('GET',  '/platform/plans'),
     updatePlan:     (code, data)     => apiRequest('PUT',  `/platform/plans/${code}`, data),
+    // Correo de prueba (solo el dueño): comprueba que el proveedor de correo está bien configurado
+    emailTest:      (to)             => apiRequest('POST', '/platform/email-test', { to }),
     // Ficha de empresa y correcciones (contacto: dueño y soporte; NIT: solo el dueño, con su PIN)
     detail:        (id)             => apiRequest('GET',   `/platform/organizations/${id}/detail`),
     updateContact: (id, data)       => apiRequest('PATCH', `/platform/organizations/${id}/contact`, data),

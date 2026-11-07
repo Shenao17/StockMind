@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { API, fmtDate } from '../api';
 import Modal from '../components/ui/Modal';
+import { useAuth } from '../context/AuthContext';
 import { PLATFORM_ROLE_LABELS, TEAM_ASSIGNABLE_ROLES } from '../platformRoles';
 
 const emptyMember = { fullName: '', email: '', role: 'PLATFORM_SUPPORT' };
@@ -10,6 +11,24 @@ const emptyMember = { fullName: '', email: '', role: 'PLATFORM_SUPPORT' };
  * La contraseña temporal de un alta o reinicio se muestra una sola vez.
  */
 export default function PlatformTeam({ showToast }) {
+  const { user } = useAuth() || {};
+  const [testTo, setTestTo] = useState(user?.email || '');
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState(null);   // { ok, text }
+
+  async function sendTest() {
+    if (!testTo.trim()) { setTestResult({ ok: false, text: 'Escribe un correo de destino' }); return; }
+    setTesting(true); setTestResult(null);
+    try {
+      const r = await API.platform.emailTest(testTo.trim());
+      setTestResult(r.sent
+        ? { ok: true, text: `Enviado a ${r.to}. Revisa tu bandeja (y la carpeta de spam).` }
+        : { ok: false, text: 'Modo desarrollo: no hay proveedor real, no se envió nada. Configura STOCKMIND_EMAIL_PROVIDER=resend.' });
+    } catch (e) {
+      setTestResult({ ok: false, text: e.message });
+    } finally { setTesting(false); }
+  }
+
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -73,6 +92,19 @@ export default function PlatformTeam({ showToast }) {
 
   return (
     <>
+      <div className="table-container" style={{ padding: 20, marginBottom: 16 }}>
+        <div className="table-header" style={{ padding: 0, marginBottom: 8 }}><h2>Correo del sistema</h2></div>
+        <p style={{ color: 'var(--text-muted)', fontSize: '.85rem', marginBottom: 12 }}>
+          Verificación de cuentas y avisos de prueba y vencimiento salen por correo. Envía uno de prueba para comprobar que la configuración funciona.
+        </p>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <input type="email" aria-label="Correo de destino" placeholder="destino@correo.com" value={testTo}
+            onChange={(e) => setTestTo(e.target.value)} style={{ maxWidth: 320 }} />
+          <button className="btn btn-primary btn-sm" onClick={sendTest} disabled={testing}>{testing ? 'Enviando...' : 'Enviar correo de prueba'}</button>
+        </div>
+        {testResult && <p role="status" className={`field-hint ${testResult.ok ? 'ok' : 'warn'}`} style={{ marginTop: 10 }}>{testResult.text}</p>}
+      </div>
+
       <div className="table-container">
         <div className="table-header">
           <h2>Equipo de la plataforma</h2>
