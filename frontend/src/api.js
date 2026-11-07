@@ -180,6 +180,14 @@ export const API = {
     summary:       ()               => apiRequest('GET', '/platform/summary'),
     payments:      (params)         => apiRequest('GET', `/platform/payments${qs(params)}`),
     audit:         (params)         => apiRequest('GET', `/platform/audit${qs(params)}`),
+    // Solicitudes de acciones sensibles (Soporte/Cobranza piden; el dueño aprueba con PIN) y editor de planes (dueño)
+    requests:       (params)         => apiRequest('GET',  `/platform/requests${qs(params)}`),
+    createRequest:  (data)           => apiRequest('POST', '/platform/requests', data),
+    approveRequest: (id, pin, note)  => apiRequest('POST', `/platform/requests/${id}/approve`, { pin, note }),
+    rejectRequest:  (id, note)       => apiRequest('POST', `/platform/requests/${id}/reject`, { note }),
+    cancelRequest:  (id)             => apiRequest('POST', `/platform/requests/${id}/cancel`),
+    plans:          ()               => apiRequest('GET',  '/platform/plans'),
+    updatePlan:     (code, data)     => apiRequest('PUT',  `/platform/plans/${code}`, data),
     // Ficha de empresa y correcciones (contacto: dueño y soporte; NIT: solo el dueño, con su PIN)
     detail:        (id)             => apiRequest('GET',   `/platform/organizations/${id}/detail`),
     updateContact: (id, data)       => apiRequest('PATCH', `/platform/organizations/${id}/contact`, data),

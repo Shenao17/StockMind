@@ -5,6 +5,8 @@ import Modal from '../components/ui/Modal';
 import Pagination from '../components/ui/Pagination';
 import { useDebounce } from '../hooks/useDebounce';
 import { useAuth } from '../context/AuthContext';
+import RequestModal from '../components/RequestModal';
+import { REQUEST_TYPES } from '../platformRoles';
 
 const PAGE_SIZE = 10;
 
@@ -33,6 +35,9 @@ export default function Platform({ showToast }) {
   const perms = user?.permissions || [];
   const can = (p) => perms.includes(p);
   const allowedActions = ACTIONS.filter((a) => can(a.perm));
+  // Quien no puede hacer lo sensible directamente (Soporte, Cobranza) lo pide al dueño
+  const canRequest = can('REQUEST_CREATE') && !can('SENSITIVE');
+  const [requesting, setRequesting] = useState(null);   // { org, type }
   const [data, setData] = useState({ content: [], page: 0, totalElements: 0, totalPages: 0 });
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
@@ -88,6 +93,7 @@ export default function Platform({ showToast }) {
 
   function startAction(org, type) {
     if (!type) return;
+    if (type.startsWith('request:')) { setRequesting({ org, type: type.slice(8) }); return; }
     if (['suspend', 'reactivate', 'cancel'].includes(type)) {
       const label = ACTIONS.find((a) => a.value === type).label.toLowerCase();
       if (!confirm(`¿Confirmas ${label} a "${org.name}"?`)) return;
@@ -157,12 +163,17 @@ export default function Platform({ showToast }) {
                   <td className="mono">{expiry(o.subscription)}</td>
                   <td>{o.origin === 'SELF_SIGNUP' ? 'Autoregistro' : 'Plataforma'}</td>
                   <td>
-                    {allowedActions.length === 0 ? (
+                    {allowedActions.length === 0 && !canRequest ? (
                       <span style={{ color: 'var(--text-muted)', fontSize: '.8rem' }}>Solo consulta</span>
                     ) : (
                       <select aria-label={`Acción para ${o.name}`} value="" onChange={(e) => startAction(o, e.target.value)} style={{ width: 170 }}>
                         <option value="">Acciones…</option>
                         {allowedActions.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
+                        {canRequest && (
+                          <optgroup label="Pedir al dueño">
+                            {Object.entries(REQUEST_TYPES).map(([k, v]) => <option key={k} value={`request:${k}`}>Solicitar: {v}</option>)}
+                          </optgroup>
+                        )}
                       </select>
                     )}
                   </td>
@@ -217,6 +228,9 @@ export default function Platform({ showToast }) {
           </>
         )}
       </Modal>
+
+      <RequestModal open={!!requesting} org={requesting?.org} initialType={requesting?.type}
+        onClose={() => setRequesting(null)} showToast={showToast} />
 
       {/* Enlace de pago generado */}
       <Modal open={!!link} onClose={() => setLink(null)} title="Enlace de pago"

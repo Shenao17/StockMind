@@ -130,4 +130,23 @@ describe('Platform', () => {
     expect(screen.queryByLabelText(/acción para/i)).toBeNull();
   });
 
+
+  it('soporte con permiso de pedir ve la sección "Pedir al dueño" y abre la solicitud', async () => {
+    vi.spyOn(apiModule.API.public, 'plans').mockResolvedValue(plans);
+    setup(envelope([org()]), [...SUPPORT_PERMS, 'REQUEST_CREATE']);
+    await screen.findByText('Ferretería El Tornillo');
+    const select = screen.getByLabelText(/acción para ferretería/i);
+    const labels = within(select).getAllByRole('option').map((o) => o.textContent);
+    expect(labels).toContain('Solicitar: Suspender');
+    expect(labels).toContain('Solicitar: Corregir NIT');
+    fireEvent.change(select, { target: { value: 'request:CANCEL' } });
+    expect(await screen.findByText(/solicitar acción — ferretería el tornillo/i)).toBeInTheDocument();
+  });
+
+  it('el dueño no ve "Pedir al dueño": ya puede hacerlo directamente', async () => {
+    setup(envelope([org()]), [...OWNER_PERMS, 'REQUEST_CREATE']);
+    await screen.findByText('Ferretería El Tornillo');
+    const labels = within(screen.getByLabelText(/acción para ferretería/i)).getAllByRole('option').map((o) => o.textContent);
+    expect(labels.some((l) => l.startsWith('Solicitar'))).toBe(false);
+  });
 });

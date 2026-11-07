@@ -138,3 +138,15 @@ describe('PlatformCompany — correcciones', () => {
     await waitFor(() => expect(reset).toHaveBeenCalledWith('7', 1, '482915'));
   });
 });
+
+describe('PlatformCompany — solicitar acción', () => {
+  it('soporte con permiso de pedir ve el botón; el dueño no', async () => {
+    setup([...SUPPORT, 'REQUEST_CREATE']);
+    expect(await screen.findByRole('button', { name: /solicitar acción/i })).toBeInTheDocument();
+  });
+  it('el dueño no lo necesita', async () => {
+    setup([...OWNER, 'REQUEST_CREATE']);
+    await screen.findByRole('heading', { name: 'Ferretería El Tornillo' });
+    expect(screen.queryByRole('button', { name: /solicitar acción/i })).toBeNull();
+  });
+});

@@ -14,6 +14,8 @@ import PlatformSummary from './pages/PlatformSummary';
 import PlatformPayments from './pages/PlatformPayments';
 import PlatformAudit from './pages/PlatformAudit';
 import PlatformTeam from './pages/PlatformTeam';
+import PlatformRequests from './pages/PlatformRequests';
+import PlatformPlans from './pages/PlatformPlans';
 import PlatformNav from './components/PlatformNav';
 import Security from './pages/Security';
 import { isPlatformRole, PLATFORM_ROLE_LABELS } from './platformRoles';
@@ -86,6 +88,8 @@ function ProtectedLayout({ showToast }) {
             <Route path="/platform/orgs/:id" element={<PlatformCompany showToast={showToast} />} />
             <Route path="/platform/payments" element={<PlatformPayments showToast={showToast} />} />
             <Route path="/platform/audit" element={<PlatformAudit showToast={showToast} />} />
+            <Route path="/platform/requests" element={<PlatformRequests showToast={showToast} />} />
+            <Route path="/platform/plans" element={<PlatformPlans showToast={showToast} />} />
             <Route path="/platform/team" element={<PlatformTeam showToast={showToast} />} />
             <Route path="*" element={<Navigate to="/platform" replace />} />
           </Routes>

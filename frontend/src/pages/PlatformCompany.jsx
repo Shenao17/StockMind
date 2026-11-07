@@ -5,6 +5,7 @@ import Modal from '../components/ui/Modal';
 import PinConfirm from '../components/PinConfirm';
 import { useAuth } from '../context/AuthContext';
 import { AUDIT_LABELS } from '../platformRoles';
+import RequestModal from '../components/RequestModal';
 
 const STATUS_LABELS = { PENDING: 'Sin verificar', ACTIVE: 'Activa', SUSPENDED: 'Suspendida', CANCELLED: 'Cancelada' };
 const SUB_LABELS = { TRIAL: 'Prueba', ACTIVE: 'Activo', GRACE: 'Gracia', SUSPENDED: 'Suspendido', CANCELLED: 'Cancelado' };
@@ -40,6 +41,7 @@ export default function PlatformCompany({ showToast }) {
   const [editing, setEditing] = useState(null);       // formulario de contacto
   const [taxModal, setTaxModal] = useState(null);     // { taxId } → luego pide PIN
   const [pinFor, setPinFor] = useState(null);         // { kind: 'tax'|'mfa', ... }
+  const [requesting, setRequesting] = useState(false);
 
   const reload = () => setReloadKey((k) => k + 1);
 
@@ -134,6 +136,9 @@ export default function PlatformCompany({ showToast }) {
         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
           {can('ORG_EDIT_CONTACT') && <button className="btn btn-ghost btn-sm" onClick={startEdit}>Corregir datos</button>}
           {can('SENSITIVE') && <button className="btn btn-ghost btn-sm" onClick={() => setTaxModal({ taxId: org.taxId || '' })}>Corregir NIT</button>}
+          {can('REQUEST_CREATE') && !can('SENSITIVE') && (
+            <button className="btn btn-ghost btn-sm" onClick={() => setRequesting(true)}>Solicitar acción…</button>
+          )}
         </div>
       </div>
 
@@ -245,6 +250,8 @@ export default function PlatformCompany({ showToast }) {
           </>
         )}
       </Modal>
+
+      <RequestModal open={requesting} org={{ id: org.id, name: org.name, subscription: plan }} onClose={() => setRequesting(false)} showToast={showToast} />
 
       <PinConfirm open={!!pinFor} onConfirm={confirmPin} onCancel={() => setPinFor(null)} />
     </>
