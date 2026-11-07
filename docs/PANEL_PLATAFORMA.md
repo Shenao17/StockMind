@@ -1,6 +1,6 @@
 # StockMind — Panel de plataforma (equipo de BlackLabs)
 
-**Estado:** Fases (a), (b) y (c) implementadas (roles, permisos, equipo, 2FA, ficha de empresa, resumen, cobros y auditoría). Fase (d) por hacer.
+**Estado:** Fases (a), (b), (c) y (d) implementadas: roles y permisos, equipo, 2FA, ficha de empresa, resumen, cobros, auditoría, solicitudes con aprobación y editor de planes.
 Detalle técnico en `docs/manual-tecnico.md` (secciones 5.6 y 6.5).
 
 El panel `/platform` es para quien opera StockMind (no para las empresas clientes). Lo usa el equipo de BlackLabs con roles distintos.
@@ -16,7 +16,7 @@ El panel `/platform` es para quien opera StockMind (no para las empresas cliente
 | `PLATFORM_SUPPORT` (Soporte) | Asesor técnico | Ver empresas (sin cobros), **corregir datos de contacto**, reactivar, extender pruebas (≤ 7 días) |
 | `PLATFORM_VIEWER` (Consulta) | Socio / contador | Solo ver (incluye cobros) |
 
-**Operaciones sensibles** (suspender, cancelar, cambiar de plan, registrar pago manual, extender pruebas más de 7 días): hoy **solo el Dueño** las ejecuta (permiso interno `SENSITIVE`). Cuando se implemente la fase (d), el resto del equipo podrá *solicitarlas* y el Dueño las aprobará.
+**Operaciones sensibles** (suspender, cancelar, cambiar de plan, registrar pago manual, extender pruebas más de 7 días, corregir el NIT): **solo el Dueño** las ejecuta directamente (permiso interno `SENSITIVE`). Soporte y Cobranza las **solicitan** con un motivo y el Dueño las aprueba o rechaza (sección 4.3).
 
 Cada endpoint exige un **permiso** (`PERM_*`), no un rol concreto: así se pueden agregar roles sin tocar los endpoints. La matriz vive en `PlatformPermission.java`. El backend es quien decide; el gateway y el frontend solo ocultan lo que no corresponde.
 
@@ -59,7 +59,7 @@ Protecciones:
 | (a) | Roles y permisos, equipo, 2FA (app + PIN), contraseña temporal, sesiones revocables | ✔ hecho |
 | (b) | Ficha de empresa: datos, uso frente a límites, usuarios, cobros, línea de tiempo; corregir contacto y NIT; reiniciar 2FA de usuarios | ✔ hecho |
 | (c) | Resumen con métricas, pantalla de cobros y de auditoría | ✔ hecho |
-| (d) | Solicitudes con aprobación del Dueño (cancelar, NIT, plan, pago manual, suspender) y editor de planes/precios | pendiente |
+| (d) | Solicitudes con aprobación del Dueño y editor de planes/precios | ✔ hecho |
 
 ## 4.1 Ficha de empresa (`/platform/orgs/:id`)
 
@@ -79,6 +79,21 @@ Barra del panel (cada rol solo ve lo suyo): **Resumen** (`/platform`), **Empresa
 - **Cobros:** todas las empresas, con filtros (estado: pagado/pendiente/vencido/fallido; empresa, NIT o correo; fechas) y paginación. Muestra el **total pagado dentro del filtro sobre todas las páginas** (neto, IVA y total): útil para cuadrar con el contador. Nunca muestra la referencia de los enlaces de pago.
 - **Auditoría:** quién hizo qué, sobre qué empresa y cuándo, con filtros por acción, persona y fechas; las acciones se muestran en español. Todos los roles del equipo la ven.
 - Ninguna de las tres expone datos de negocio de las empresas.
+
+## 4.3 Solicitudes con aprobación y editor de planes
+
+**Solicitudes** (pestaña *Solicitudes*; el Dueño ve un contador de pendientes):
+- Tipos: suspender, cancelar, cambiar plan, registrar pago manual, extender prueba (más de 7 días) y corregir NIT.
+- **Quién pide:** Soporte y Cobranza (desde la lista de empresas, opción "Solicitar…", o desde la ficha), siempre con un **motivo** de 10 a 500 caracteres. Los parámetros se validan al pedir (plan que exista, días de 1 a 90, NIT con formato y que no exista). No puede haber dos solicitudes pendientes del mismo tipo para la misma empresa.
+- **Quién decide:** solo el Dueño. **Aprobar exige su PIN** y ejecuta la acción en ese momento; si la acción falla (p. ej. el NIT ya lo tomó otra empresa) la solicitud sigue pendiente y ve el error. **Rechazar** exige una nota que verá quien pidió. Quien pidió puede **cancelarla** mientras esté pendiente.
+- Una solicitud pendiente **vence a los 7 días** (se ve "Vencida" y ya no se aprueba).
+- Cada miembro ve solo las suyas; el Dueño, todas. Todo queda en la auditoría: la acción aparece a nombre del Dueño con "solicitud #N de <quien pidió>".
+
+**Editor de planes** (pestaña *Planes*, solo el Dueño, con PIN): nombre, precios (mensual y anual, sin IVA), usuarios, productos, usuario adicional, funciones incluidas y si el plan está activo.
+- Los **límites y funciones** aplican de inmediato a las empresas que ya usan el plan; el **precio** aplica solo a los cobros nuevos (los ya generados conservan su monto).
+- Reducir un límite por debajo del uso actual no borra nada: solo impide agregar más.
+- Validaciones: precio mínimo $1.000, el anual no puede superar 12 meses del mensual, funciones conocidas, y el plan por defecto del registro (PRO) no se puede desactivar. Los planes **no se crean ni se borran** desde aquí (el código identifica sus suscripciones y cobros).
+- Un plan desactivado deja de verse para contratar; las empresas que ya lo tienen lo conservan.
 
 ## 5. 2FA para las empresas clientes
 

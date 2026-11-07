@@ -309,6 +309,7 @@ El esquema lo gestiona **Flyway** desde el backend; Hibernate solo valida (`ddl-
 | `V2__organizations_multitenancy.sql` | `organizations`, `organization_id` en todas las tablas, unicidades por empresa, empresa inicial (id 1) con los datos existentes |
 | `V3__registration_and_verification.sql` | Verificación de correo, fin de prueba y términos |
 | `V4__plans_subscriptions_payments.sql` | Planes (borrador de precios), suscripciones, pagos y auditoría; las empresas existentes quedan con una suscripción de cortesía (Business) |
+| `V7__platform_requests.sql` | Solicitudes con aprobación del dueño (`platform_requests`; columnas ENUM, como pide Hibernate en MySQL) |
 | `V6__company_mfa.sql` | `organizations.require_mfa`: la empresa exige 2FA a todos sus usuarios |
 | `V5__platform_roles_mfa.sql` | Roles de plataforma (`PLATFORM_ADMIN` pasa a `PLATFORM_OWNER`), columnas de 2FA/PIN/sesiones en `users` y `platform_backup_codes` |
 
@@ -484,6 +485,8 @@ Flujo: `POST /billing/checkout` (ADMIN) crea un cobro `PENDING` con la referenci
 
 **Resumen, cobros y auditoría** (`PlatformStatsController`): `GET /platform/summary` (`ORG_VIEW`; el bloque `revenue` solo con `PAYMENT_VIEW`, si no llega `null`), `GET /platform/payments` (`PAYMENT_VIEW`; filtros `status` incluido `EXPIRED` derivado, `organizationId`, `search`, `from`/`to`, paginación con orden permitido, y totales de lo pagado sobre TODO el filtro vía consulta de criterios agregada) y `GET /platform/audit` (`AUDIT_VIEW`, todos los roles; filtros acción/actor/empresa/fechas). Fechas `yyyy-MM-dd` (400 si no). El umbral de pruebas por vencer (5 días) es el mismo del ciclo diario.
 
+**Acciones y solicitudes:** las acciones sensibles viven en `PlatformActionService` (suspender, cancelar, extender prueba, cambiar plan, pago manual, corregir NIT; cada una audita). Las usan el Dueño directamente y la aprobación de una solicitud (`PlatformRequestService`, `PlatformRequestController` `/platform/requests`: crear `REQUEST_CREATE`, listar —el dueño todas, los demás las suyas—, `approve` con PIN y `reject` `REQUEST_REVIEW`, `cancel` solo quien pidió). Aprobar ejecuta la acción en la misma transacción: si falla, la solicitud sigue pendiente. Vencen a los 7 días (estado derivado `EXPIRED`). **Editor de planes** (`PlatformPlansController`, `PLANS_MANAGE` + PIN): `GET /platform/plans`, `PUT /platform/plans/{code}`; tras guardar se vacía la caché de permisos (`EntitlementService.evictAll`) y el gateway la suya.
+
 Una empresa sin verificar el correo no puede suspenderse ni reactivarse (409 `ORGANIZATION_PENDING`). **Toda acción queda en `audit_log`.**
 
 ### 6.6 Ciclo diario
@@ -581,10 +584,10 @@ Reiniciar la base con los datos de ejemplo: `docker compose down -v` y volver a 
 
 | Servicio | Herramienta | Pruebas | Cómo ejecutar |
 |----------|-------------|--------:|---------------|
-| Backend | JUnit + MockMvc (H2 por defecto) | 180 | `mvn test` en `backend/` |
-| Backend contra **MySQL real** | idem, con `MYSQL_TEST_URL` | 180 | `MYSQL_TEST_URL=jdbc:mysql://host:3306/db MYSQL_TEST_USER=... MYSQL_TEST_PASSWORD=... mvn test` |
-| Gateway | `node:test` (sin dependencias) | 168 | `npm test` en `gateway/` |
-| Frontend | Vitest + Testing Library | 127 | `npx vitest run` en `frontend/` |
+| Backend | JUnit + MockMvc (H2 por defecto) | 193 | `mvn test` en `backend/` |
+| Backend contra **MySQL real** | idem, con `MYSQL_TEST_URL` | 193 | `MYSQL_TEST_URL=jdbc:mysql://host:3306/db MYSQL_TEST_USER=... MYSQL_TEST_PASSWORD=... mvn test` |
+| Gateway | `node:test` (sin dependencias) | 172 | `npm test` en `gateway/` |
+| Frontend | Vitest + Testing Library | 146 | `npx vitest run` en `frontend/` |
 | Analytics | pytest | 65 (+4 contra MySQL real) | `python -m pytest` en `analytics/` (con `ANALYTICS_MYSQL_HOST` corre también el aislamiento sobre MySQL) |
 
 Cobertura destacada: roles y tokens, validaciones, ventas con **concurrencia** (nunca se vende más del stock), **aislamiento entre empresas** (listados, por id, escrituras cruzadas, reportes, usuarios, analytics), login, registro y verificación, planes (solo lectura, bloqueo, funciones y límites), pagos idempotentes, ciclo diario, panel de plataforma, paginación y orden permitido, cabeceras de seguridad, CORS, límites y logs sin datos sensibles.
@@ -619,12 +622,13 @@ Cobertura destacada: roles y tokens, validaciones, ventas con **concurrencia** (
 │                PaymentService · PaymentProvider (+ Simulated) · BillingQueryService · AuditService
 ├── bootstrap/   PlatformAdminBootstrap                       # primer PLATFORM_OWNER desde el entorno
 ├── config/      JwtConfig · SecurityConfig (+ JwtAuthFilter) · SubscriptionAccessFilter · DevDataSeeder
-├── controller/  Auth · Billing · Category · Dashboard · Inventory · MfaSelf · Platform · PlatformDetail · PlatformStats · PlatformTeam · Product
+├── controller/  Auth · Billing · Category · Dashboard · Inventory · MfaSelf · Platform · PlatformDetail · PlatformPlans · PlatformRequest · PlatformStats · PlatformTeam · Product
 │                PublicBilling · PublicRegistration · Report · Sale · User
 ├── dto/         BillingDTO · InventoryDTO · LoginRequest/Response · PageResponse · PlatformDTO
 │                ProductDTO · RegistrationDTO · SaleDTO · TeamDTO · UserDTO · CompanyDetailDTO
 ├── exception/   ConflictException · PinException · ResourceNotFoundException · GlobalExceptionHandler
 ├── platform/    PlatformPermission · PlatformSecurityService · TotpService · MfaCrypto   # roles, 2FA y PIN
+│                PlatformActionService · PlatformRequestService                          # acciones y solicitudes
 ├── mail/        EmailSender · DevEmailSender · NoopEmailSender
 ├── model/       AuditLog · Category · EmailVerificationToken · InventoryMovement · Organization
 │                Payment · Plan · PlatformBackupCode · Product · Sale · SaleDetail · Subscription · User
