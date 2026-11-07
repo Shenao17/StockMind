@@ -12,11 +12,15 @@ public final class EmailTemplates {
 
     public record Message(String subject, String html, String text) {}
 
-    private static final String ACCENT = "#5656d9";
+    private static final String ACCENT = "#3978F6";
 
     private EmailTemplates() {}
 
     public static Message verification(String name, String url, int hours) {
+        return verification(name, url, hours, null);
+    }
+
+    public static Message verification(String name, String url, int hours, String logoUrl) {
         String who = greeting(name);
         return new Message(
             "Confirma tu correo en StockMind",
@@ -24,12 +28,16 @@ public final class EmailTemplates {
                 p(who + "Gracias por registrarte en StockMind. Para activar tu cuenta y empezar tu prueba gratis, confirma tu correo:")
                     + button("Confirmar mi correo", url)
                     + small("Este enlace vence en " + hours + " horas y solo sirve una vez. Si no creaste una cuenta en StockMind, ignora este mensaje."),
-                url),
+                url, logoUrl),
             plain(who + "Gracias por registrarte en StockMind. Confirma tu correo para activar tu cuenta:\n\n" + url
                 + "\n\nEl enlace vence en " + hours + " horas y solo sirve una vez. Si no creaste una cuenta, ignora este mensaje."));
     }
 
     public static Message billing(BillingNotice kind, String name, int daysLeft, String url) {
+        return billing(kind, name, daysLeft, url, null);
+    }
+
+    public static Message billing(BillingNotice kind, String name, int daysLeft, String url, String logoUrl) {
         String who = greeting(name);
         String days = daysLeft <= 0 ? "hoy" : daysLeft == 1 ? "mañana" : "en " + daysLeft + " días";
         String subject;
@@ -64,13 +72,17 @@ public final class EmailTemplates {
             default -> throw new IllegalArgumentException("Aviso desconocido: " + kind);
         }
         return new Message(subject,
-            layout(title, p(who + body) + button(cta, url) + small("Si ya pagaste, ignora este mensaje: tu pago puede tardar unos minutos en reflejarse."), url),
+            layout(title, p(who + body) + button(cta, url) + small("Si ya pagaste, ignora este mensaje: tu pago puede tardar unos minutos en reflejarse."), url, logoUrl),
             plain(who + body + "\n\n" + cta + ": " + url + "\n\nSi ya pagaste, ignora este mensaje."));
     }
 
     public static Message test() {
+        return test(null);
+    }
+
+    public static Message test(String logoUrl) {
         return new Message("Correo de prueba de StockMind",
-            layout("Todo en orden", p("Este es un correo de prueba. Si lo estás leyendo, StockMind puede enviar correos correctamente."), null),
+            layout("Todo en orden", p("Este es un correo de prueba. Si lo estás leyendo, StockMind puede enviar correos correctamente."), null, logoUrl),
             plain("Este es un correo de prueba. Si lo estás leyendo, StockMind puede enviar correos correctamente."));
     }
 
@@ -99,14 +111,26 @@ public final class EmailTemplates {
         return text + "\n\n— StockMind";
     }
 
-    private static String layout(String title, String content, String fallbackUrl) {
+    /** Solo se acepta una dirección http(s) para el logo; cualquier otra cosa se ignora y queda el nombre en texto. */
+    public static String safeLogoUrl(String logoUrl) {
+        if (logoUrl == null) return null;
+        String u = logoUrl.trim();
+        return u.matches("(?i)^https?://[^\\s\"'<>]+$") ? u : null;
+    }
+
+    private static String layout(String title, String content, String fallbackUrl, String logoUrl) {
+        String logo = safeLogoUrl(logoUrl);
+        String header = logo == null
+            ? "<tr><td style=\"background:#14151c;padding:22px 32px\"><span style=\"font-size:20px;font-weight:700;color:#ffffff;letter-spacing:.02em\">StockMind</span></td></tr>"
+            : "<tr><td style=\"background:#090D19;padding:24px 32px\"><img src=\"" + HtmlUtils.htmlEscape(logo) + "\" alt=\"StockMind\" height=\"34\" style=\"display:block;height:34px;border:0\"></td></tr>"
+              + "<tr><td style=\"height:4px;line-height:4px;font-size:0;background:#3978F6;background-image:linear-gradient(90deg,#3978F6,#42D9E8,#8065F5)\">&nbsp;</td></tr>";
         String fallback = fallbackUrl == null ? ""
             : "<p style=\"margin:20px 0 0;font-size:12px;line-height:1.5;color:#7a7d90\">¿El botón no funciona? Copia este enlace en tu navegador:<br>"
               + "<span style=\"word-break:break-all\">" + HtmlUtils.htmlEscape(fallbackUrl) + "</span></p>";
         return "<!doctype html><html lang=\"es\"><body style=\"margin:0;padding:0;background:#f3f4f8;font-family:Arial,Helvetica,sans-serif\">"
             + "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f3f4f8;padding:32px 12px\"><tr><td align=\"center\">"
             + "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:520px;background:#ffffff;border-radius:14px;overflow:hidden\">"
-            + "<tr><td style=\"background:#14151c;padding:22px 32px\"><span style=\"font-size:20px;font-weight:700;color:#ffffff;letter-spacing:.02em\">StockMind</span></td></tr>"
+            + header
             + "<tr><td style=\"padding:32px\"><h1 style=\"margin:0 0 16px;font-size:20px;color:#14151c\">" + HtmlUtils.htmlEscape(title) + "</h1>"
             + content + fallback + "</td></tr>"
             + "<tr><td style=\"padding:16px 32px;background:#fafafc;font-size:11px;color:#9a9db0\">Mensaje automático de StockMind. Por favor no respondas a este correo.</td></tr>"

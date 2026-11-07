@@ -27,6 +27,8 @@ import java.util.regex.Pattern;
  *                    Resend (SPF/DKIM). Para pruebas sin dominio Resend permite "onboarding@resend.dev", pero solo
  *                    entrega a la dirección con la que te registraste en Resend.
  *  - EMAIL_REPLY_TO  opcional: a dónde llegan las respuestas.
+ *  - EMAIL_LOGO_URL  opcional: dirección PÚBLICA (https) del logo para el encabezado, p. ej. https://app.tu-dominio.com/brand/logo-color.png.
+ *                    Sin ella el encabezado lleva el nombre en texto. Usa el PNG (algunos clientes de correo no muestran SVG).
  *
  * Si el proveedor está activo y falta la llave o el remitente, el backend NO arranca (falla ruidosa, no en silencio).
  * Un error del proveedor lanza EmailDeliveryException con el código y el mensaje de Resend; la llave nunca se registra.
@@ -44,6 +46,7 @@ public class ResendEmailSender implements EmailSender {
     private final URI endpoint;
     private final Duration timeout;
     private final int verificationHours;
+    private final String logoUrl;   // null = encabezado de solo texto
     private final ObjectMapper mapper;
     private final HttpClient http;
 
@@ -53,6 +56,7 @@ public class ResendEmailSender implements EmailSender {
                              @Value("${stockmind.mail.resend.base-url:https://api.resend.com}") String baseUrl,
                              @Value("${stockmind.mail.timeout-seconds:10}") int timeoutSeconds,
                              @Value("${stockmind.verification-hours:24}") int verificationHours,
+                             @Value("${stockmind.mail.logo-url:}") String logoUrl,
                              ObjectMapper mapper) {
         if (apiKey == null || apiKey.isBlank()) {
             throw new IllegalStateException("STOCKMIND_EMAIL_PROVIDER=resend requiere RESEND_API_KEY");
@@ -67,6 +71,10 @@ public class ResendEmailSender implements EmailSender {
         this.endpoint = URI.create(baseUrl.replaceAll("/+$", "") + "/emails");
         this.timeout = Duration.ofSeconds(Math.max(1, timeoutSeconds));
         this.verificationHours = verificationHours;
+        this.logoUrl = EmailTemplates.safeLogoUrl(logoUrl);
+        if (logoUrl != null && !logoUrl.isBlank() && this.logoUrl == null) {
+            log.warn("EMAIL_LOGO_URL no es una dirección http(s) válida: los correos llevarán el nombre en texto");
+        }
         this.mapper = mapper;
         this.http = HttpClient.newBuilder().connectTimeout(this.timeout).build();
         log.info("Correo: Resend activo (remitente {})", this.from);
@@ -74,17 +82,17 @@ public class ResendEmailSender implements EmailSender {
 
     @Override
     public void sendVerificationEmail(String toEmail, String recipientName, String verifyUrl) {
-        send(toEmail, EmailTemplates.verification(recipientName, verifyUrl, verificationHours), "verificación");
+        send(toEmail, EmailTemplates.verification(recipientName, verifyUrl, verificationHours, logoUrl), "verificación");
     }
 
     @Override
     public void sendBillingNotice(String toEmail, String recipientName, BillingNotice kind, int daysLeft, String billingUrl) {
-        send(toEmail, EmailTemplates.billing(kind, recipientName, daysLeft, billingUrl), "aviso " + kind);
+        send(toEmail, EmailTemplates.billing(kind, recipientName, daysLeft, billingUrl, logoUrl), "aviso " + kind);
     }
 
     @Override
     public void sendTestEmail(String toEmail) {
-        send(toEmail, EmailTemplates.test(), "prueba");
+        send(toEmail, EmailTemplates.test(logoUrl), "prueba");
     }
 
     @Override

@@ -45,6 +45,7 @@ services:
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM: ${EMAIL_FROM:-}
       EMAIL_REPLY_TO: ${EMAIL_REPLY_TO:-}
+      EMAIL_LOGO_URL: ${EMAIL_LOGO_URL:-}
       # Pasarela de pagos: vacío = pagos desactivados; 'simulated' solo en desarrollo (ver override)
       STOCKMIND_PAYMENTS_PROVIDER: ${STOCKMIND_PAYMENTS_PROVIDER:-}
     depends_on:

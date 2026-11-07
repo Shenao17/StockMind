@@ -59,8 +59,10 @@ class ResendEmailSenderTest {
         server.stop(0);
     }
 
+    String logo = "";
+
     private ResendEmailSender sender(String key, String from, String replyTo, int timeoutSeconds) {
-        return new ResendEmailSender(key, from, replyTo, "http://127.0.0.1:" + server.getAddress().getPort() + "/", timeoutSeconds, 24, mapper);
+        return new ResendEmailSender(key, from, replyTo, "http://127.0.0.1:" + server.getAddress().getPort() + "/", timeoutSeconds, 24, logo, mapper);
     }
 
     private ResendEmailSender sender() {
@@ -129,6 +131,37 @@ class ResendEmailSenderTest {
         assertTrue(html.contains("token=a&amp;b=&lt;x&gt;"));
     }
 
+    @Test
+    @DisplayName("Con EMAIL_LOGO_URL el encabezado lleva el logo (con texto alternativo); sin ella queda el nombre en texto")
+    void logoInHeader() {
+        sender().sendTestEmail("a@x.com");
+        String sinLogo = calls.get(0).body().get("html").asText();
+        assertFalse(sinLogo.contains("<img"));
+        assertTrue(sinLogo.contains(">StockMind</span>"));
+
+        logo = "https://app.stockmind.test/brand/logo-color.png";
+        sender().sendVerificationEmail("a@x.com", "Ana", "https://app.test/v?token=a");
+        String html = calls.get(1).body().get("html").asText();
+        assertTrue(html.contains("<img src=\"https://app.stockmind.test/brand/logo-color.png\" alt=\"StockMind\""));
+        assertTrue(html.contains("linear-gradient(90deg,#3978F6,#42D9E8,#8065F5)"));
+    }
+
+    @Test
+    @DisplayName("Una dirección de logo que no sea http(s) (o con comillas o etiquetas) se ignora: no se inyecta nada")
+    void unsafeLogoIgnored() {
+        for (String bad : new String[]{"javascript:alert(1)", "data:image/png;base64,AAAA", "ftp://x.com/l.png",
+                "https://x.com/a\" onerror=\"alert(1)", "https://x.com/<script>", "no es una url"}) {
+            logo = bad;
+            calls.clear();
+            sender().sendTestEmail("a@x.com");
+            String html = calls.get(0).body().get("html").asText();
+            assertFalse(html.contains("<img"), "no debe usar " + bad);
+            assertFalse(html.contains("onerror"));
+        }
+        assertEquals("https://x.com/l.png", EmailTemplates.safeLogoUrl("  https://x.com/l.png "));
+        assertNull(EmailTemplates.safeLogoUrl(null));
+    }
+
     // ───────────────────────── Errores ─────────────────────────
 
     @Test
@@ -167,7 +200,7 @@ class ResendEmailSenderTest {
         int port = server.getAddress().getPort();
         server.stop(0);
         EmailDeliveryException e = assertThrows(EmailDeliveryException.class,
-            () -> new ResendEmailSender(KEY, FROM, "", "http://127.0.0.1:" + port, 2, 24, mapper).sendTestEmail("a@x.com"));
+            () -> new ResendEmailSender(KEY, FROM, "", "http://127.0.0.1:" + port, 2, 24, "", mapper).sendTestEmail("a@x.com"));
         assertFalse(e.getMessage().contains(KEY));
     }
 

@@ -43,6 +43,7 @@ stockmind:
     provider: ${STOCKMIND_EMAIL_PROVIDER:}
     from: ${EMAIL_FROM:}              # "StockMind <no-responder@tu-dominio.com>" (dominio verificado en Resend)
     reply-to: ${EMAIL_REPLY_TO:}      # opcional
+    logo-url: ${EMAIL_LOGO_URL:}      # opcional: URL pública (https) del PNG del logo para el encabezado de los correos
     timeout-seconds: 10
     resend:
       api-key: ${RESEND_API_KEY:}
