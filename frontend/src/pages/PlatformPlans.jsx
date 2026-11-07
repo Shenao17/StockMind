@@ -4,6 +4,14 @@ import Modal from '../components/ui/Modal';
 import PinConfirm from '../components/PinConfirm';
 
 const FEATURES = { REPORTS: 'Reportes', PREDICTIONS: 'Predicciones', EXPORT: 'Exportar', AI_ASSISTANT: 'Asistente IA', API: 'API' };
+// Descripción y estado de cada función: no se debe prometer lo que aún no existe
+const FEATURE_INFO = {
+  REPORTS: { desc: 'Ventas por periodo y productos más vendidos', ready: true },
+  PREDICTIONS: { desc: 'Demanda esperada y recomendaciones de compra', ready: true },
+  EXPORT: { desc: 'Descargar datos en Excel o PDF', ready: false },
+  AI_ASSISTANT: { desc: 'Asistente con inteligencia artificial', ready: false },
+  API: { desc: 'Integraciones con otros sistemas', ready: false },
+};
 const NUM = ['priceMonthly', 'priceYearly', 'maxUsers', 'maxProducts', 'extraUserPrice'];
 
 /**
@@ -69,6 +77,21 @@ export default function PlatformPlans({ showToast }) {
     }
   }
 
+  // Ayuda en vivo: cuánto ahorra quien paga el año completo frente a 12 meses
+  let savings = null;
+  if (editing) {
+    const m = Number(editing.priceMonthly);
+    const y = Number(editing.priceYearly);
+    if (m > 0 && y > 0) {
+      if (y > m * 12) savings = { cls: 'warn', text: 'El anual no puede superar 12 meses del mensual.' };
+      else {
+        const saved = m * 12 - y;
+        const months = Math.round((saved / m) * 10) / 10;
+        savings = { cls: saved > 0 ? 'ok' : '', text: saved > 0 ? `Ahorro de ${fmt(saved)} al año (≈ ${months} meses gratis)` : 'Sin descuento frente a pagar 12 meses.' };
+      }
+    }
+  }
+
   if (loading) return <div className="loading-state"><div className="spinner" /> Cargando...</div>;
 
   return (
@@ -97,32 +120,66 @@ export default function PlatformPlans({ showToast }) {
         </table>
       </div>
 
-      <Modal open={!!editing && !pinFor} onClose={() => setEditing(null)} title={editing ? `Editar plan ${editing.code}` : ''}
+      <Modal open={!!editing && !pinFor} size="wide" onClose={() => setEditing(null)} title={editing ? `Editar plan ${editing.name || editing.code}` : ''}
         footer={<><button className="btn btn-ghost" onClick={() => setEditing(null)}>Cancelar</button><button className="btn btn-primary" onClick={review}>Continuar</button></>}>
         {editing && (
           <>
             {error && <div className="login-error visible"><span className="login-error-icon">!</span><span>{error}</span></div>}
             {editing.subscribers > 0 && (
-              <p style={{ fontSize: '.8rem', color: 'var(--text-muted)' }}>
-                {editing.subscribers} empresa(s) usan este plan: los límites y funciones nuevos les aplican de inmediato; el precio, solo a los cobros nuevos.
-              </p>
+              <div className="notice">
+                <strong>{editing.subscribers} empresa(s) usan este plan.</strong> Los límites y las funciones nuevos les aplican de inmediato;
+                el precio nuevo solo a los cobros que se generen desde ahora.
+              </div>
             )}
-            <div className="form-group"><label htmlFor="pl-name">Nombre</label><input id="pl-name" value={editing.name} onChange={set('name')} /></div>
-            <div className="form-group"><label htmlFor="pl-m">Precio mensual (sin IVA)</label><input id="pl-m" type="number" value={editing.priceMonthly} onChange={set('priceMonthly')} /></div>
-            <div className="form-group"><label htmlFor="pl-y">Precio anual (sin IVA)</label><input id="pl-y" type="number" value={editing.priceYearly} onChange={set('priceYearly')} /></div>
-            <div className="form-group"><label htmlFor="pl-u">Usuarios incluidos</label><input id="pl-u" type="number" value={editing.maxUsers} onChange={set('maxUsers')} /></div>
-            <div className="form-group"><label htmlFor="pl-p">Productos activos</label><input id="pl-p" type="number" value={editing.maxProducts} onChange={set('maxProducts')} /></div>
-            <div className="form-group"><label htmlFor="pl-x">Usuario adicional (sin IVA/mes)</label><input id="pl-x" type="number" value={editing.extraUserPrice} onChange={set('extraUserPrice')} /></div>
-            <fieldset style={{ border: 0, padding: 0, margin: '0 0 12px' }}>
-              <legend style={{ fontSize: '.85rem', marginBottom: 6 }}>Funciones incluidas</legend>
+
+            <div className="form-group"><label htmlFor="pl-name">Nombre del plan</label>
+              <input id="pl-name" value={editing.name} onChange={set('name')} /></div>
+
+            <div className="form-section"><h4>Precios</h4><p>En pesos colombianos, sin IVA (el IVA se suma al cobrar).</p></div>
+            <div className="form-row">
+              <div className="form-group"><label htmlFor="pl-m">Mensual</label>
+                <input id="pl-m" type="number" min="0" value={editing.priceMonthly} onChange={set('priceMonthly')} /></div>
+              <div className="form-group"><label htmlFor="pl-y">Anual</label>
+                <input id="pl-y" type="number" min="0" value={editing.priceYearly} onChange={set('priceYearly')} />
+                {savings && <p className={`field-hint ${savings.cls}`}>{savings.text}</p>}</div>
+            </div>
+
+            <div className="form-section"><h4>Límites</h4><p>Reducir un límite no borra nada: solo impide agregar más.</p></div>
+            <div className="form-row cols-3">
+              <div className="form-group"><label htmlFor="pl-u">Usuarios incluidos</label>
+                <input id="pl-u" type="number" min="1" value={editing.maxUsers} onChange={set('maxUsers')} /></div>
+              <div className="form-group"><label htmlFor="pl-p">Productos activos</label>
+                <input id="pl-p" type="number" min="1" value={editing.maxProducts} onChange={set('maxProducts')} /></div>
+              <div className="form-group"><label htmlFor="pl-x">Usuario adicional</label>
+                <input id="pl-x" type="number" min="0" value={editing.extraUserPrice} onChange={set('extraUserPrice')} />
+                <p className="field-hint">precio por mes, sin IVA</p></div>
+            </div>
+
+            <div className="form-section"><h4>Funciones incluidas</h4><p>Marca lo que recibe quien contrata este plan.</p></div>
+            <div className="check-grid" role="group" aria-label="Funciones incluidas">
               {Object.entries(FEATURES).map(([k, label]) => (
-                <label key={k} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <input type="checkbox" checked={editing.features.includes(k)} onChange={() => toggleFeature(k)} /> {label}
+                <label key={k} className="check-row">
+                  <input type="checkbox" aria-label={label} checked={editing.features.includes(k)} onChange={() => toggleFeature(k)} />
+                  <span className="check-text">
+                    <span className="check-title">{label}</span>
+                    <span className="check-desc">{FEATURE_INFO[k].desc}</span>
+                  </span>
+                  {!FEATURE_INFO[k].ready && <span className="check-tag">Próximamente</span>}
                 </label>
               ))}
-            </fieldset>
-            <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <input type="checkbox" checked={editing.active} onChange={(e) => setEditing((p) => ({ ...p, active: e.target.checked }))} /> Activo (visible para contratar)
+            </div>
+            {editing.features.some((f) => !FEATURE_INFO[f].ready) && (
+              <p className="field-hint warn">Algunas funciones marcadas aún no están construidas: quien contrate el plan no las tendrá hasta que existan.</p>
+            )}
+
+            <div className="form-section"><h4>Disponibilidad</h4></div>
+            <label className="check-row">
+              <input type="checkbox" className="switch" aria-label="Activo" checked={editing.active}
+                onChange={(e) => setEditing((p) => ({ ...p, active: e.target.checked }))} />
+              <span className="check-text">
+                <span className="check-title">{editing.active ? 'Plan activo' : 'Plan inactivo'}</span>
+                <span className="check-desc">{editing.active ? 'Se puede contratar desde la web y el panel.' : 'No se muestra para contratar; las empresas que ya lo tienen lo conservan.'}</span>
+              </span>
             </label>
           </>
         )}

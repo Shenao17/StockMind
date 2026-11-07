@@ -80,8 +80,12 @@ export default function RequestModal({ open, org, initialType = 'SUSPEND', onClo
         </>
       )}
       {type === 'CHANGE_PLAN' && (
-        <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
-          <input type="checkbox" checked={complimentary} onChange={(e) => setComplimentary(e.target.checked)} /> Cortesía (sin cobro)
+        <label className="check-row" style={{ marginBottom: 14 }}>
+          <input type="checkbox" aria-label="Cortesía" checked={complimentary} onChange={(e) => setComplimentary(e.target.checked)} />
+          <span className="check-text">
+            <span className="check-title">Cortesía</span>
+            <span className="check-desc">La empresa usa el plan sin cobro.</span>
+          </span>
         </label>
       )}
       {type === 'EXTEND_TRIAL' && (

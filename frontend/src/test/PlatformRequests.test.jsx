@@ -156,13 +156,39 @@ describe('PlatformPlans', () => {
     wrap(<PlatformPlans />, OWNER);
     fireEvent.click(await screen.findByRole('button', { name: /editar/i }));
     expect(await screen.findByText(/4 empresa\(s\) usan este plan/i)).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText(/precio mensual/i), { target: { value: '129900' } });
+    fireEvent.change(screen.getByLabelText('Mensual'), { target: { value: '129900' } });
     fireEvent.click(screen.getByLabelText('Exportar'));                       // agrega una función
     fireEvent.click(screen.getByRole('button', { name: /continuar/i }));
     fireEvent.change(await screen.findByLabelText('PIN'), { target: { value: '482915' } });
     fireEvent.click(screen.getByRole('button', { name: /^confirmar$/i }));
     await waitFor(() => expect(upd).toHaveBeenCalledWith('PRO', { name: 'Pro', active: true, features: ['REPORTS', 'PREDICTIONS', 'EXPORT'],
       pin: '482915', priceMonthly: 129900, priceYearly: 1199000, maxUsers: 5, maxProducts: 3000, extraUserPrice: 15000 }));
+  });
+
+  it('ayuda a decidir: muestra el ahorro del plan anual, avisa si supera 12 meses y marca lo que aún no existe', async () => {
+    vi.spyOn(apiModule.API.platform, 'plans').mockResolvedValue([plan()]);
+    wrap(<PlatformPlans />, OWNER);
+    fireEvent.click(await screen.findByRole('button', { name: /editar/i }));
+    expect(await screen.findByText(/ahorro de \$ 239\.800 al año \(≈ 2 meses gratis\)/i)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Anual'), { target: { value: '1500000' } });
+    expect(screen.getByText(/no puede superar 12 meses/i)).toBeInTheDocument();
+
+    // Exportar, Asistente IA y API aún no están construidos: se avisa al marcarlos
+    expect(screen.queryByText(/aún no están construidas/i)).toBeNull();
+    fireEvent.click(screen.getByLabelText('Asistente IA'));
+    expect(screen.getByText(/aún no están construidas/i)).toBeInTheDocument();
+    expect(screen.getAllByText('Próximamente')).toHaveLength(3);
+  });
+
+  it('el interruptor de activo cambia el texto que explica qué pasa', async () => {
+    vi.spyOn(apiModule.API.platform, 'plans').mockResolvedValue([plan()]);
+    wrap(<PlatformPlans />, OWNER);
+    fireEvent.click(await screen.findByRole('button', { name: /editar/i }));
+    expect(await screen.findByText('Plan activo')).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('Activo'));
+    expect(screen.getByText('Plan inactivo')).toBeInTheDocument();
+    expect(screen.getByText(/las empresas que ya lo tienen lo conservan/i)).toBeInTheDocument();
   });
 
   it('un error de validación del servidor vuelve al formulario para corregir', async () => {
@@ -174,7 +200,7 @@ describe('PlatformPlans', () => {
     fireEvent.change(await screen.findByLabelText('PIN'), { target: { value: '482915' } });
     fireEvent.click(screen.getByRole('button', { name: /^confirmar$/i }));
     expect(await screen.findByText(/no puede superar 12 meses/i)).toBeInTheDocument();
-    expect(screen.getByLabelText('Nombre')).toBeInTheDocument();
+    expect(screen.getByLabelText('Nombre del plan')).toBeInTheDocument();
   });
 });
 
