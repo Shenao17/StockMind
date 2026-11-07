@@ -54,7 +54,7 @@ def health():
     return jsonify({
         "status":   "OK" if db_ok else "DEGRADED",
         "service":  "StockMind Analytics Microservice",
-        "version":  "1.2.0",
+        "version":  "1.4.0",
         "database": "connected" if db_ok else "unreachable"
     }), 200 if db_ok else 503
 

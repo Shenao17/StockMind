@@ -37,7 +37,7 @@ La v1.4.0 convierte StockMind de una aplicación de un solo negocio en una plata
 - **MongoDB** (solo guardaba logs que nadie leía). Los logs pasan a la salida estándar en JSON.
 - `morgan` (reemplazado por `pino-http`).
 
-> Los números de versión internos de cada servicio (gateway 1.0.0, analytics 1.2.0, frontend 0.0.0) no se han alineado con la versión del producto. Es un pendiente menor.
+> **Versión:** todos los servicios llevan el mismo número (**1.4.0**): `frontend/package.json` (única fuente de la versión que muestra el login, vía `__APP_VERSION__` en `vite.config.js`), `gateway/package.json`, `backend/pom.xml` y `/health` de analytics. Al subir de versión se cambian esos cuatro lugares, más los pies de los manuales y el README.
 
 ---
 

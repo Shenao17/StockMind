@@ -14,14 +14,28 @@
 **Plataforma multiempresa (SaaS)**
 - Tabla `organizations` y aislamiento automático de los datos por empresa (`organization_id` + `@TenantId` de Hibernate). El SKU, la categoría y el nombre de usuario son únicos por empresa.
 - Inicio de sesión por **correo electrónico**; el token lleva la empresa.
-- Nuevo rol `PLATFORM_ADMIN` (dueño de la plataforma) y operaciones `/api/platform/*`.
+- Equipo de plataforma con roles (`PLATFORM_OWNER`, `PLATFORM_BILLING`, `PLATFORM_SUPPORT`, `PLATFORM_VIEWER`) y permisos por función; panel `/platform`.
 - Registro de empresas: **autoregistro** con verificación de correo, CAPTCHA, honeypot y **14 días de prueba gratis**, y **alta desde el panel de plataforma**.
 - Servicio de analítica aislado por empresa y autenticado con clave interna gateway ↔ analytics.
 
+**Planes, suscripciones y cobros**
+- Planes (Starter, Pro, Business) con precios + IVA, límites y funciones por plan; suscripción con prueba, gracia de solo lectura, suspensión y cancelación; avisos por correo a 5 y 1 día del vencimiento.
+- Pagos con pasarela **simulada** (la real, Wompi, está pendiente), enlaces de pago y pago manual.
+
+**Panel de plataforma**
+- Resumen con métricas (estados, pruebas por vencer, ingresos, MRR), ficha de cada empresa (datos, uso frente a límites, usuarios, cobros, línea de tiempo), cobros y auditoría con filtros.
+- Equipo de plataforma con confirmación por PIN; **solicitudes con aprobación del dueño** para acciones sensibles; editor de planes y precios.
+
 **Seguridad e integridad**
+- **Verificación en dos pasos** (app autenticadora y códigos de respaldo): obligatoria para el equipo de plataforma y opcional (o exigible por el administrador) para las empresas.
 - Secretos fuera del repositorio (`.env`), puertos internos cerrados y usuario de aplicación de MySQL sin permisos de administrador.
 - Roles aplicados también en el backend; ventas con precio fijado por el servidor y bloqueo de stock; validación de entradas con DTOs; errores sin detalles internos.
 - Gateway con Helmet, límites de cuerpo, timeouts y logging estructurado (JSON).
+
+**Correo, marca y diseño adaptable**
+- Correo transaccional con **Resend** (verificación de cuenta y avisos de la suscripción).
+- Identidad de marca: logo vectorial, favicon, ícono de la app y paleta; componente `BrandLogo`.
+- Interfaz **responsive**: menú compacto en tablet, cajón en celular, tablas como tarjetas y diálogos como hoja inferior.
 
 **Calidad e infraestructura**
 - Migraciones con **Flyway**; Hibernate solo valida el esquema.

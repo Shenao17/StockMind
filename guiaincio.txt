@@ -1,150 +1,264 @@
 ===============================================
-  STOCKMIND — GUÍA DE INICIO CON DOCKER
+  STOCKMIND v1.4.0 — GUÍA DE INICIO CON DOCKER
 ===============================================
 
-  ⚠ LEE TODO ESTE DOCUMENTO ANTES DE EMPEZAR ⚠
-  Sigue los pasos en orden y con atención.
-  Saltarse cualquier paso puede hacer que el
-  proyecto no arranque o no sea accesible.
-  Si algo falla, revisa primero aquí la solución.
+  LEE ESTE DOCUMENTO ANTES DE EMPEZAR.
+  Sigue los pasos en orden. El paso 2 (el archivo .env)
+  es obligatorio: sin él, el proyecto NO arranca.
+  Si algo falla, mira al final: "SI ALGO FALLA".
 
 ===============================================
 
 ¿POR QUÉ DOCKER?
 ----------------
-StockMind usa Docker para garantizar compatibilidad entre
-distintos equipos y sistemas operativos. Así no importa si
-tienes Windows, Mac o Linux — el proyecto corre igual en
-todos lados sin necesidad de instalar Java, Python, Node.js
-o MySQL manualmente en tu máquina.
+StockMind usa Docker para que funcione igual en Windows,
+Mac y Linux, sin instalar Java, Python, Node.js ni MySQL
+en tu máquina.
 
 PRE-REQUISITOS
 --------------
-- Docker Desktop corriendo
-- Puertos disponibles: 5173, 3000, 8080, 8000, 3306
+- Docker Desktop (o Docker Engine + Compose v2) corriendo.
+- Git.
+- Puertos libres en tu máquina:
+    5173  (frontend)
+    3000  (gateway / API)
+    3306  (MySQL, solo accesible desde tu propia máquina)
+  El backend (8080) y analytics (8000) NO se publican:
+  solo hablan entre contenedores.
+- Unos 4 GB de espacio libre para las imágenes.
 
-- Credenciales de acceso a la app:
-    usuario: admin  |  contraseña: admin123
-    
 -----------------------------------------------
-PASO 1 — Posicionarse en la raíz del proyecto
+PASO 1 — Descargar el proyecto
 -----------------------------------------------
+git clone https://github.com/Shenao17/StockMind.git
 cd StockMind
 
 -----------------------------------------------
-PASO 2 — Obtener y configurar tu GROQ API KEY
+PASO 2 — Crear el archivo .env  (OBLIGATORIO)
 -----------------------------------------------
-StockMind usa Groq para las funciones de IA/analytics.
-Cada quien debe crear su propia key gratuita:
+El .env guarda las claves y NO se sube a Git.
+Parte de la plantilla:
 
-  1. Ir a: https://console.groq.com
-  2. Crear cuenta (es gratis)
-  3. Ir a "API Keys" → "Create API Key"
-  4. Copiar la key generada
+  Linux / Mac:   cp .env.example .env
+  Windows:       copy .env.example .env
 
-Luego en docker-compose.yml, reemplazar en el servicio "gateway":
+Abre .env y reemplaza TODOS los "cambia_esto":
 
-  GROQ_API_KEY: TU_GROQ_API_KEY_AQUI
-                ↑ pegar aquí tu key
+  MYSQL_ROOT_PASSWORD   una contraseña cualquiera (desarrollo)
+  MYSQL_USER            stockmind_app   (puede quedarse así)
+  MYSQL_PASSWORD        otra contraseña cualquiera
+  JWT_SECRET            mínimo 32 caracteres aleatorios
+  INTERNAL_API_KEY      mínimo 32 caracteres aleatorios
 
-  ⚠ NO compartas ni subas tu key a Git.
+Para generar un valor aleatorio fuerte:
+
+  openssl rand -hex 32
+
+(En Windows sin openssl: escribe 40 caracteres cualquiera
+mezclando letras y números; en desarrollo basta.)
+
+Variables que puedes dejar como vienen en desarrollo:
+
+  NODE_ENV=development
+  CAPTCHA_PROVIDER=none         (sin CAPTCHA, SOLO desarrollo)
+  AGENT_ENABLED=false           (el asistente IA está apagado)
+  GROQ_API_KEY=                 (vacío; no hace falta)
+  STOCKMIND_EMAIL_PROVIDER=     (vacío = sin correo real)
+
+  IMPORTANTE: la clave de Groq YA NO se pone en
+  docker-compose.yml. Si algún día reactivas el asistente,
+  va en el .env (GROQ_API_KEY), nunca en un archivo versionado.
 
 -----------------------------------------------
 PASO 3 — Levantar todos los servicios
 -----------------------------------------------
-docker compose up --build
+Para desarrollar (recomendado; recarga automática):
 
-  Servicios y puertos:
-    • mysql       (stockmind_db)        → 3306
-    • backend     (stockmind_backend)   → 8080  [Spring Boot]
-    • analytics   (stockmind_analytics) → 8000  [Python Flask]
-    • gateway     (stockmind_gateway)   → 3000  [Node.js]
-    • frontend    (stockmind_frontend)  → 5173  [React/Vite]
+  docker compose up --build --watch
 
-  NOTA: MySQL tiene healthcheck. Spring Boot y Flask
-  esperan a que MySQL esté listo antes de arrancar.
-  Primera vez puede tardar 1-2 min.
+Solo ejecutar (sin recarga automática):
+
+  docker compose up --build
+
+  Servicios:
+    • mysql       (stockmind_db)         MySQL 8
+    • backend     (stockmind_backend)    Spring Boot (interno)
+    • analytics   (stockmind_analytics)  Flask + scikit-learn (interno)
+    • gateway     (stockmind_gateway)    Node.js  → :3000
+    • frontend    (stockmind_frontend)   React/Vite → :5173
+
+  Orden de arranque (automático): mysql → backend +
+  analytics → gateway → frontend.
+  La primera vez tarda entre 3 y 6 minutos (descarga e
+  instala dependencias). Las siguientes, mucho menos.
+
+  Con --watch, al guardar un archivo:
+    frontend   → el navegador se recarga solo
+    gateway / analytics → el servicio se reinicia en segundos
+    backend    → se reconstruye (tarda un poco más)
 
 -----------------------------------------------
-PASO 4 — Verificar que todo esté OK
+PASO 4 — Verificar que todo esté en marcha
 -----------------------------------------------
-docker compose ps
+  docker compose ps
 
-  Todos deben aparecer en estado "running".
-  Si "backend" o "analytics" aparecen "restarting",
-  espera un momento — están esperando a MySQL.
+Todos deben aparecer "running" (mysql, "healthy").
+Si "backend" aparece "restarting", espera: está esperando
+a que MySQL termine de arrancar. Comprueba también:
+
+  http://localhost:3000/health     →  {"status":"OK", ...}
 
 -----------------------------------------------
-PASO 5 — Abrir el frontend desde Docker Desktop
+PASO 5 — Abrir la aplicación
 -----------------------------------------------
-  Opción A — desde Docker Desktop (recomendada):
-    1. Abrir Docker Desktop
-    2. Ir a la sección "Containers"
-    3. Buscar el contenedor "stockmind_frontend"
-    4. Clic en el enlace del puerto 5173 que aparece
-       junto al contenedor → abre el navegador solo
+  Navegador:  http://localhost:5173
+  (o desde Docker Desktop → Containers → stockmind_frontend
+   → clic en el puerto 5173)
 
-  Opción B — manual:
-    Abrir el navegador y entrar a: http://localhost:5173
+La app se adapta a pantallas de escritorio, tablet y
+celular. Para probarla en el celular, entra desde la
+misma red WiFi a  http://IP-DE-TU-PC:5173  (puede que
+tengas que abrir el puerto 5173 en el firewall, y poner
+FRONTEND_URL con esa dirección en el .env).
 
-  Otros servicios (solo si necesitas debug):
-    Gateway:    http://localhost:3000
-    Backend:    http://localhost:8080
-    Analytics:  http://localhost:8000
+-----------------------------------------------
+PASO 6 — Iniciar sesión (datos de ejemplo)
+-----------------------------------------------
+En desarrollo, si la base está vacía, el backend carga
+datos de ejemplo (1 empresa, 5 categorías, 20 productos,
+6 ventas). El inicio de sesión es con CORREO:
+
+    Administrador:  admin@stockmind.com      /  admin123
+    Vendedor:       vendedor1@stockmind.com  /  admin123
+
+  (Ya no se entra con "admin" a secas: es el correo.)
+
+-----------------------------------------------
+PASO 7 — Panel de la plataforma (el dueño de StockMind)
+-----------------------------------------------
+El panel /platform es para quien opera StockMind (ver las
+empresas clientes, planes, cobros, solicitudes y equipo).
+NO usa las cuentas de ejemplo: el primer dueño se crea
+desde el .env, ANTES de arrancar el backend:
+
+    PLATFORM_ADMIN_EMAIL=tucorreo@dominio.com
+    PLATFORM_ADMIN_PASSWORD=UnaClave1234   (8-72 caracteres, letra y número)
+    PLATFORM_ADMIN_NAME=Tu Nombre
+    STOCKMIND_MFA_KEY=una-frase-larga-y-aleatoria-de-40-caracteres
+
+Reinicia el backend:  docker compose up -d --force-recreate backend
+
+Luego entra en http://localhost:5173 con ese correo. Pide
+configurar la verificación en dos pasos:
+  1. Escanea el QR con Google/Microsoft Authenticator o Aegis.
+  2. Escribe el código de 6 dígitos y elige un PIN (6-10 dígitos).
+  3. Guarda los 8 códigos de respaldo (se muestran UNA vez).
+Después de la primera vez, borra la contraseña del .env.
+
+-----------------------------------------------
+PASO 8 — Opcionales
+-----------------------------------------------
+• CORREO REAL (verificación de cuentas y avisos): Resend.
+  Variables STOCKMIND_EMAIL_PROVIDER=resend, RESEND_API_KEY,
+  EMAIL_FROM. Guía completa:  docs/CORREO.md
+  Sin esto, en desarrollo el enlace de verificación se
+  escribe en el log:  docker compose logs backend
+
+• PAGOS: en desarrollo la pasarela es SIMULADA (el enlace de
+  pago abre una página con un botón de prueba). La pasarela
+  real (Wompi) está pendiente de integrar.
+
+• PRUEBA GRATIS Y PLANES: una empresa nueva recibe 14 días de
+  prueba. Los precios y límites (borrador) se editan desde
+  el panel, pestaña "Planes".
 
 -----------------------------------------------
 COMANDOS ÚTILES
 -----------------------------------------------
-# Ver logs en tiempo real (todos los servicios)
+# Ver logs en tiempo real (todos)
 docker compose logs -f
 
-# Logs de un servicio específico
-docker compose logs -f backend
-docker compose logs -f analytics
-docker compose logs -f gateway
-docker compose logs -f frontend
-docker compose logs -f mysql
+# Logs de un servicio
+docker compose logs -f backend      (o gateway, analytics, frontend, mysql)
 
-# Parar todo (sin borrar datos)
+# Parar sin borrar datos
 docker compose stop
 
-# Parar y eliminar contenedores
+# Parar y eliminar contenedores (los DATOS se conservan)
 docker compose down
 
-# Parar, eliminar contenedores Y volumen de MySQL (reset DB)
+# Parar y BORRAR también la base de datos (empieza de cero)
 docker compose down -v
 
-# Reconstruir solo un servicio (ej: tras cambios en backend)
-docker compose up --build backend
+# Reconstruir un servicio tras cambios
+docker compose up -d --build backend
 
-# Reiniciar un servicio sin rebuild
+# Reiniciar un servicio sin reconstruir
 docker compose restart gateway
 
------------------------------------------------
-ORDEN DE ARRANQUE (automático vía depends_on)
------------------------------------------------
-mysql → backend + analytics → gateway → frontend
+# Ejecutar las pruebas
+docker compose exec gateway npm test
+docker compose exec frontend npx vitest run
+(backend: ver docs/manual-tecnico.md, sección 9)
 
 -----------------------------------------------
-NOTAS
+NOTAS IMPORTANTES
 -----------------------------------------------
-- La BD se inicializa automáticamente con:
-    database/schema.sql  (estructura)
-    database/seed.sql    (datos iniciales)
+- LA BASE DE DATOS la crea Flyway (migraciones en
+  backend/src/main/resources/db/migration). Ya no se usan
+  database/schema.sql ni database/seed.sql. Los datos de
+  ejemplo están en backend/src/main/resources/db/dev/seed.sql
+  y SOLO se cargan en desarrollo, si no hay ningún usuario.
 
-- Si borras el volumen (down -v), la BD se recrea
-  desde cero con esos archivos al próximo up.
+- OJO: "docker compose down -v" BORRA tus cuentas y datos.
+  Si la base queda con un solo usuario (por ejemplo, solo
+  el dueño de plataforma), los datos de ejemplo NO se
+  cargan solos: el cargador solo corre con la base vacía.
 
-- Credenciales MySQL (solo desarrollo local):
-    usuario: root  |  password: root  |  db: stockmind_db
+- MySQL desde tu máquina (cliente SQL): 127.0.0.1:3306 con el
+  MYSQL_USER / MYSQL_PASSWORD de tu .env (base stockmind_db).
+  En desarrollo no hay contraseñas fijas: las pones tú.
 
-- Credenciales de acceso a la app:
-    usuario: admin  |  contraseña: admin123
+- Los secretos (.env) NO se suben a Git. Cambia TODAS las
+  claves antes de publicar en un servidor real.
 
-  NOTA: El sistema de usuarios tuvo un problema durante
-  la migración de HTML a React que no alcanzó a corregirse.
-  Si el login falla, usar siempre estas credenciales por defecto.
+- start.bat (arranque sin Docker con XAMPP) está
+  DESACTUALIZADO: no crea el .env ni sigue el flujo actual.
+  Usa Docker.
 
-- JWT_SECRET está hardcodeado para dev. Cambiar en producción.
+-----------------------------------------------
+SI ALGO FALLA
+-----------------------------------------------
+• "Falta MYSQL_ROOT_PASSWORD en .env" (u otra variable)
+    → No existe el .env o le falta esa variable (paso 2).
 
-===============================================
+• Login: "Correo o contraseña incorrectos"
+    → Entra con el CORREO (admin@stockmind.com), no con "admin".
+    → Si borraste la base y el usuario de ejemplo no existe,
+      mira "NOTAS IMPORTANTES".
+
+• "Demasiados intentos fallidos"
+    → El límite es de 10 intentos fallidos por IP cada 15
+      minutos. Reinicia el gateway:  docker compose restart gateway
+
+• El backend se reinicia en bucle
+    → Mira el motivo:  docker compose logs backend
+      (suele ser una variable del .env mal escrita, o una
+      clave de correo/2FA incompleta).
+
+• El navegador muestra "No se puede conectar con el servidor"
+    → Comprueba http://localhost:3000/health y que
+      VITE_GATEWAY_URL / FRONTEND_URL del .env coincidan con
+      la dirección desde la que abres la app.
+
+• Los cambios del frontend no se ven
+    → Usa  docker compose up --build --watch  o reconstruye:
+      docker compose up -d --build frontend
+
+• El puerto 5173, 3000 o 3306 está ocupado
+    → Cierra el programa que lo usa (otra copia del proyecto,
+      un MySQL local) y vuelve a levantar.
+
+=====================================================
+  StockMind v1.4.0 — BlackLabs Dev
+=====================================================

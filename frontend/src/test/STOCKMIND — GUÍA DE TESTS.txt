@@ -121,5 +121,5 @@ Testea el hook de notificaciones usado en todas las páginas.
   ✓ Cada toast generado tiene un ID único
 
 ================================================================
-  StockMind v1.1.0 — Proyecto Académico
+  StockMind v1.4.0 — BlackLabs Dev
 ================================================================

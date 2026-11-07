@@ -151,3 +151,12 @@ describe('Login — equipo de plataforma', () => {
       expect.objectContaining({ role: 'PLATFORM_OWNER', fullName: 'Sebas', permissions: ['ORG_VIEW'] })));
   });
 });
+
+describe('Login — versión', () => {
+  it('muestra la versión de package.json (única fuente) y no una escrita a mano', () => {
+    renderLogin();
+    expect(screen.getByText(`v${__APP_VERSION__}`)).toBeInTheDocument();
+    expect(__APP_VERSION__).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(screen.queryByText('v1.3.1')).toBeNull();
+  });
+});

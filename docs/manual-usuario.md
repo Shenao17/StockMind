@@ -1,6 +1,6 @@
 # StockMind — Manual de Usuario
 
-**Versión:** 1.2.0  
+**Versión:** 1.4.0  
 **Audiencia:** Administradores y vendedores del sistema
 
 ---
@@ -251,7 +251,7 @@ En **Seguridad → Política de la empresa → Exigirla a todos**. Quien aún no
 
 ## 10. Agente IA *(experimental)*
 
-A partir de la versión 1.2.0, StockMind incluye un asistente de inteligencia artificial conversacional accesible desde cualquier módulo del sistema.
+Desde la versión 1.2.0, StockMind incluye un asistente de inteligencia artificial conversacional accesible desde cualquier módulo del sistema.
 
 
 ⚠ El agente IA se encuentra en fase experimental. Su comportamiento puede ser inestable y sus respuestas no siempre serán precisas. No comparta información sensible, confidencial o personal a través del chat. Las respuestas del agente son orientativas y no reemplazan el criterio del usuario ni la información oficial del sistema.
@@ -322,4 +322,4 @@ No en esta versión. El agente opera de forma independiente al backend del siste
 
 ---
 
-*StockMind v1.2.0 — Manual de Usuario — Proyecto Académico*
+*StockMind v1.4.0 — Manual de Usuario — BlackLabs Dev*

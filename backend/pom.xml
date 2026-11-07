@@ -15,7 +15,7 @@
 
     <groupId>com.stockmind</groupId>
     <artifactId>stockmind-backend</artifactId>
-    <version>1.0.0</version>
+    <version>1.4.0</version>
     <name>StockMind Backend</name>
     <description>Backend principal de StockMind — Gestión de inventario y ventas</description>
     <packaging>jar</packaging>

@@ -4,7 +4,7 @@
 > 
 > Objetivo: construir una aplicación de gestión de inventario moderna, funcional y escalable, manteniendo separadas las capas Frontend, Gateway y API Java Spring Boot.
 >
-> Estado actual: **v1.3.2**
+> Estado actual: **v1.4.0** (este documento es el historial de las versiones 1.0–1.3; los cambios de la 1.4.0 están en el README y en `manual-tecnico.md`)
 
 ---
 

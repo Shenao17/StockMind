@@ -1,6 +1,6 @@
 {
   "name": "stockmind-gateway",
-  "version": "1.0.0",
+  "version": "1.4.0",
   "description": "API Gateway para StockMind — Enrutamiento entre frontend, Java Backend y Python Analytics",
   "main": "server.js",
   "scripts": {

@@ -173,7 +173,7 @@ export default function Login() {
           <div className="login-footer">
             <span>StockMind</span>
             <span className="login-footer-separator">·</span>
-            <span>v1.3.1</span>
+            <span>v{__APP_VERSION__}</span>
             <span className="login-footer-separator">·</span>
             <span>AI Agent Experimental</span>
           </div>
