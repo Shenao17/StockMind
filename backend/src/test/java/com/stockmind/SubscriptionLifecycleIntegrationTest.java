@@ -44,6 +44,26 @@ class SubscriptionLifecycleIntegrationTest extends IntegrationTestBase {
     }
 
     @Test
+    @DisplayName("Si el proveedor de correo falla, el aviso NO se da por enviado y se reintenta en la siguiente corrida (una sola vez al recuperarse)")
+    void failedReminderIsRetried() {
+        edit(s -> s.setTrialEndsAt(LocalDateTime.now().plusDays(4).plusHours(3)));
+
+        emails.failing(true);
+        lifecycle.run(LocalDateTime.now());                        // el proveedor está caído: no se envía y no se marca
+        assertTrue(emails.notices().isEmpty());
+        assertNull(sub().getReminder5dSentAt(), "no debe marcarse como enviado");
+        assertEquals(Status.TRIAL, sub().getStatus(), "el ciclo siguió funcionando");
+
+        emails.failing(false);
+        lifecycle.run(LocalDateTime.now());                        // se recuperó: ahora sí
+        assertEquals(1, emails.notices().size());
+        assertNotNull(sub().getReminder5dSentAt());
+
+        lifecycle.run(LocalDateTime.now());                        // y no se repite
+        assertEquals(1, emails.notices().size());
+    }
+
+    @Test
     @DisplayName("Prueba lejos de terminar: no pasa nada")
     void nothingHappensEarly() {
         edit(s -> s.setTrialEndsAt(LocalDateTime.now().plusDays(10)));

@@ -20,8 +20,37 @@ public class CapturingEmailSender implements EmailSender {
     private final List<Sent> sent = new CopyOnWriteArrayList<>();
     private final List<Notice> notices = new CopyOnWriteArrayList<>();
 
+    /** Si es true, los envíos fallan (simula una caída del proveedor de correo). */
+    private volatile boolean failing;
+    private volatile String providerName = "test";
+    private final List<String> tests = new CopyOnWriteArrayList<>();
+
+    public void failing(boolean value) {
+        this.failing = value;
+    }
+
+    public void provider(String name) {
+        this.providerName = name;
+    }
+
+    public List<String> tests() {
+        return tests;
+    }
+
+    @Override
+    public void sendTestEmail(String toEmail) {
+        if (failing) throw new com.stockmind.mail.EmailDeliveryException("Resend rechazó el correo (prueba) con HTTP 403: dominio sin verificar");
+        tests.add(toEmail);
+    }
+
+    @Override
+    public String provider() {
+        return providerName;
+    }
+
     @Override
     public void sendBillingNotice(String toEmail, String recipientName, BillingNotice kind, int daysLeft, String billingUrl) {
+        if (failing) throw new com.stockmind.mail.EmailDeliveryException("proveedor caído");
         notices.add(new Notice(toEmail, kind, daysLeft));
     }
 
@@ -31,6 +60,7 @@ public class CapturingEmailSender implements EmailSender {
 
     @Override
     public void sendVerificationEmail(String toEmail, String recipientName, String verifyUrl) {
+        if (failing) throw new com.stockmind.mail.EmailDeliveryException("proveedor caído");
         sent.add(new Sent(toEmail, recipientName, verifyUrl));
     }
 
@@ -45,5 +75,8 @@ public class CapturingEmailSender implements EmailSender {
     public void clear() {
         sent.clear();
         notices.clear();
+        tests.clear();
+        failing = false;
+        providerName = "test";
     }
 }
