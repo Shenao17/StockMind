@@ -485,6 +485,8 @@ Flujo: `POST /billing/checkout` (ADMIN) crea un cobro `PENDING` con la referenci
 
 **Resumen, cobros y auditoría** (`PlatformStatsController`): `GET /platform/summary` (`ORG_VIEW`; el bloque `revenue` solo con `PAYMENT_VIEW`, si no llega `null`), `GET /platform/payments` (`PAYMENT_VIEW`; filtros `status` incluido `EXPIRED` derivado, `organizationId`, `search`, `from`/`to`, paginación con orden permitido, y totales de lo pagado sobre TODO el filtro vía consulta de criterios agregada) y `GET /platform/audit` (`AUDIT_VIEW`, todos los roles; filtros acción/actor/empresa/fechas). Fechas `yyyy-MM-dd` (400 si no). El umbral de pruebas por vencer (5 días) es el mismo del ciclo diario.
 
+**Correo:** `ResendEmailSender` (activo con `STOCKMIND_EMAIL_PROVIDER=resend`; falla el arranque si falta la llave o el remitente) envía por la API de Resend con tiempos de espera; las plantillas (`EmailTemplates`) escapan todo dato de usuario. Las fallas lanzan `EmailDeliveryException`: el registro las captura (se puede reenviar el enlace) y el ciclo diario **no marca el aviso como enviado**, así que lo reintenta. `POST /platform/email-test` (solo el dueño) envía un correo de prueba (502 con el motivo del proveedor si falla). Guía de configuración en [`CORREO.md`](CORREO.md).
+
 **Acciones y solicitudes:** las acciones sensibles viven en `PlatformActionService` (suspender, cancelar, extender prueba, cambiar plan, pago manual, corregir NIT; cada una audita). Las usan el Dueño directamente y la aprobación de una solicitud (`PlatformRequestService`, `PlatformRequestController` `/platform/requests`: crear `REQUEST_CREATE`, listar —el dueño todas, los demás las suyas—, `approve` con PIN y `reject` `REQUEST_REVIEW`, `cancel` solo quien pidió). Aprobar ejecuta la acción en la misma transacción: si falla, la solicitud sigue pendiente. Vencen a los 7 días (estado derivado `EXPIRED`). **Editor de planes** (`PlatformPlansController`, `PLANS_MANAGE` + PIN): `GET /platform/plans`, `PUT /platform/plans/{code}`; tras guardar se vacía la caché de permisos (`EntitlementService.evictAll`) y el gateway la suya.
 
 Una empresa sin verificar el correo no puede suspenderse ni reactivarse (409 `ORGANIZATION_PENDING`). **Toda acción queda en `audit_log`.**
@@ -550,6 +552,7 @@ El `.env` no se versiona; `.env.example` es la plantilla. Docker Compose lo lee 
 | `TRUST_PROXY` | no | Número de proxies delante del gateway |
 | `VITE_GATEWAY_URL` | no | URL del gateway para el frontend |
 | `PLATFORM_ADMIN_EMAIL`, `PLATFORM_ADMIN_PASSWORD`, `PLATFORM_ADMIN_NAME` | no | Primer dueño de la plataforma (vacías = no se crea; nombre opcional) |
+| `STOCKMIND_EMAIL_PROVIDER`, `RESEND_API_KEY`, `EMAIL_FROM`, `EMAIL_REPLY_TO` | prod: sí | Correo real con Resend (ver [`CORREO.md`](CORREO.md)); sin proveedor no se envía nada (en dev el enlace va al log). `EMAIL_REPLY_TO` es opcional |
 | `STOCKMIND_MFA_KEY` | prod: sí | Llave que cifra los secretos TOTP; vacía = derivada de `JWT_SECRET` (solo desarrollo) |
 | `CAPTCHA_PROVIDER`, `TURNSTILE_SECRET` | prod | Anti-bots del registro público |
 | `STOCKMIND_PAYMENTS_PROVIDER` | no | `simulated` = pasarela de pruebas (solo desarrollo); vacío = pagos desactivados (503) |
@@ -584,10 +587,10 @@ Reiniciar la base con los datos de ejemplo: `docker compose down -v` y volver a 
 
 | Servicio | Herramienta | Pruebas | Cómo ejecutar |
 |----------|-------------|--------:|---------------|
-| Backend | JUnit + MockMvc (H2 por defecto) | 193 | `mvn test` en `backend/` |
-| Backend contra **MySQL real** | idem, con `MYSQL_TEST_URL` | 193 | `MYSQL_TEST_URL=jdbc:mysql://host:3306/db MYSQL_TEST_USER=... MYSQL_TEST_PASSWORD=... mvn test` |
-| Gateway | `node:test` (sin dependencias) | 172 | `npm test` en `gateway/` |
-| Frontend | Vitest + Testing Library | 146 | `npx vitest run` en `frontend/` |
+| Backend | JUnit + MockMvc (H2 por defecto) | 206 | `mvn test` en `backend/` |
+| Backend contra **MySQL real** | idem, con `MYSQL_TEST_URL` | 206 | `MYSQL_TEST_URL=jdbc:mysql://host:3306/db MYSQL_TEST_USER=... MYSQL_TEST_PASSWORD=... mvn test` |
+| Gateway | `node:test` (sin dependencias) | 173 | `npm test` en `gateway/` |
+| Frontend | Vitest + Testing Library | 150 | `npx vitest run` en `frontend/` |
 | Analytics | pytest | 65 (+4 contra MySQL real) | `python -m pytest` en `analytics/` (con `ANALYTICS_MYSQL_HOST` corre también el aislamiento sobre MySQL) |
 
 Cobertura destacada: roles y tokens, validaciones, ventas con **concurrencia** (nunca se vende más del stock), **aislamiento entre empresas** (listados, por id, escrituras cruzadas, reportes, usuarios, analytics), login, registro y verificación, planes (solo lectura, bloqueo, funciones y límites), pagos idempotentes, ciclo diario, panel de plataforma, paginación y orden permitido, cabeceras de seguridad, CORS, límites y logs sin datos sensibles.
@@ -622,14 +625,14 @@ Cobertura destacada: roles y tokens, validaciones, ventas con **concurrencia** (
 │                PaymentService · PaymentProvider (+ Simulated) · BillingQueryService · AuditService
 ├── bootstrap/   PlatformAdminBootstrap                       # primer PLATFORM_OWNER desde el entorno
 ├── config/      JwtConfig · SecurityConfig (+ JwtAuthFilter) · SubscriptionAccessFilter · DevDataSeeder
-├── controller/  Auth · Billing · Category · Dashboard · Inventory · MfaSelf · Platform · PlatformDetail · PlatformPlans · PlatformRequest · PlatformStats · PlatformTeam · Product
+├── controller/  Auth · Billing · Category · Dashboard · Inventory · MfaSelf · Platform · PlatformDetail · PlatformEmail · PlatformPlans · PlatformRequest · PlatformStats · PlatformTeam · Product
 │                PublicBilling · PublicRegistration · Report · Sale · User
 ├── dto/         BillingDTO · InventoryDTO · LoginRequest/Response · PageResponse · PlatformDTO
 │                ProductDTO · RegistrationDTO · SaleDTO · TeamDTO · UserDTO · CompanyDetailDTO
 ├── exception/   ConflictException · PinException · ResourceNotFoundException · GlobalExceptionHandler
 ├── platform/    PlatformPermission · PlatformSecurityService · TotpService · MfaCrypto   # roles, 2FA y PIN
 │                PlatformActionService · PlatformRequestService                          # acciones y solicitudes
-├── mail/        EmailSender · DevEmailSender · NoopEmailSender
+├── mail/        EmailSender · ResendEmailSender · EmailTemplates · DevEmailSender · NoopEmailSender
 ├── model/       AuditLog · Category · EmailVerificationToken · InventoryMovement · Organization
 │                Payment · Plan · PlatformBackupCode · Product · Sale · SaleDetail · Subscription · User
 ├── repository/  *Repository (+ spec/ con los filtros combinables)
@@ -670,10 +673,10 @@ analytics/
 
 | Área | Pendiente |
 |------|-----------|
-| Planes | Pasarela de pagos real (Wompi u otra) con webhook firmado y facturación electrónica DIAN; **correo real** para los avisos de prueba y vencimiento; precios definitivos; bloqueo (ShedLock) del ciclo diario si hay varias réplicas |
-| Panel de plataforma | Métricas de actividad por empresa (uso, últimas conexiones); `EXPORT`, `AI_ASSISTANT` y `API` aún sin construir; pantalla de auditoría |
+| Planes | Pasarela de pagos real (Wompi u otra) con webhook firmado y facturación electrónica DIAN; precios definitivos; bloqueo (ShedLock) del ciclo diario si hay varias réplicas |
+| Panel de plataforma | Métricas de actividad por empresa (uso, últimas conexiones); `EXPORT`, `AI_ASSISTANT` y `API` aún sin construir; exportar cobros a CSV |
 | Cuentas | Recuperación y cambio de contraseña (incluido el cambio obligatorio tras un alta por teléfono) |
-| Correo | Proveedor real de correo (SMTP/SES/...) |
+| Correo | Configurar tu llave y dominio de Resend (ver `CORREO.md`); correos de recuperación de contraseña y de invitación |
 | Infraestructura | Imágenes de producción, HTTPS, backups, monitoreo, recogida de logs, zona horaria, usuario de migraciones |
 | Datos | Auditoría de negocio por empresa; paginación de las pantallas que aún cargan listas completas; `ADJUSTMENT` como conteo físico |
 | Analytics | Respuesta 503 cuando MySQL falla; evaluación del error del modelo (backtesting) |
