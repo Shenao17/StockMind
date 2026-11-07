@@ -145,3 +145,56 @@ describe('resumen, cobros y auditoría', () => {
         }
     });
 });
+
+describe('solicitudes y planes', () => {
+    const owner = () => tokenFor('PLATFORM_OWNER');
+    const support = () => tokenFor('PLATFORM_SUPPORT');
+
+    test('crear una solicitud reenvía solo los campos esperados', async () => {
+        javaCalls.length = 0;
+        await req('POST', '/requests', support(), { type: 'SUSPEND', organizationId: 3, reason: 'motivo largo', params: { days: 3 }, status: 'APPROVED', requestedBy: 'otro' });
+        assert.deepEqual(javaCalls[0], { method: 'POST', url: '/platform/requests',
+            body: { type: 'SUSPEND', organizationId: 3, reason: 'motivo largo', params: { days: 3 } } });
+    });
+
+    test('listar usa solo filtros conocidos; aprobar, rechazar y cancelar filtran el cuerpo y validan el id', async () => {
+        javaCalls.length = 0;
+        await req('GET', '/requests?status=PENDING&type=CANCEL&organizationId=3&page=0&hack=1', owner());
+        const u = new URL(javaCalls[0].url, 'http://x');
+        assert.equal(u.pathname, '/platform/requests');
+        assert.deepEqual(Object.fromEntries(u.searchParams), { status: 'PENDING', type: 'CANCEL', organizationId: '3', page: '0' });
+
+        javaCalls.length = 0;
+        await req('POST', '/requests/5/approve', owner(), { pin: '482915', note: 'ok', status: 'APPROVED' });
+        assert.deepEqual(javaCalls[0], { method: 'POST', url: '/platform/requests/5/approve', body: { pin: '482915', note: 'ok' } });
+        javaCalls.length = 0;
+        await req('POST', '/requests/5/reject', owner(), { note: 'no procede', pin: '1' });
+        assert.deepEqual(javaCalls[0].body, { note: 'no procede' });
+        javaCalls.length = 0;
+        await req('POST', '/requests/5/cancel', support(), { x: 1 });
+        assert.deepEqual(javaCalls[0], { method: 'POST', url: '/platform/requests/5/cancel', body: {} });
+
+        javaCalls.length = 0;
+        assert.equal((await req('POST', '/requests/abc/approve', owner(), {})).status, 400);
+        assert.equal((await req('POST', '/requests/5/delete', owner(), {})).status, 404);
+        assert.equal(javaCalls.length, 0);
+    });
+
+    test('el editor de planes filtra el cuerpo y valida el código', async () => {
+        javaCalls.length = 0;
+        await req('PUT', '/plans/PRO', owner(), { name: 'Pro', priceMonthly: 129900, priceYearly: 1299000, maxUsers: 6, maxProducts: 3000,
+            extraUserPrice: 15000, active: true, features: ['REPORTS'], pin: '482915', code: 'OTRO', sortOrder: 9 });
+        assert.deepEqual(javaCalls[0], { method: 'PUT', url: '/platform/plans/PRO', body: { name: 'Pro', priceMonthly: 129900,
+            priceYearly: 1299000, maxUsers: 6, maxProducts: 3000, extraUserPrice: 15000, active: true, features: ['REPORTS'], pin: '482915' } });
+        javaCalls.length = 0;
+        assert.equal((await req('PUT', '/plans/PR%20O;x', owner(), {})).status, 400);
+        assert.equal((await req('GET', '/plans', owner())).status, 200);
+        assert.equal(javaCalls.length, 1);
+    });
+
+    test('las empresas no entran', async () => {
+        for (const [m, p] of [['GET', '/requests'], ['POST', '/requests'], ['GET', '/plans'], ['PUT', '/plans/PRO']]) {
+            assert.equal((await req(m, p, tokenFor('ADMIN'), m === 'GET' ? undefined : {})).status, 403, `${m} ${p}`);
+        }
+    });
+});

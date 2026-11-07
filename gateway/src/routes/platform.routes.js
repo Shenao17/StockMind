@@ -15,6 +15,12 @@
  * GET  /api/platform/summary                           → métricas (ingresos solo con permiso de cobros)
  * GET  /api/platform/payments                          → cobros de todas las empresas (filtros y paginación)
  * GET  /api/platform/audit                             → auditoría (filtros y paginación)
+ * POST /api/platform/requests                         { type, organizationId, reason, params }
+ * GET  /api/platform/requests                          → solicitudes (el dueño ve todas; el resto, las suyas)
+ * POST /api/platform/requests/:id/approve              { pin, note }  (solo el dueño)
+ * POST /api/platform/requests/:id/reject               { note }       (solo el dueño)
+ * POST /api/platform/requests/:id/cancel               (quien la pidió)
+ * GET  /api/platform/plans · PUT /api/platform/plans/:code   → editor de planes (solo el dueño, con PIN)
  * GET  /api/platform/team                              → miembros (solo el dueño)
  * POST /api/platform/team                              { fullName, email, role, pin }
  * PATCH /api/platform/team/:id                         { role, active, fullName, pin }
@@ -52,7 +58,8 @@ const ACTIONS = {
 // Solo pasan los filtros conocidos; el resto de la query se descarta
 const QUERY = {
     payments: ['status', 'organizationId', 'search', 'from', 'to', 'page', 'size', 'sort', 'dir'],
-    audit: ['action', 'actor', 'organizationId', 'from', 'to', 'page', 'size', 'sort', 'dir']
+    audit: ['action', 'actor', 'organizationId', 'from', 'to', 'page', 'size', 'sort', 'dir'],
+    requests: ['status', 'type', 'organizationId', 'page', 'size', 'sort', 'dir']
 };
 
 router.get('/summary', ...guard, async (req, res, next) => {
@@ -62,7 +69,7 @@ router.get('/summary', ...guard, async (req, res, next) => {
     } catch (e) { next(e); }
 });
 
-for (const name of ['payments', 'audit']) {
+for (const name of ['payments', 'audit', 'requests']) {
     router.get(`/${name}`, ...guard, async (req, res, next) => {
         try {
             const r = await axios.get(`${JAVA}/platform/${name}`, { headers: authHeader(req), params: pick(req.query, QUERY[name]) });
@@ -127,6 +134,51 @@ router.patch('/organizations/:id/tax-id', ...guard, async (req, res, next) => {
             pick(req.body, ['taxId', 'pin']), {
                 headers: { ...authHeader(req), 'Content-Type': 'application/json' }
             });
+        res.status(r.status).json(r.data);
+    } catch (e) { next(e); }
+});
+
+// ── Solicitudes con aprobación y editor de planes ──
+
+const REQUEST_ACTIONS = { approve: ['pin', 'note'], reject: ['note'], cancel: [] };
+
+router.post('/requests', ...guard, async (req, res, next) => {
+    try {
+        const r = await axios.post(`${JAVA}/platform/requests`, pick(req.body, ['type', 'organizationId', 'reason', 'params']), {
+            headers: { ...authHeader(req), 'Content-Type': 'application/json' }
+        });
+        res.status(r.status).json(r.data);
+    } catch (e) { next(e); }
+});
+
+router.post('/requests/:id/:action', ...guard, async (req, res, next) => {
+    try {
+        const { id, action } = req.params;
+        if (!/^\d{1,18}$/.test(id)) return res.status(400).json({ error: 'Identificador inválido' });
+        if (!Object.prototype.hasOwnProperty.call(REQUEST_ACTIONS, action)) return res.status(404).json({ error: 'Ruta no encontrada' });
+        const r = await axios.post(`${JAVA}/platform/requests/${id}/${action}`, pick(req.body, REQUEST_ACTIONS[action]), {
+            headers: { ...authHeader(req), 'Content-Type': 'application/json' }
+        });
+        clearEntitlementCache();   // aprobar puede suspender, cambiar el plan, registrar un pago...
+        res.status(r.status).json(r.data);
+    } catch (e) { next(e); }
+});
+
+router.get('/plans', ...guard, async (req, res, next) => {
+    try {
+        const r = await axios.get(`${JAVA}/platform/plans`, { headers: authHeader(req) });
+        res.status(r.status).json(r.data);
+    } catch (e) { next(e); }
+});
+
+router.put('/plans/:code', ...guard, async (req, res, next) => {
+    try {
+        if (!/^[A-Za-z0-9_]{1,20}$/.test(req.params.code)) return res.status(400).json({ error: 'Código de plan inválido' });
+        const r = await axios.put(`${JAVA}/platform/plans/${req.params.code}`,
+            pick(req.body, ['name', 'priceMonthly', 'priceYearly', 'maxUsers', 'maxProducts', 'extraUserPrice', 'active', 'features', 'pin']), {
+                headers: { ...authHeader(req), 'Content-Type': 'application/json' }
+            });
+        clearEntitlementCache();   // los límites y funciones nuevos aplican de inmediato
         res.status(r.status).json(r.data);
     } catch (e) { next(e); }
 });
