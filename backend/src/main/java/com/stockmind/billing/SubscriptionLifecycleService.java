@@ -114,27 +114,29 @@ public class SubscriptionLifecycleService {
     private void reminders(Subscription s, LocalDateTime endsAt, LocalDateTime now, BillingNotice kind) {
         int daysLeft = (int) Math.max(0, Math.ceil(Duration.between(now, endsAt).toMinutes() / (60.0 * 24)));
         boolean changed = false;
-        if (daysLeft <= 5 && s.getReminder5dSentAt() == null) {
-            notify(s, kind, daysLeft);
+        // El aviso se marca como enviado SOLO si salió: si el proveedor falla, la próxima corrida lo reintenta
+        if (daysLeft <= 5 && s.getReminder5dSentAt() == null && notify(s, kind, daysLeft)) {
             s.setReminder5dSentAt(now);
             changed = true;
         }
-        if (daysLeft <= 1 && s.getReminder1dSentAt() == null) {
-            notify(s, kind, daysLeft);
+        if (daysLeft <= 1 && s.getReminder1dSentAt() == null && notify(s, kind, daysLeft)) {
             s.setReminder1dSentAt(now);
             changed = true;
         }
         if (changed) subscriptionRepository.save(s);
     }
 
-    private void notify(Subscription s, BillingNotice kind, int daysLeft) {
-        organizationRepository.findById(s.getOrganizationId()).ifPresent(org -> {
+    /** Intenta enviar el aviso; devuelve false si falló (se registra el error y no se rompe el ciclo). */
+    private boolean notify(Subscription s, BillingNotice kind, int daysLeft) {
+        return organizationRepository.findById(s.getOrganizationId()).map(org -> {
             try {
                 emailSender.sendBillingNotice(org.getContactEmail(), org.getName(), kind, daysLeft,
                     publicUrl.replaceAll("/+$", "") + "/billing");
+                return true;
             } catch (Exception e) {
-                log.error("No se pudo enviar el aviso {} a la empresa {}", kind, org.getId(), e);
+                log.error("No se pudo enviar el aviso {} a la empresa {}: {}", kind, org.getId(), e.getMessage());
+                return false;
             }
-        });
+        }).orElse(false);
     }
 }

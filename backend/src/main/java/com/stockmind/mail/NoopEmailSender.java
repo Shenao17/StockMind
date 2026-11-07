@@ -1,6 +1,7 @@
 package com.stockmind.mail;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @Profile("!dev")
+@ConditionalOnExpression("'${stockmind.mail.provider:}' != 'resend'")
 public class NoopEmailSender implements EmailSender {
 
     @Override
@@ -21,5 +23,15 @@ public class NoopEmailSender implements EmailSender {
     @Override
     public void sendBillingNotice(String toEmail, String recipientName, BillingNotice kind, int daysLeft, String billingUrl) {
         log.error("No hay proveedor de correo configurado: NO se envió el aviso {} a {}", kind, toEmail);
+    }
+
+    @Override
+    public void sendTestEmail(String toEmail) {
+        throw new IllegalStateException("No hay proveedor de correo configurado");
+    }
+
+    @Override
+    public String provider() {
+        return "none";
     }
 }

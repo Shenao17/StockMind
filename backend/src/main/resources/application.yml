@@ -38,6 +38,14 @@ stockmind:
     cache-seconds: 30         # caché del estado de la suscripción (ver EntitlementService)
     cron: "0 0 6 * * *"       # ciclo diario: avisos y cambios de estado
     scheduler-enabled: true
+  mail:
+    # resend = correo real con Resend; vacío = sin proveedor (en dev solo se escribe el enlace en el log)
+    provider: ${STOCKMIND_EMAIL_PROVIDER:}
+    from: ${EMAIL_FROM:}              # "StockMind <no-responder@tu-dominio.com>" (dominio verificado en Resend)
+    reply-to: ${EMAIL_REPLY_TO:}      # opcional
+    timeout-seconds: 10
+    resend:
+      api-key: ${RESEND_API_KEY:}
   payments:
     # simulated = pasarela de pruebas (solo desarrollo/demos). Sin valor, los cobros responden 503.
     provider: ${STOCKMIND_PAYMENTS_PROVIDER:}

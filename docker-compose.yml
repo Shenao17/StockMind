@@ -40,6 +40,11 @@ services:
       PLATFORM_ADMIN_PASSWORD: ${PLATFORM_ADMIN_PASSWORD:-}
       PLATFORM_ADMIN_NAME: ${PLATFORM_ADMIN_NAME:-}
       STOCKMIND_MFA_KEY: ${STOCKMIND_MFA_KEY:-}
+      # Correo transaccional: 'resend' = real; vacío = sin proveedor (en dev solo se escribe el enlace en el log)
+      STOCKMIND_EMAIL_PROVIDER: ${STOCKMIND_EMAIL_PROVIDER:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      EMAIL_REPLY_TO: ${EMAIL_REPLY_TO:-}
       # Pasarela de pagos: vacío = pagos desactivados; 'simulated' solo en desarrollo (ver override)
       STOCKMIND_PAYMENTS_PROVIDER: ${STOCKMIND_PAYMENTS_PROVIDER:-}
     depends_on:

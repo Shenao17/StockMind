@@ -53,6 +53,13 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(ex.getStatus()).body(body);
     }
 
+    /** El proveedor de correo falló → 502 con su motivo (sin la llave): el dueño necesita verlo para corregir la configuración */
+    @ExceptionHandler(com.stockmind.mail.EmailDeliveryException.class)
+    public ResponseEntity<Map<String, Object>> handleEmail(com.stockmind.mail.EmailDeliveryException ex) {
+        log.warn("Fallo de correo: {}", ex.getMessage());
+        return buildResponse(HttpStatus.BAD_GATEWAY, ex.getMessage());
+    }
+
     /** PIN de confirmación incorrecto o bloqueado → 403 con código estable (la sesión sigue vigente) */
     @ExceptionHandler(PinException.class)
     public ResponseEntity<Map<String, Object>> handlePin(PinException ex) {
