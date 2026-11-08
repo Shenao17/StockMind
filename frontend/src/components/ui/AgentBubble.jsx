@@ -575,8 +575,12 @@ const styles = `
 
     border: 2px solid #0e0e0e;
 
+    /*
+     * 3 latidos y se queda quieto. Antes era infinito: anima box-shadow (repinta cada frame)
+     * pegado al vidrio con refracción, que se recalculaba ~60 veces por segundo con la app quieta.
+     */
     animation:
-      notifPulse 2s ease-in-out infinite;
+      notifPulse 2s ease-in-out 3;
 
     z-index: 5;
   }

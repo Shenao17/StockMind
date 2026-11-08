@@ -1247,71 +1247,338 @@ select option {
    TOASTS
    ========================================================= */
 
-.toast-container {
+/*
+ * Notificaciones con StockMindGlass (<glass-element mode="lite">).
+ * Pila arriba a la derecha, debajo de la barra superior: ya no comparte esquina
+ * con el asistente. Informativas: se cierran solas. Críticas: persisten.
+ */
+.ntf-stack {
+  --ntf-w: 380px;
   position: fixed;
-
-  bottom: 24px;
+  top: 84px;
   right: 24px;
-
+  z-index: 10050;            /* sobre diálogos (1000), menú (1100) y asistente (9999) */
+  width: var(--ntf-w);
   display: flex;
-
   flex-direction: column;
-
+  align-items: stretch;
   gap: 10px;
-
-  z-index: 2000;
+  pointer-events: none;      /* solo las tarjetas reciben clics */
 }
 
-.toast {
+.ntf-item {
+  pointer-events: auto;
+  /* backwards (no both): al terminar no deja estilos aplicados ni capas de composición extra */
+  animation: ntfIn 0.26s cubic-bezier(0.2, 0.9, 0.3, 1.2) backwards;
+  transform-origin: top right;
+}
+.ntf-item.is-leaving { animation: ntfOut 0.2s ease-in forwards; }
+
+/*
+ * Superficie "esmerilada" sin backdrop-filter: casi opaca, con degradado y brillo de borde.
+ * Se pinta una vez y no se recalcula al hacer scroll ni cuando cambia lo de atrás (≈0 GPU).
+ * StockMindGlass (vidrio real) queda solo en el asistente.
+ */
+.ntf-surface,
+.ntf-panel-surface {
+  --ntf-bg: rgba(17, 23, 40, 0.97);
+  position: relative;
+  overflow: hidden;
   background:
-    rgba(20, 22, 29, 0.82);
+    linear-gradient(135deg, rgba(255, 255, 255, 0.075) 0%, rgba(255, 255, 255, 0.02) 30%, rgba(255, 255, 255, 0) 55%),
+    var(--ntf-bg);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 18px 44px rgba(0, 0, 0, 0.45);
+}
+.ntf-surface { border-radius: 18px; }
+.ntf-success .ntf-surface { --ntf-bg: rgba(15, 30, 42, 0.97); }
+.ntf-info .ntf-surface { --ntf-bg: rgba(16, 27, 52, 0.97); }
+.ntf-warning .ntf-surface { --ntf-bg: rgba(38, 30, 22, 0.97); }
+.ntf-error .ntf-surface { --ntf-bg: rgba(44, 21, 28, 0.97); }
+.ntf-critical .ntf-surface {
+  --ntf-bg: rgba(58, 20, 28, 0.97);
+  border-color: rgba(255, 128, 128, 0.42);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 0 0 4px rgba(255, 92, 92, 0.1),
+    0 22px 52px rgba(0, 0, 0, 0.5);
+}
 
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-
-  border: 1px solid var(--border);
-
-  border-radius: var(--radius);
-
-  padding: 12px 17px;
-
-  font-size: 0.86rem;
-
-  max-width: 340px;
-
+.ntf-inner {
+  width: var(--ntf-w);
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 13px 12px 0 14px;
   display: flex;
+  flex-direction: column;
+  color: var(--text);
+  font-size: 0.86rem;
+  text-align: left;
+}
+.ntf-row { display: flex; align-items: flex-start; gap: 11px; padding-bottom: 13px; }
 
+.ntf-icon {
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: flex;
   align-items: center;
+  justify-content: center;
+}
+.ntf-success .ntf-icon { background: rgba(66, 217, 232, 0.18); color: #9EF0F7; }
+.ntf-info .ntf-icon { background: rgba(57, 120, 246, 0.22); color: #B8D0FD; }
+.ntf-warning .ntf-icon { background: rgba(255, 184, 107, 0.2); color: #FFD3A1; }
+.ntf-error .ntf-icon { background: rgba(255, 92, 92, 0.2); color: #FFC2C2; }
+.ntf-critical .ntf-icon { background: rgba(255, 92, 92, 0.3); color: #FFD6D6; }
 
-  gap: 10px;
+.ntf-body { flex: 1; min-width: 0; padding-top: 1px; }
+.ntf-eyebrow {
+  display: block;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #FFB3B3;
+  margin-bottom: 2px;
+}
+.ntf-title { margin: 0; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
+.ntf-message { margin: 3px 0 0; line-height: 1.45; color: var(--text-secondary, rgba(244, 246, 252, 0.74)); overflow-wrap: anywhere; }
 
-  box-shadow: var(--shadow);
-
-  animation: slideIn 0.25s ease;
+.ntf-count {
+  align-self: center;
+  margin-left: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text);
 }
 
-.toast.success {
-  border-left: 3px solid var(--success);
+.ntf-link,
+.ntf-close,
+.ntf-primary,
+.ntf-more {
+  font: inherit;
+  cursor: pointer;
+}
+.ntf-link {
+  align-self: center;
+  border: 0;
+  background: transparent;
+  color: #9FC0FB;
+  font-weight: 600;
+  font-size: 0.8rem;
+  padding: 6px 8px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+.ntf-link:hover { background: rgba(255, 255, 255, 0.07); color: #CFE0FF; }
+
+.ntf-close {
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(244, 246, 252, 0.62);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ntf-close:hover { background: rgba(255, 255, 255, 0.1); color: var(--text); }
+
+.ntf-actions { display: flex; gap: 8px; padding: 0 0 13px 43px; }
+.ntf-primary {
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 16px;
+  min-height: 36px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  background: #FF6B6B;
+  color: #2A0606;
+}
+.ntf-primary:hover { background: #FF8585; }
+.ntf-primary-sm { min-height: 30px; padding: 5px 12px; }
+
+.ntf-link:focus-visible,
+.ntf-close:focus-visible,
+.ntf-primary:focus-visible,
+.ntf-more:focus-visible,
+.ntf-bell:focus-visible {
+  outline: 2px solid #7FA8FA;
+  outline-offset: 2px;
 }
 
-.toast.error {
-  border-left: 3px solid var(--danger);
+.ntf-progress { height: 3px; margin: 0 -12px 0 -14px; background: rgba(255, 255, 255, 0.06); }
+.ntf-progress span {
+  display: block;
+  height: 100%;
+  transform-origin: left center;
+  animation-name: ntfCountdown;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+  opacity: 0.75;
+}
+.ntf-progress span.is-paused { animation-play-state: paused; }
+.ntf-success .ntf-progress span { background: #42D9E8; }
+.ntf-info .ntf-progress span { background: #3978F6; }
+.ntf-warning .ntf-progress span { background: #FFB86B; }
+.ntf-error .ntf-progress span { background: #FF6B6B; }
+
+.ntf-more {
+  pointer-events: auto;
+  align-self: flex-end;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(17, 23, 40, 0.97);
+  color: rgba(244, 246, 252, 0.82);
+  font-size: 0.76rem;
+  padding: 6px 12px;
+  border-radius: 999px;
 }
 
-.toast.warning {
-  border-left: 3px solid var(--warning);
+@keyframes ntfIn {
+  from { opacity: 0; transform: translateY(-8px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes ntfOut {
+  to { opacity: 0; transform: translateX(16px) scale(0.97); }
+}
+@keyframes ntfCountdown {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
 }
 
-@keyframes slideIn {
-  from {
-    transform: translateX(20px);
-    opacity: 0;
+/* ── Centro de notificaciones (campana) ── */
+.ntf-center { position: relative; }
+.ntf-bell {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.ntf-bell:hover,
+.ntf-bell.is-open { background: rgba(255, 255, 255, 0.09); border-color: rgba(255, 255, 255, 0.18); }
+.ntf-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 5px;
+  box-sizing: border-box;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #FFFFFF;
+  font-size: 0.66rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--bg, #090D19);
+}
+.ntf-badge.is-critical { background: #FF5C5C; }
+.ntf-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #FF5C5C;
+  border: 2px solid var(--bg, #090D19);
+}
+
+/* Se dibuja en <body> (portal): fuera de la barra superior, que tiene backdrop-filter */
+.ntf-panel {
+  position: fixed;
+  top: 82px;
+  right: 24px;
+  z-index: 10060;
+  animation: ntfIn 0.2s ease backwards;   /* backwards: ver .ntf-item */
+}
+.ntf-panel-surface {
+  border-radius: 20px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 24px 60px rgba(0, 0, 0, 0.5);
+}
+.ntf-panel-inner {
+  width: 380px;
+  max-width: calc(100vw - 24px);
+  max-height: min(480px, 70vh);
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  color: var(--text);
+  font-size: 0.84rem;
+}
+.ntf-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 14px 10px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+.ntf-panel-title { font-weight: 700; font-size: 0.95rem; }
+.ntf-list { list-style: none; margin: 0; padding: 6px; overflow-y: auto; }
+.ntf-entry {
+  display: flex;
+  gap: 11px;
+  padding: 10px;
+  border-radius: 12px;
+}
+.ntf-entry + .ntf-entry { margin-top: 2px; }
+.ntf-entry.is-unread { background: rgba(57, 120, 246, 0.08); }
+.ntf-entry.is-pending { background: rgba(255, 92, 92, 0.1); }
+.ntf-entry .ntf-icon { flex-basis: 28px; width: 28px; height: 28px; border-radius: 9px; }
+.ntf-time { display: block; margin-top: 4px; font-size: 0.72rem; color: rgba(244, 246, 252, 0.6); }
+.ntf-entry-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+.ntf-entry-actions .ntf-link { padding-left: 4px; }
+.ntf-empty {
+  padding: 28px 22px 30px;
+  text-align: center;
+  color: rgba(244, 246, 252, 0.66);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.ntf-empty svg { color: #42D9E8; }
+.ntf-empty p { margin: 0; line-height: 1.5; }
+
+@media (max-width: 640px) {
+  .ntf-stack {
+    --ntf-w: calc(100vw - 24px);
+    top: calc(env(safe-area-inset-top, 0px) + 74px);
+    right: 12px;
+    left: 12px;
+    width: auto;
   }
+  .ntf-panel { position: fixed; top: 76px; right: 12px; left: 12px; }
+  .ntf-panel-inner { width: auto; max-width: none; }
+  .ntf-panel-surface { width: 100%; }
+}
 
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
+@media (prefers-reduced-motion: reduce) {
+  .ntf-item,
+  .ntf-item.is-leaving,
+  .ntf-panel { animation-duration: 0.01ms; }
+  /* La cuenta regresiva sigue (marca el cierre), pero sin movimiento visible */
+  .ntf-progress span { visibility: hidden; }
 }
 
 
@@ -3477,15 +3744,6 @@ select option {
     grid-template-columns: 1fr;
   }
 
-  .toast-container {
-    left: 18px;
-    right: 18px;
-    bottom: 18px;
-  }
-
-  .toast {
-    max-width: none;
-  }
 }
 
 @media (max-width: 480px) {
@@ -4566,7 +4824,6 @@ input[type="checkbox"].switch:checked::after { transform: translateX(16px); }
   .platform-layout .topbar-user { display: none; }
   .topbar .btn-ghost.btn-sm { padding-left: 12px; padding-right: 12px; }
 
-  .toast-container { left: 12px; right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); }
   .company-data { grid-template-columns: 1fr; }
   .backup-codes { grid-template-columns: 1fr 1fr; }
 }

@@ -37,6 +37,7 @@ const finite = (n, fallback) => (Number.isFinite(n) ? n : fallback);
  *  - radius: 0 … min(width, height) / 2
  *  - depth:  0 … min(width, height) / 2 - 1
  *  - strength / chromaticAberration: ≥ 0
+ *  - frost: ≥ 0 (desenfoque dentro del filtro; 0 = sin nodo de desenfoque, igual que antes)
  */
 function normalizeGeometry({
     width,
@@ -44,7 +45,8 @@ function normalizeGeometry({
     radius = 0,
     depth = 0,
     strength = 100,
-    chromaticAberration = 0
+    chromaticAberration = 0,
+    frost = 0
 }) {
     const w = Math.max(1, Math.round(finite(Number(width), 1)));
     const h = Math.max(1, Math.round(finite(Number(height), 1)));
@@ -56,12 +58,13 @@ function normalizeGeometry({
         radius: round(Math.min(Math.max(0, finite(Number(radius), 0)), half)),
         depth: round(Math.min(Math.max(0, finite(Number(depth), 0)), Math.max(0, half - 1))),
         strength: round(Math.max(0, finite(Number(strength), 100))),
-        chromaticAberration: round(Math.max(0, finite(Number(chromaticAberration), 0)))
+        chromaticAberration: round(Math.max(0, finite(Number(chromaticAberration), 0))),
+        frost: round(Math.max(0, finite(Number(frost), 0)))
     };
 }
 
 const cacheKey = (g) =>
-    `${g.width}x${g.height}|r${g.radius}|d${g.depth}|s${g.strength}|c${g.chromaticAberration}`;
+    `${g.width}x${g.height}|r${g.radius}|d${g.depth}|s${g.strength}|c${g.chromaticAberration}|f${g.frost}`;
 
 const toDataUrl = (svg) =>
     "data:image/svg+xml;utf8," + encodeURIComponent(svg.replace(/\s{2,}/g, " ").trim());
@@ -94,17 +97,24 @@ function buildMap(g) {
 }
 
 function buildFilter(g, mapUrl) {
-    const { width: w, height: h, strength: s, chromaticAberration: ca } = g;
+    const { width: w, height: h, strength: s, chromaticAberration: ca, frost: f } = g;
+    // Escarcha DENTRO del filtro: Chromium ignora un blur() de backdrop-filter cuando la lista
+    // incluye url(), así que el desenfoque tiene que vivir aquí. Se aplica antes de refractar.
+    const src = f > 0 ? "frosted" : "SourceGraphic";
+    const frostNode = f > 0
+        ? `<feGaussianBlur in="SourceGraphic" stdDeviation="${f}" edgeMode="duplicate" result="frosted"/>`
+        : "";
     const svg = `
         <svg height="${h}" width="${w}" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">
             <defs>
                 <filter id="displace" color-interpolation-filters="sRGB">
+                    ${frostNode}
                     <feImage x="0" y="0" height="${h}" width="${w}" href="${mapUrl}" result="displacementMap"/>
-                    <feDisplacementMap transform-origin="center" in="SourceGraphic" in2="displacementMap" scale="${round(s + ca * 2)}" xChannelSelector="R" yChannelSelector="G"/>
+                    <feDisplacementMap transform-origin="center" in="${src}" in2="displacementMap" scale="${round(s + ca * 2)}" xChannelSelector="R" yChannelSelector="G"/>
                     <feColorMatrix type="matrix" values="1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0" result="displacedR"/>
-                    <feDisplacementMap in="SourceGraphic" in2="displacementMap" scale="${round(s + ca)}" xChannelSelector="R" yChannelSelector="G"/>
+                    <feDisplacementMap in="${src}" in2="displacementMap" scale="${round(s + ca)}" xChannelSelector="R" yChannelSelector="G"/>
                     <feColorMatrix type="matrix" values="0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 1 0" result="displacedG"/>
-                    <feDisplacementMap in="SourceGraphic" in2="displacementMap" scale="${s}" xChannelSelector="R" yChannelSelector="G"/>
+                    <feDisplacementMap in="${src}" in2="displacementMap" scale="${s}" xChannelSelector="R" yChannelSelector="G"/>
                     <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 1 0" result="displacedB"/>
                     <feBlend in="displacedR" in2="displacedG" mode="screen"/>
                     <feBlend in2="displacedB" mode="screen"/>

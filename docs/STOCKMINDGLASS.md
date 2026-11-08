@@ -1,6 +1,6 @@
 # StockMindGlass — vidrio líquido de la interfaz
 
-**Versión:** 1.5.0 · **Código:** `frontend/src/GlassUi/` (`GlassElement.js`, `displacement.js`) · **Pruebas:** `frontend/src/test/StockMindGlass.test.js`
+**Versión:** 1.5.1 · **Código:** `frontend/src/GlassUi/` (`GlassElement.js`, `displacement.js`) · **Pruebas:** `frontend/src/test/StockMindGlass.test.js`
 
 Web Component `<glass-element>` que da el efecto de vidrio a los elementos flotantes de StockMind. Se registra solo al importarse (`main.jsx`).
 
@@ -39,7 +39,9 @@ Razones posibles en `data-glass-reason`: `auto`, `requested`, `no-svg-backdrop`,
 | `depth` | 10 | Se limita para que el mapa sea válido |
 | `strength` | 100 | Fuerza de la refracción |
 | `chromatic-aberration` | 0 | Separación de los canales RGB |
-| `blur` | 2 | `liquid` usa la mitad y `lite` el doble (mínimo 6 px) |
+| `blur` | 2 | `liquid` usa la mitad y `lite` el doble (mínimo 6 px; 16 px con `sheen`) |
+| `frost` | — | Escarcha del modo `liquid`. Va **dentro** del filtro SVG (`feGaussianBlur`), porque Chromium ignora un `blur()` de `backdrop-filter` que vaya junto a `url()` |
+| `sheen` | apagado | Brillo especular en el borde y reflejo superior: da cuerpo de vidrio |
 | `background-color` | `rgba(255,255,255,0.025)` | Tinte de la superficie |
 | `mode` | `auto` | Fuerza un modo; `liquid` sigue sujeto al soporte y al tope |
 | `interactive` | apagado | Cursor de mano, escala al presionar y más profundidad |
@@ -63,16 +65,51 @@ Razones posibles en `data-glass-reason`: `auto`, `requested`, `no-svg-backdrop`,
   ```
 - **API:** `GlassElement.version`, `.configure({ maxLiquid, debug })`, `.stats()`, `.supportsLiquid()`, `.clearCache()`. Por elemento: `el.resolvedMode` y `el.refresh()`.
 
+## Dónde se usa
+
+**Solo en el botón del asistente** (`components/ui/AgentBubble.jsx`): modo `auto` (con refracción donde se pueda) e `interactive`. `main.jsx` fija `maxLiquid: 1`: si otra instancia apareciera por error, cae sola a `lite`.
+
+**Decisión del 2026-11-08:** el vidrio consumía demasiada GPU para un software que se queda abierto todo el día en PCs de oficina. Las notificaciones y la campana usan ahora una superficie sin `backdrop-filter` (color casi opaco, degradado y brillo de borde pintados una sola vez), que casi no consume GPU. El punto rojo del asistente late 3 veces y se detiene: antes latía sin fin junto al vidrio y obligaba a recalcularlo en cada frame.
+
+### Notificaciones (sin vidrio)
+
+Motor: `hooks/useToast.js`. Se comparte por `NotificationContext` (`context/notificationState.js`) desde `App.jsx`.
+
+- **Informativas** (`success`, `info`, `warning`, `error`):
+  - Se cierran solas (4,5 / 4,5 / 6 / 7 s) con una barra de tiempo.
+  - Se pausan con el mouse encima o al enfocarlas.
+  - Las repetidas se agrupan ("×3").
+- **Críticas** (`critical`):
+  - No se cierran solas y van siempre primero, con `role="alert"` y una acción.
+  - Al ocultarlas quedan en la campana hasta que se marcan como resueltas.
+- **Ubicación:** arriba a la derecha, debajo de la barra superior (en celular, a todo lo ancho). Máximo 3 visibles; el resto aparece como "+N más".
+- **Cómo usarlas:**
+  - `showToast(mensaje, tipo)` sigue funcionando igual en todas las páginas.
+  - `showToast({ type, title, message, action: { label, href | onClick } })` para la forma completa.
+  - Fuera de React: `emitNotification({...})`.
+- **Críticas automáticas:** `api.js` lanza una crítica ante `SUBSCRIPTION_READ_ONLY` y `SUBSCRIPTION_BLOCKED`, con un botón a `/billing`. El error que repita ese mismo texto no se muestra dos veces.
+- **Errores legibles:** si el servidor responde con HTML, texto técnico o nada, `errorMessage()` lo cambia por un mensaje en español.
+- **Asistente:** la burbuja no se muestra mientras `AGENT_ENABLED=false`.
+
 ## Reglas de uso
 
 - `liquid` solo en elementos **pequeños y de tamaño fijo** (botón del asistente, tarjeta del login, selectores). En elementos que cambian de tamaño, `auto-size` regenera el mapa con cada medida nueva (queda en caché, pero cada tamaño distinto es una entrada).
 - Como máximo 2 o 3 en `liquid` en pantalla; el tope lo hace cumplir el propio componente.
 - Las animaciones van en el contenedor de afuera (`transform`, `opacity`), no en las medidas del vidrio.
 - Nada de vidrio en tablas, formularios largos ni gráficos.
+- **Backdrop root:** un contenedor con `backdrop-filter`, `filter`, `opacity < 1` o `mask` (incluida una animación de opacidad que se queda aplicada con `fill-mode: both`) corta lo que el vidrio puede ver. Con eso el vidrio solo muestra ese contenedor y parece transparente. Por eso el panel de la campana va en un portal y las animaciones de entrada usan `backwards`.
 
 ---
 
 ## Historial
+
+### 1.5.1 — 2026-11-08
+
+- **`frost`:** la escarcha del modo `liquid` va dentro del filtro SVG. Comprobado en Chromium: un `blur()` junto a `url()` en `backdrop-filter` se ignora y el texto de atrás se veía nítido.
+- **`sheen`:** brillo especular de borde y reflejo superior. En `lite` también sube el desenfoque y la saturación.
+- **Respaldo de `requestAnimationFrame`** con un temporizador de 120 ms: en pestañas ocultas el navegador pausa los frames y el vidrio no se aplicaba.
+- Notificaciones y campana dejan de usar StockMindGlass (superficie sin `backdrop-filter`, ≈0 GPU); el vidrio queda solo en el asistente (`maxLiquid: 1`).
+- El punto rojo del asistente late 3 veces en lugar de infinitamente.
 
 ### 1.5.0 — 2026-11-08
 

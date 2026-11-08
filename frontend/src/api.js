@@ -5,6 +5,8 @@
  * que la cookie viaje automáticamente; no hay nada que leer/escribir aquí.
  */
 
+import { emitNotification } from './hooks/useToast';
+
 const BASE_URL = 'http://localhost:3000/api';
 
 // ── Auth helpers ──────────────────────────────────────────
@@ -17,6 +19,45 @@ export const Auth = {
   isAdmin:    () => cachedUser?.role === 'ADMIN',
   isLoggedIn: () => !!cachedUser,
 };
+
+// ── Mensajes de error ─────────────────────────────────────
+/**
+ * Texto para el usuario. El gateway ya responde con mensajes en español ({ error });
+ * si en su lugar llega HTML, texto técnico o nada, se usa un mensaje legible según el código.
+ */
+const STATUS_MESSAGES = {
+  400: 'Revisa los datos e inténtalo de nuevo.',
+  403: 'No tienes permiso para hacer esto.',
+  404: 'No encontramos lo que buscas.',
+  409: 'Ese registro ya existe o cambió mientras lo editabas.',
+  413: 'La información enviada es demasiado grande.',
+  429: 'Demasiadas solicitudes. Espera un momento e inténtalo de nuevo.',
+};
+
+export function errorMessage(status, data) {
+  if (data && typeof data === 'object' && typeof data.error === 'string' && data.error.trim()) {
+    return data.error;
+  }
+  const looksTechnical = typeof data !== 'string' || !data.trim() || data.length > 200 || /<[a-z!/]/i.test(data);
+  if (typeof data === 'string' && !looksTechnical) return data;
+  if (STATUS_MESSAGES[status]) return STATUS_MESSAGES[status];
+  if (status >= 500) return 'El servidor tuvo un problema. Inténtalo de nuevo en unos minutos.';
+  return 'No se pudo completar la operación.';
+}
+
+// ── Avisos críticos ───────────────────────────────────────
+/** Errores que requieren acción del usuario: se muestran como notificación crítica persistente. */
+const CRITICAL_CODES = {
+  SUBSCRIPTION_READ_ONLY: { title: 'Tu plan está en solo lectura', action: { label: 'Renovar plan', href: '/billing' } },
+  SUBSCRIPTION_BLOCKED:   { title: 'Tu cuenta está suspendida',   action: { label: 'Ver mi plan', href: '/billing' } },
+};
+
+function notifyCritical(code, message) {
+  const meta = CRITICAL_CODES[code];
+  if (!meta) return;
+  // key = código: si ya hay una visible no se apila otra igual
+  emitNotification({ type: 'critical', key: code, title: meta.title, message, action: meta.action });
+}
 
 // ── Fetch base ────────────────────────────────────────────
 async function apiRequest(method, endpoint, body = null) {
@@ -57,8 +98,9 @@ async function apiRequest(method, endpoint, body = null) {
       : await response.text();
 
     if (!response.ok) {
-      const errorMsg = data?.error || data || `Error HTTP ${response.status}`;
+      const errorMsg = errorMessage(response.status, data);
       // `code` y `status` permiten distinguir p. ej. PLAN_LIMIT_REACHED o SUBSCRIPTION_READ_ONLY (402)
+      notifyCritical(data?.code, errorMsg);
       throw Object.assign(new Error(errorMsg), { code: data?.code, status: response.status });
     }
 

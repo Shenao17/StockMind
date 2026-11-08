@@ -2,7 +2,7 @@
  * ============================================================
  * StockMindGlass — Web Component <glass-element>
  * Archivo: frontend/src/GlassUi/GlassElement.js
- * Versión: v1.5.0
+ * Versión: v1.5.1
  * ============================================================
  *
  * Vidrio de StockMind en tres niveles, elegidos automáticamente:
@@ -23,6 +23,8 @@
  *   strength               Fuerza del desplazamiento
  *   chromatic-aberration   Separación de canales RGB
  *   blur                   Desenfoque base (liquid usa la mitad, lite el doble)
+ *   frost                  Escarcha del modo liquid en px (por defecto blur / 2)
+ *   sheen                  Brillo especular del borde y reflejo superior
  *   background-color       Tinte de la superficie
  *   mode                   auto | liquid | lite | solid  (por defecto auto)
  *   interactive            Activa el efecto al presionar (más profundidad + escala)
@@ -82,7 +84,7 @@ import {
 } from "./displacement.js";
 
 
-const VERSION = "1.5.0";
+const VERSION = "1.5.1";
 const TAG = "glass-element";
 const DEBUG_KEY = "stockmind:glass:debug";
 const LOG_PREFIX = `[StockMindGlass v${VERSION}]`;
@@ -100,6 +102,9 @@ const DEFAULTS = {
 
 /** Factor de profundidad al presionar (igual que v1.0.x). */
 const PRESSED_DEPTH_FACTOR = 1 / 0.7;
+
+/** Respaldo si requestAnimationFrame no llega (pestaña oculta). */
+const SCHEDULE_FALLBACK_MS = 120;
 
 const MODES = ["auto", "liquid", "lite", "solid"];
 
@@ -237,7 +242,28 @@ const TEMPLATE_CSS = `
     }
     :host([interactive]) .glass-box:active { transform: scale(0.98); }
 
+    /* sheen: brillo especular del borde y reflejo superior, encima del fondo y debajo del contenido */
+    :host([sheen]) .glass-box::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        pointer-events: none;
+        z-index: 0;
+        background:
+            linear-gradient(135deg, rgba(255, 255, 255, 0.20) 0%, rgba(255, 255, 255, 0.05) 26%, rgba(255, 255, 255, 0) 52%),
+            radial-gradient(140% 70% at 50% -20%, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 60%);
+        box-shadow:
+            inset 0 1px 0 rgba(255, 255, 255, 0.42),
+            inset 0 -1px 0 rgba(255, 255, 255, 0.08),
+            inset 1px 0 0 rgba(255, 255, 255, 0.12),
+            inset -1px 0 0 rgba(255, 255, 255, 0.06);
+    }
+    :host([sheen][data-glass-mode="solid"]) .glass-box::before { display: none; }
+
     .content {
+        position: relative;
+        z-index: 1;
         width: 100%;
         height: 100%;
         display: flex;
@@ -268,7 +294,8 @@ class GlassElement extends BaseElement {
             "width", "height", "radius", "depth", "blur", "strength",
             "chromatic-aberration", "background-color", "debug", "mode",
             "auto-size", "min-width", "min-height",
-            "responsive", "base-width", "base-height", "interactive"
+            "responsive", "base-width", "base-height", "interactive",
+            "frost", "sheen"
         ];
     }
 
@@ -316,6 +343,7 @@ class GlassElement extends BaseElement {
         this._rendered = false;
         this._pressed = false;
         this._frame = 0;
+        this._fallback = 0;
         this._applied = null;     // último estilo aplicado
         this._ready = false;
         this._observedSize = null;
@@ -345,10 +373,7 @@ class GlassElement extends BaseElement {
         this._unbindPointer();
         this._stopAutoSize();
         this._stopResponsive();
-        if (this._frame) {
-            cancelAnimationFrame(this._frame);
-            this._frame = 0;
-        }
+        this._cancelScheduled();
         // Libera su cupo de liquid para las demás
         refreshAll();
         log("debug", "Desconectado", this);
@@ -393,6 +418,14 @@ class GlassElement extends BaseElement {
 
     get blur() { return readNumber(this, "blur", DEFAULTS.blur, 0); }
     set blur(v) { this.setAttribute("blur", v); }
+
+    /** Escarcha (desenfoque en px) del modo liquid. Sin atributo: la mitad de blur, como v1.0.3. */
+    get frost() { return readNumber(this, "frost", this.blur * 0.5, 0); }
+    set frost(v) { this.setAttribute("frost", v); }
+
+    /** Brillo especular en el borde y reflejo superior (cuerpo de vidrio). */
+    get sheen() { return this.hasAttribute("sheen"); }
+    set sheen(v) { this._toggleAttr("sheen", v); }
 
     get strength() { return readNumber(this, "strength", DEFAULTS.strength, 0); }
     set strength(v) { this.setAttribute("strength", v); }
@@ -452,23 +485,32 @@ class GlassElement extends BaseElement {
 
     // ── programación de actualizaciones (una por frame) ──
 
+    /**
+     * Una actualización por frame. Con respaldo por temporizador: el navegador pausa
+     * requestAnimationFrame en pestañas ocultas, y un elemento creado ahí (p. ej. una
+     * notificación que llega en segundo plano) se quedaría sin vidrio hasta volver.
+     */
     _schedule() {
         if (this._frame || !this.isConnected) return;
-        const raf = typeof requestAnimationFrame === "function"
-            ? requestAnimationFrame
-            : (fn) => setTimeout(fn, 16);
-        this._frame = raf(() => {
-            this._frame = 0;
+        const run = () => {
+            if (!this._frame) return;
+            this._cancelScheduled();
             this._update();
-        });
+        };
+        this._frame = typeof requestAnimationFrame === "function" ? requestAnimationFrame(run) : -1;
+        this._fallback = setTimeout(run, SCHEDULE_FALLBACK_MS);
+    }
+
+    _cancelScheduled() {
+        if (this._frame > 0 && typeof cancelAnimationFrame === "function") cancelAnimationFrame(this._frame);
+        if (this._fallback) clearTimeout(this._fallback);
+        this._frame = 0;
+        this._fallback = 0;
     }
 
     /** Aplica el efecto de inmediato (útil en pruebas o tras un cambio crítico). */
     refresh() {
-        if (this._frame) {
-            cancelAnimationFrame(this._frame);
-            this._frame = 0;
-        }
+        this._cancelScheduled();
         this._update();
     }
 
@@ -613,14 +655,23 @@ class GlassElement extends BaseElement {
         }
 
         if (mode === "liquid") {
+            // Con `frost`, la escarcha va DENTRO del filtro SVG (feGaussianBlur antes de refractar):
+            // Chromium ignora un blur() de backdrop-filter cuando la lista incluye url(), y el texto
+            // de atrás se veía nítido ("transparencia"), comprobado en el navegador.
+            // Sin `frost`: blur(blur/2) url(), idéntico a v1.0.3 (blur=3 → 1.5px) para no cambiar el FAB.
+            const inFilterFrost = this.hasAttribute("frost") ? this.frost : 0;
             const { filter } = getGlassFilter({
                 width, height, radius: this.radius, depth: this.depth,
-                strength: this.strength, chromaticAberration: this.chromaticAberration
+                strength: this.strength, chromaticAberration: this.chromaticAberration,
+                frost: inFilterFrost
             });
-            // Desenfoque bajo a propósito: más blur apaga la refracción (blur=3 → 1.5px, como v1.0.3)
+            const saturate = this.sheen ? " saturate(170%)" : "";
+            const backdropFilter = inFilterFrost > 0
+                ? `url('${filter}')${saturate}`
+                : `blur(${round2(this.frost)}px) url('${filter}')${saturate}`;
             return {
                 background: bg,
-                backdropFilter: `blur(${round2(this.blur * 0.5)}px) url('${filter}')`,
+                backdropFilter,
                 border: "1px solid rgba(255, 255, 255, 0.055)",
                 boxShadow: "inset 0 0 3px rgba(255, 255, 255, 0.12)"
             };
@@ -630,7 +681,7 @@ class GlassElement extends BaseElement {
             const pressed = this._pressed ? 0.04 : 0;
             return {
                 background: `linear-gradient(180deg, rgba(255, 255, 255, ${round2(0.09 + pressed)}), rgba(255, 255, 255, 0.025)), ${bg}`,
-                backdropFilter: `blur(${round2(Math.max(this.blur * 2, 6))}px) saturate(160%)`,
+                backdropFilter: `blur(${round2(Math.max(this.blur * 2, this.sheen ? 16 : 6))}px) saturate(${this.sheen ? 180 : 160}%)`,
                 border: "1px solid rgba(255, 255, 255, 0.12)",
                 boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.18)"
             };

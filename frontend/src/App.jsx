@@ -4,6 +4,8 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { useToast } from './hooks/useToast';
 import { ToastContainer } from './components/ui/ToastContainer';
+import NotificationBell from './components/ui/NotificationBell';
+import { NotificationContext } from './context/notificationState';
 import Sidebar from './components/layout/Sidebar';
 
 import Login from './pages/Login';
@@ -81,6 +83,7 @@ function ProtectedLayout({ showToast }) {
             <span className="topbar-subtitle">{PAGE_SUBTITLES['/platform']}</span>
           </div>
           <div className="topbar-actions">
+            <NotificationBell />
             <span className="mono topbar-user" style={{ fontSize: '.8rem' }}>{user.fullName || user.email} · {PLATFORM_ROLE_LABELS[user.role]}</span>
             <button className="btn btn-ghost btn-sm" onClick={logout}>Cerrar sesión</button>
           </div>
@@ -148,6 +151,7 @@ function CompanyLayout({ showToast }) {
         <div className="topbar-actions">
           {location.pathname === '/dashboard' && <DateDisplay />}
           {topbarActions}
+          <NotificationBell />
         </div>
       </header>
 
@@ -210,20 +214,23 @@ function PredictionsTopbar() {
 
 export default function App() {
   useTableLabels();   // tablas como tarjetas en celular
-  const { toasts, showToast } = useToast();
+  const notifications = useToast();
+  const { showToast } = notifications;
 
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Login />} />
-          <Route path="/verify-email" element={<VerifyEmail />} />
-          <Route path="/pay/:reference" element={<Pay />} />
-          <Route path="/*" element={<ProtectedLayout showToast={showToast} />} />
-        </Routes>
+      <NotificationContext.Provider value={notifications}>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Login />} />
+            <Route path="/verify-email" element={<VerifyEmail />} />
+            <Route path="/pay/:reference" element={<Pay />} />
+            <Route path="/*" element={<ProtectedLayout showToast={showToast} />} />
+          </Routes>
 
-        <ToastContainer toasts={toasts} />
-      </BrowserRouter>
+          <ToastContainer />
+        </BrowserRouter>
+      </NotificationContext.Provider>
     </AuthProvider>
   );
 }

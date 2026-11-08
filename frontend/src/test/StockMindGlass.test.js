@@ -95,9 +95,9 @@ describe('StockMindGlass · <glass-element>', () => {
   it('se registra y expone su versión', () => {
     const el = mount({ width: 52, height: 52 });
     expect(customElements.get('glass-element')).toBe(GlassElement);
-    expect(GlassElement.version).toBe('1.5.0');
-    expect(el.getAttribute('data-glass-version')).toBe('1.5.0');
-    expect(window.__STOCKMIND_GLASS__.version).toBe('1.5.0');
+    expect(GlassElement.version).toBe('1.5.1');
+    expect(el.getAttribute('data-glass-version')).toBe('1.5.1');
+    expect(window.__STOCKMIND_GLASS__.version).toBe('1.5.1');
   });
 
   it('sin soporte de filtros SVG usa lite e informa la razón', () => {
@@ -114,6 +114,23 @@ describe('StockMindGlass · <glass-element>', () => {
     expect(el.resolvedMode).toBe('liquid');
     expect(el._applied.signature).toContain('blur(1.5px)');
     expect(el._applied.signature).toContain('#displace');
+  });
+
+  it('frost pone la escarcha DENTRO del filtro SVG (Chromium ignora blur() junto a url())', () => {
+    fakeBrowser();
+    const el = mount({ width: 380, height: 80, radius: 18, frost: '16', sheen: '' });
+    const sig = el._applied.signature;   // el SVG va codificado en la data URL
+    expect(sig).toContain('feGaussianBlur');
+    expect(sig).toContain(encodeURIComponent('stdDeviation="16"'));
+    // El backdrop-filter empieza por url(): ningún blur() de CSS que Chromium ignoraría
+    expect(JSON.parse(sig).backdropFilter.startsWith("url(")).toBe(true);
+    expect(el._applied.signature).toContain('saturate(170%)');
+  });
+
+  it('sin frost el filtro queda igual que antes (sin feGaussianBlur)', () => {
+    fakeBrowser();
+    const el = mount({ width: 52, height: 52, radius: 16, depth: 8, strength: 28, blur: 3 });
+    expect(el._applied.signature).not.toContain('feGaussianBlur');
   });
 
   it('Chrome en iOS no se considera compatible (usa WebKit)', () => {
