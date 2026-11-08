@@ -3,6 +3,8 @@ import { API, fmt } from '../api';
 import { useAuth } from '../context/AuthContext';
 import Modal from '../components/ui/Modal';
 import Pagination from '../components/ui/Pagination';
+import { SkeletonRegion, SkeletonTable } from '../components/ui/Skeleton';
+import ErrorState from '../components/ui/ErrorState';
 import { useDebounce } from '../hooks/useDebounce';
 
 const UNITS = ['UNIT', 'KG', 'LT', 'BOX'];
@@ -24,6 +26,7 @@ export default function Products({ showToast }) {
   const [form, setForm] = useState(emptyForm);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
 
   const debouncedSearch = useDebounce(search, 300);
   const products = data.content;
@@ -52,8 +55,9 @@ export default function Products({ showToast }) {
           return;
         }
         setData(res);
+        setFailed(false);
       } catch (e) {
-        if (!cancelled) showToast?.('Error cargando productos: ' + e.message, 'error');
+        if (!cancelled) { setFailed(true); showToast?.('Error cargando productos: ' + e.message, 'error'); }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -112,7 +116,8 @@ export default function Products({ showToast }) {
 
   const f = (k) => (e) => setForm(prev => ({ ...prev, [k]: e.target.value }));
 
-  if (loading) return <div className="loading-state"><div className="spinner" /> Cargando productos...</div>;
+  if (loading) return <SkeletonRegion label="Cargando productos"><SkeletonTable rows={7} cols={5} /></SkeletonRegion>;
+  if (failed && products.length === 0) return <ErrorState title="No pudimos cargar los productos" onRetry={reload} />;
 
   return (
     <>

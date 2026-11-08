@@ -28,6 +28,7 @@ import { isPlatformRole, PLATFORM_ROLE_LABELS } from './platformRoles';
 import { SubscriptionProvider } from './context/SubscriptionContext';
 import { useSubscription } from './context/subscriptionState';
 import PlanBanner from './components/ui/PlanBanner';
+import RouteProgress from './components/ui/RouteProgress';
 import FeatureGate from './components/ui/FeatureGate';
 import Dashboard from './pages/Dashboard';
 import Products from './pages/Products';
@@ -174,6 +175,7 @@ function CompanyLayout({ showToast }) {
 
       <main className="main-content">
         <PlanBanner />
+        <div key={location.pathname} className="page-enter">
         <Routes>
           <Route path="/billing"     element={<Billing     showToast={showToast} />} />
           <Route path="/security"    element={<Security    showToast={showToast} />} />
@@ -187,8 +189,10 @@ function CompanyLayout({ showToast }) {
           <Route path="/users"       element={<Users       showToast={showToast} />} />
           <Route path="*"            element={<Navigate to="/dashboard" replace />} />
         </Routes>
+        </div>
       </main>
 
+      <RouteProgress />
       <BottomNav onMore={() => setNavOpen(true)} />
       <AgentBubble />
     </div>

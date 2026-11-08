@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { API, fmt, fmtDate } from '../api';
 import Pagination from '../components/ui/Pagination';
+import { SkeletonRegion, SkeletonTable } from '../components/ui/Skeleton';
 
 export default function Sales({ showToast }) {
   const [view, setView] = useState('nueva');
@@ -679,10 +680,7 @@ export default function Sales({ showToast }) {
 
             {histLoading ? (
 
-              <div className="loading-state">
-                <div className="spinner" />
-                Cargando...
-              </div>
+              <SkeletonRegion label="Cargando ventas"><SkeletonTable rows={5} cols={5} title={false} /></SkeletonRegion>
 
             ) : salesHistory.length === 0 ? (
 

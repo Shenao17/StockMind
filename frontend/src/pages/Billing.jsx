@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { API, fmt, fmtDate } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useSubscription } from '../context/subscriptionState';
+import { SkeletonRegion, SkeletonCards } from '../components/ui/Skeleton';
+import ErrorState from '../components/ui/ErrorState';
 
 const STATUS_LABELS = {
   TRIAL: 'Prueba gratis',
@@ -39,9 +41,14 @@ export default function Billing({ showToast }) {
   const [payments, setPayments] = useState([]);
   const [cycle, setCycle] = useState('MONTHLY');
   const [busy, setBusy] = useState(null);
+  const [plansState, setPlansState] = useState('loading'); // loading | ok | error
+
+  const loadPlans = () => API.billing.plans()
+    .then((r) => { setPlans(r); setPlansState('ok'); })
+    .catch((e) => { setPlansState('error'); showToast?.('Error cargando planes: ' + e.message, 'error'); });
 
   useEffect(() => {
-    API.billing.plans().then(setPlans).catch((e) => showToast?.('Error cargando planes: ' + e.message, 'error'));
+    loadPlans();
     if (isAdmin()) API.billing.payments().then(setPayments).catch(() => {});
     // eslint-disable-next-line
   }, []);
@@ -101,7 +108,9 @@ export default function Billing({ showToast }) {
           </div>
         </div>
 
-        <div className="plans-grid">
+        {plansState === 'loading' && <SkeletonRegion label="Cargando planes"><SkeletonCards count={3} /></SkeletonRegion>}
+        {plansState === 'error' && <ErrorState title="No pudimos cargar los planes" onRetry={loadPlans} />}
+        <div className="plans-grid" hidden={plansState !== 'ok'}>
           {plans.map((p) => {
             const yearly = cycle === 'YEARLY';
             const net = yearly ? p.priceYearly : p.priceMonthly;

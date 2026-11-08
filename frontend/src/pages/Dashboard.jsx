@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { API, fmt, fmtDate } from '../api';
+import { SkeletonRegion, SkeletonStats, SkeletonTable } from '../components/ui/Skeleton';
+import ErrorState from '../components/ui/ErrorState';
+import CountUp from '../components/ui/CountUp';
 
 export default function Dashboard({ showToast }) {
   const [stats, setStats] = useState({ products: 0, lowStock: 0, salesToday: 0, salesTodayCount: 0, salesMonth: 0 });
   const [lowStockItems, setLowStockItems] = useState([]);
   const [recentSales, setRecentSales] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     loadDashboard();
@@ -27,14 +31,17 @@ export default function Dashboard({ showToast }) {
       });
       setLowStockItems(summary.lowStockItems || []);
       setRecentSales(summary.recentSales || []);
+      setFailed(false);
     } catch (err) {
+      setFailed(true);
       showToast?.('Error cargando el dashboard: ' + err.message, 'error');
     } finally {
       setLoading(false);
     }
   }
 
-  if (loading) return <div className="loading-state"><div className="spinner" /> Cargando...</div>;
+  if (loading) return <SkeletonRegion label="Cargando el dashboard"><SkeletonStats count={4} /><SkeletonTable rows={5} cols={4} /></SkeletonRegion>;
+  if (failed) return <ErrorState title="No pudimos cargar el dashboard" onRetry={loadDashboard} />;
 
   return (
     <>
@@ -48,22 +55,22 @@ export default function Dashboard({ showToast }) {
       <div className="stats-grid">
         <div className="stat-card">
           <div className="stat-label">Ventas hoy</div>
-          <div className="stat-value accent">{fmt(stats.salesToday)}</div>
+          <div className="stat-value accent"><CountUp value={stats.salesToday} format={fmt} /></div>
           <div className="stat-sub">{stats.salesTodayCount} transacciones</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Productos activos</div>
-          <div className="stat-value">{stats.products}</div>
+          <div className="stat-value"><CountUp value={stats.products} /></div>
           <div className="stat-sub">en catálogo</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Stock crítico</div>
-          <div className="stat-value danger">{stats.lowStock}</div>
+          <div className="stat-value danger"><CountUp value={stats.lowStock} /></div>
           <div className="stat-sub">productos bajo mínimo</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Ventas del mes</div>
-          <div className="stat-value success">{fmt(stats.salesMonth)}</div>
+          <div className="stat-value success"><CountUp value={stats.salesMonth} format={fmt} /></div>
           <div className="stat-sub">total acumulado</div>
         </div>
       </div>

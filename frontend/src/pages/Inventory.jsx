@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { SkeletonRegion, SkeletonTable } from '../components/ui/Skeleton';
+import ErrorState from '../components/ui/ErrorState';
 import { API } from '../api';
 import { useAuth } from '../context/AuthContext';
 import Modal from '../components/ui/Modal';
@@ -24,6 +26,7 @@ export default function Inventory({ showToast }) {
   const [reloadKey, setReloadKey] = useState(0);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
 
@@ -38,8 +41,9 @@ export default function Inventory({ showToast }) {
         if (cancelled) return;
         if (res.content.length === 0 && page > 0) { setPage(page - 1); return; }
         setData(res);
+        setFailed(false);
       } catch (e) {
-        if (!cancelled) showToast?.('Error cargando movimientos: ' + e.message, 'error');
+        if (!cancelled) { setFailed(true); showToast?.('Error cargando movimientos: ' + e.message, 'error'); }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -97,7 +101,9 @@ export default function Inventory({ showToast }) {
           </div>
         </div>
         {loading ? (
-          <div className="loading-state"><div className="spinner" /> Cargando...</div>
+          <SkeletonRegion label="Cargando movimientos"><SkeletonTable rows={6} cols={5} title={false} /></SkeletonRegion>
+        ) : failed && movements.length === 0 ? (
+          <ErrorState title="No pudimos cargar los movimientos" onRetry={() => setReloadKey((k) => k + 1)} />
         ) : movements.length === 0 ? (
           <div className="loading-state">Sin movimientos registrados</div>
         ) : (
