@@ -1411,6 +1411,7 @@ export default function AgentBubble() {
         {/* ── FAB / LIQUID GLASS ───────────────────────────────────── */}
         <glass-element
           className="agent-glass-toggle"
+          interactive
           width="52"
           height="52"
           radius="16"
