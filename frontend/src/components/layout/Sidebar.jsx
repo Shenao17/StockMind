@@ -1,117 +1,64 @@
-import { useEffect } from 'react';
-import { NavLink } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useSubscription } from '../../context/subscriptionState';
 import BrandLogo from '../ui/BrandLogo';
+import NavIcon from '../ui/NavIcon';
+import CommandPalette from './CommandPalette';
+import useLowStock from './useLowStock';
+import { NAV_ITEMS, ACCOUNT_ITEMS } from './navItems';
 
-const navItems = [
-  { to: '/dashboard', icon: 'dashboard', label: 'Dashboard', section: 'Principal' },
-  { to: '/products', icon: 'products', label: 'Productos' },
-  { to: '/inventory', icon: 'inventory', label: 'Inventario' },
-  { to: '/sales', icon: 'sales', label: 'Ventas' },
-  { to: '/predictions', icon: 'predictions', label: 'Predicciones', section: 'Analítica', feature: 'PREDICTIONS' },
-  { to: '/reports', icon: 'reports', label: 'Reportes', feature: 'REPORTS' },
-  { to: '/users', icon: 'users', label: 'Usuarios', section: 'Administración', adminOnly: true },
-  { to: '/billing', icon: 'billing', label: 'Plan y pagos', section: 'Cuenta' },
-  { to: '/security', icon: 'security', label: 'Seguridad' },
-];
+const TRIAL_DAYS = 14;
+const STATUS_SHORT = { ACTIVE: 'Activo', GRACE: 'En gracia', SUSPENDED: 'Suspendido', CANCELLED: 'Cancelado' };
 
-function NavIcon({ type }) {
-  const paths = {
-    security: (
-      <>
-        <path d="M12 3 5 6v5c0 4.5 2.9 8.2 7 10 4.1-1.8 7-5.5 7-10V6l-7-3Z" />
-        <path d="m9 12 2 2 4-4" />
-      </>
-    ),
-    dashboard: (
-      <>
-        <rect x="3" y="3" width="7" height="7" rx="1" />
-        <rect x="14" y="3" width="7" height="7" rx="1" />
-        <rect x="3" y="14" width="7" height="7" rx="1" />
-        <rect x="14" y="14" width="7" height="7" rx="1" />
-      </>
-    ),
-    products: (
-      <>
-        <path d="M12 3 20 7.5 12 12 4 7.5 12 3Z" />
-        <path d="m4 12 8 4.5 8-4.5" />
-        <path d="m4 16.5 8 4.5 8-4.5" />
-      </>
-    ),
-    inventory: (
-      <>
-        <path d="M4 7h16" />
-        <path d="M4 12h16" />
-        <path d="M4 17h16" />
-        <path d="M7 4v16" />
-      </>
-    ),
-    sales: (
-      <>
-        <path d="M4 19V5" />
-        <path d="M4 19h16" />
-        <path d="m7 15 3-4 3 2 5-6" />
-      </>
-    ),
-    predictions: (
-      <>
-        <path d="M4 17 9 12l3 3 8-9" />
-        <path d="M16 6h4v4" />
-        <path d="M4 20h16" />
-      </>
-    ),
-    reports: (
-      <>
-        <path d="M6 3h9l4 4v14H6V3Z" />
-        <path d="M14 3v5h5" />
-        <path d="M9 13h6" />
-        <path d="M9 17h6" />
-      </>
-    ),
-    billing: (
-      <>
-        <rect x="3" y="6" width="18" height="12" rx="2" />
-        <path d="M3 10h18" />
-        <path d="M7 15h3" />
-      </>
-    ),
-    users: (
-      <>
-        <circle cx="12" cy="8" r="3.5" />
-        <path d="M5 21c.7-4 3-6 7-6s6.3 2 7 6" />
-      </>
-    ),
-  };
-
+/** Tarjeta del plan: prueba (días y barra), plan activo o estado que pide atención. */
+function PlanCard({ onNavigate }) {
+  const { subscription: sub } = useSubscription();
+  if (!sub) return null;
+  const trial = sub.status === 'TRIAL';
+  const left = sub.trialDaysLeft ?? null;
+  const used = trial && left != null ? Math.min(100, Math.max(0, Math.round(((TRIAL_DAYS - left) / TRIAL_DAYS) * 100))) : null;
+  const bad = !trial && sub.status !== 'ACTIVE';
   return (
-    <svg
-      className="nav-icon-svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      {paths[type]}
-    </svg>
+    <div className={`sb-plan${bad ? ' sb-plan-bad' : ''}`}>
+      <div className="sb-plan-top">
+        <strong>{sub.planName || 'Plan'}</strong>
+        <span>{trial ? 'Prueba gratis' : (STATUS_SHORT[sub.status] || sub.status)}</span>
+      </div>
+      {used != null && (
+        <>
+          <div className="sb-plan-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={used} aria-label="Avance de la prueba"><i style={{ width: `${used}%` }} /></div>
+          <small>{left === 0 ? 'Tu prueba termina hoy' : `Te quedan ${left} de ${TRIAL_DAYS} días`}</small>
+        </>
+      )}
+      {(trial || bad) && (
+        <NavLink to="/billing" className="sb-plan-cta" onClick={onNavigate}>{trial ? 'Elegir mi plan' : 'Revisar mi plan'}</NavLink>
+      )}
+    </div>
   );
 }
 
 /**
  * Sidebar — Menú lateral.
- *  - Escritorio: completo (logo, etiquetas, usuario).
- *  - Tablet (769–1024 px): compacto, solo íconos (el nombre sale como ayuda al pasar el cursor).
- *  - Celular (≤ 768 px): cajón que se abre con el botón ☰ de la barra superior; se cierra con la X, tocando
+ *  - Escritorio: completo; se puede contraer a solo íconos (`collapsed`, la decide CompanyLayout).
+ *  - Tablet (769–1024 px): contraído siempre.
+ *  - Celular (≤ 768 px): cajón (se abre con "Más" de la barra inferior o ☰); se cierra con la X, tocando
  *    fuera, con Esc o al elegir una sección. `open` y `onClose` solo importan en celular.
+ *  - Plan y pagos, Seguridad y Cerrar sesión viven en el menú del usuario (abajo).
  */
-export default function Sidebar({ open = false, onClose = () => {} }) {
+export default function Sidebar({ open = false, onClose = () => {}, collapsed = false, onToggleCollapse = null }) {
   const { user, logout, isAdmin } = useAuth();
   const { hasFeature } = useSubscription();
+  const lowStock = useLowStock();
+  const { pathname } = useLocation();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const meRef = useRef(null);
 
-  // Con el cajón abierto: Esc lo cierra, no se desplaza la página de atrás y se oculta la burbuja del asistente
+  const items = useMemo(() => NAV_ITEMS.filter((i) => !i.adminOnly || isAdmin()), [isAdmin]);
+  const searchable = useMemo(() => [...items, ...ACCOUNT_ITEMS], [items]);
+
+  // Cajón abierto: Esc lo cierra, la página de atrás no se desplaza y se oculta la burbuja del asistente
   useEffect(() => {
     if (!open) return undefined;
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
@@ -123,89 +70,100 @@ export default function Sidebar({ open = false, onClose = () => {} }) {
     };
   }, [open, onClose]);
 
+  // Ctrl/Cmd + K abre el buscador
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setPaletteOpen((v) => !v); }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
+
+  // El menú del usuario se cierra al navegar, con Esc o al tocar fuera
+  useEffect(() => { setMenuOpen(false); }, [pathname]);
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const onDown = (e) => { if (meRef.current && !meRef.current.contains(e.target)) setMenuOpen(false); };
+    const onKey = (e) => { if (e.key === 'Escape') setMenuOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [menuOpen]);
+
+  const roleLabel = user?.role === 'ADMIN' ? 'Administrador' : 'Vendedor';
+
   return (
     <>
     {open && <div className="sidebar-backdrop" onClick={onClose} aria-hidden="true" />}
     <aside className={`sidebar${open ? ' sidebar-open' : ''}`} id="app-sidebar" aria-label="Navegación principal">
       <button type="button" className="sidebar-close" onClick={onClose} aria-label="Cerrar menú">✕</button>
-      <div className="sidebar-logo">
-        <div className="sidebar-brand">
 
-          <div>
-            <h1>
-              <BrandLogo height={34} className="brand-full" />
-              <BrandLogo variant="icon" height={34} alt="" className="brand-icon" />
-            </h1>
-            <span>Gestión inteligente</span>
-          </div>
-        </div>
+      <div className="sidebar-logo">
+        <h1>
+          <BrandLogo height={32} className="brand-full" />
+          <BrandLogo variant="icon" height={32} alt="" className="brand-icon" />
+        </h1>
+        {onToggleCollapse && (
+          <button type="button" className="sidebar-collapse" onClick={onToggleCollapse}
+            aria-label={collapsed ? 'Expandir menú' : 'Contraer menú'} aria-pressed={collapsed} title={collapsed ? 'Expandir menú' : 'Contraer menú'}>
+            <NavIcon type="chevron" />
+          </button>
+        )}
       </div>
 
-      <nav className="sidebar-nav">
-        {navItems.map((item) => {
-          if (item.adminOnly && !isAdmin()) return null;
+      <button type="button" className="sidebar-search" onClick={() => setPaletteOpen(true)} title="Buscar o ir a… (Ctrl K)">
+        <NavIcon type="search" />
+        <span className="nav-label">Buscar o ir a…</span>
+        <kbd>Ctrl K</kbd>
+      </button>
 
+      <nav className="sidebar-nav">
+        {items.map((item) => {
+          const locked = item.feature && !hasFeature(item.feature);
+          const alert = item.alert === 'lowStock' && lowStock > 0 ? lowStock : 0;
           return (
             <div key={item.to} className="nav-group">
-              {item.section && (
-                <span className="nav-section-label">
-                  {item.section}
-                </span>
-              )}
-
-              <NavLink
-                to={item.to}
-                title={item.label}
-                onClick={onClose}
-                className={({ isActive }) =>
-                  `nav-item${isActive ? ' active' : ''}`
-                }
-              >
-                <span className="nav-icon">
-                  <NavIcon type={item.icon} />
-                </span>
-
-                <span className="nav-label">
-                  {item.label}
-                </span>
-
-                {item.feature && !hasFeature(item.feature) && (
-                  <span className="nav-lock" title="No incluido en tu plan" aria-label="No incluido en tu plan">🔒</span>
-                )}
+              {item.section && <span className="nav-section-label">{item.section}</span>}
+              <NavLink to={item.to} title={item.label} onClick={onClose}
+                className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
+                <span className="nav-icon"><NavIcon type={item.icon} /></span>
+                <span className="nav-label">{item.label}</span>
+                {locked && <span className="nav-tag nav-tag-pro" title="No incluido en tu plan" aria-label="No incluido en tu plan"><NavIcon type="lock" />Pro</span>}
+                {alert > 0 && <span className="nav-tag nav-tag-warn" title={`${alert} producto(s) con stock crítico`} aria-label={`${alert} con stock crítico`}>{alert}</span>}
               </NavLink>
             </div>
           );
         })}
       </nav>
 
-      <div className="sidebar-user">
-        <div className="user-avatar">
-          {user?.username?.charAt(0).toUpperCase() || '?'}
-        </div>
+      <PlanCard onNavigate={onClose} />
 
-        <div className="user-info">
-          <div className="user-name">
-            {user?.username || '—'}
+      <div className="sidebar-user" ref={meRef}>
+        {menuOpen && (
+          <div className="user-menu" role="menu">
+            {ACCOUNT_ITEMS.map((i) => (
+              <NavLink key={i.to} to={i.to} role="menuitem" className="user-menu-item" onClick={() => { setMenuOpen(false); onClose(); }}>
+                <NavIcon type={i.icon} />{i.label}
+              </NavLink>
+            ))}
+            <hr />
+            <button type="button" role="menuitem" className="user-menu-item user-menu-out" onClick={logout}>
+              <NavIcon type="logout" />Cerrar sesión
+            </button>
           </div>
-
-          <div className="user-role">
-            {user?.role === 'ADMIN' ? 'Administrador' : 'Vendedor'}
-          </div>
-        </div>
-
-        <button
-          className="btn btn-ghost btn-sm btn-icon"
-          onClick={logout}
-          title="Cerrar sesión"
-          aria-label="Cerrar sesión"
-        >
-          <svg className="logout-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="m16 17 5-5-5-5" /><path d="M21 12H9" />
-          </svg>
-          <span className="logout-label">Cerrar sesión</span>
+        )}
+        <button type="button" className="user-trigger" onClick={() => setMenuOpen((v) => !v)}
+          aria-haspopup="menu" aria-expanded={menuOpen} title={`${user?.username || ''} · ${roleLabel}`}>
+          <span className="user-avatar">{user?.username?.charAt(0).toUpperCase() || '?'}</span>
+          <span className="user-info">
+            <span className="user-name">{user?.username || '—'}</span>
+            <span className="user-role">{roleLabel}</span>
+          </span>
+          <NavIcon type="more" className="user-more" />
         </button>
       </div>
     </aside>
+    <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} items={searchable} />
     </>
   );
 }

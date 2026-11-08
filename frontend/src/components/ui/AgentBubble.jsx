@@ -39,8 +39,10 @@ const styles = `
   }
 
   /* Celular: la burbuja no tapa contenido ni el menú, y el panel ocupa casi todo el ancho */
+  @media (max-width: 768px) {
+    .agent-fab { bottom: calc(86px + env(safe-area-inset-bottom)); right: 14px; }
+  }
   @media (max-width: 640px) {
-    .agent-fab { bottom: calc(14px + env(safe-area-inset-bottom)); right: 14px; }
     .agent-panel { width: calc(100vw - 28px); height: min(72dvh, 520px); }
   }
   body.nav-open .agent-fab { display: none; }

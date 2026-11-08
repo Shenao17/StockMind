@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTableLabels } from './hooks/useTableLabels';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -7,6 +7,7 @@ import { ToastContainer } from './components/ui/ToastContainer';
 import NotificationBell from './components/ui/NotificationBell';
 import { NotificationContext } from './context/notificationState';
 import Sidebar from './components/layout/Sidebar';
+import BottomNav from './components/layout/BottomNav';
 
 import Login from './pages/Login';
 import VerifyEmail from './pages/VerifyEmail';
@@ -119,6 +120,21 @@ function CompanyLayout({ showToast }) {
   const [navOpen, setNavOpen] = useState(false);          // cajón del menú (solo celular)
   const closeNav = useCallback(() => setNavOpen(false), []);
 
+  // Menú contraído (solo íconos): lo elige la persona en escritorio y se recuerda; en tablet siempre va contraído
+  const [pref, setPref] = useState(() => { try { return localStorage.getItem('sm.nav.collapsed') === '1'; } catch { return false; } });
+  const [tablet, setTablet] = useState(() => window.matchMedia('(min-width: 769px) and (max-width: 1024px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 769px) and (max-width: 1024px)');
+    const on = (e) => setTablet(e.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  const toggleCollapsed = useCallback(() => setPref((v) => {
+    try { localStorage.setItem('sm.nav.collapsed', v ? '0' : '1'); } catch { /* sin almacenamiento */ }
+    return !v;
+  }), []);
+  const collapsed = pref || tablet;
+
   const title = PAGE_TITLES[location.pathname] || 'StockMind';
   const subtitle = PAGE_SUBTITLES[location.pathname] || 'Gestión inteligente de inventario';
 
@@ -131,11 +147,12 @@ function CompanyLayout({ showToast }) {
   }[location.pathname];
 
   return (
-    <div className="app-layout">
-      <Sidebar open={navOpen} onClose={closeNav} />
+    <div className={`app-layout${collapsed ? ' nav-collapsed' : ''}`}>
+      <Sidebar open={navOpen} onClose={closeNav} collapsed={collapsed} onToggleCollapse={tablet ? null : toggleCollapsed} />
 
       <header className="topbar">
         <div className="topbar-start">
+          <BrandLogo variant="icon" tone="white" height={30} alt="StockMind" className="topbar-mark" />
           <button type="button" className="nav-toggle" onClick={() => setNavOpen(true)}
             aria-label="Abrir menú" aria-expanded={navOpen} aria-controls="app-sidebar">
             <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
@@ -172,6 +189,7 @@ function CompanyLayout({ showToast }) {
         </Routes>
       </main>
 
+      <BottomNav onMore={() => setNavOpen(true)} />
       <AgentBubble />
     </div>
   );

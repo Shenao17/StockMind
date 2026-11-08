@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { API } from '../api';
 import { useAuth } from '../context/AuthContext';
+import NavIcon from './ui/NavIcon';
 
 /** PlatformNav — Navegación del panel de plataforma; solo muestra lo que el rol puede ver. */
 export default function PlatformNav() {
@@ -29,20 +30,20 @@ export default function PlatformNav() {
     return () => { cancelled = true; };
   }, [reviewer, location.pathname, tick]);
   const items = [
-    { to: '/platform', label: 'Resumen', end: true, show: true },
-    { to: '/platform/companies', label: 'Empresas', show: true },
-    { to: '/platform/payments', label: 'Cobros', show: can('PAYMENT_VIEW') },
-    { to: '/platform/requests', label: 'Solicitudes', show: can('REQUEST_CREATE') || reviewer, badge: pending },
-    { to: '/platform/audit', label: 'Auditoría', show: can('AUDIT_VIEW') },
-    { to: '/platform/plans', label: 'Planes', show: can('PLANS_MANAGE') },
-    { to: '/platform/team', label: 'Equipo', show: can('TEAM_MANAGE') },
+    { to: '/platform', icon: 'dashboard', label: 'Resumen', end: true, show: true },
+    { to: '/platform/companies', icon: 'building', label: 'Empresas', show: true },
+    { to: '/platform/payments', icon: 'money', label: 'Cobros', show: can('PAYMENT_VIEW') },
+    { to: '/platform/requests', icon: 'inbox', label: 'Solicitudes', show: can('REQUEST_CREATE') || reviewer, badge: pending },
+    { to: '/platform/audit', icon: 'audit', label: 'Auditoría', show: can('AUDIT_VIEW') },
+    { to: '/platform/plans', icon: 'tag', label: 'Planes', show: can('PLANS_MANAGE') },
+    { to: '/platform/team', icon: 'team', label: 'Equipo', show: can('TEAM_MANAGE') },
   ].filter((i) => i.show);
 
   return (
     <nav className="platform-tabs" aria-label="Secciones del panel">
       {items.map((i) => (
         <NavLink key={i.to} to={i.to} end={i.end}
-          className={({ isActive }) => `btn btn-ghost btn-sm${isActive ? ' active' : ''}`}>{i.label}{i.badge > 0 && <span className="nav-badge" aria-label={`${i.badge} pendientes`}>{i.badge}</span>}</NavLink>
+          className={({ isActive }) => `ptab${isActive ? ' active' : ''}`}><NavIcon type={i.icon} className="ptab-icon" />{i.label}{i.badge > 0 && <span className="nav-badge" aria-label={`${i.badge} pendientes`}>{i.badge}</span>}</NavLink>
       ))}
     </nav>
   );

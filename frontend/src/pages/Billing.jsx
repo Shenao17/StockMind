@@ -96,8 +96,8 @@ export default function Billing({ showToast }) {
         <div className="table-header">
           <h2>Planes</h2>
           <div className="cycle-toggle" role="group" aria-label="Ciclo de cobro">
-            <button className={`btn btn-sm ${cycle === 'MONTHLY' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setCycle('MONTHLY')}>Mensual</button>
-            <button className={`btn btn-sm ${cycle === 'YEARLY' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setCycle('YEARLY')}>Anual · 2 meses gratis</button>
+            <button type="button" className={cycle === 'MONTHLY' ? 'active' : ''} aria-pressed={cycle === 'MONTHLY'} onClick={() => setCycle('MONTHLY')}>Mensual</button>
+            <button type="button" className={cycle === 'YEARLY' ? 'active' : ''} aria-pressed={cycle === 'YEARLY'} onClick={() => setCycle('YEARLY')}>Anual<small>2 meses gratis</small></button>
           </div>
         </div>
 
